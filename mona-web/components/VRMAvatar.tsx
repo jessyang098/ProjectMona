@@ -1,0 +1,376 @@
+"use client";
+
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useLoader } from "@react-three/fiber";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
+import type { EmotionData } from "@/types/chat";
+import * as THREE from "three";
+import { LipSyncManager } from "@/lib/animation";
+
+type BlendShapeName = Parameters<NonNullable<NonNullable<VRM["blendShapeProxy"]>["setValue"]>>[0];
+
+// Procedural animation configuration
+const ANIMATION_CONFIG = {
+  // Blinking behavior
+  blink: {
+    minInterval: 0.5,
+    maxInterval: 3.0,
+    speed: 8.0,
+    duration: 0.1,
+  },
+  // Head movement ranges and timing
+  head: {
+    nodRange: 0.2,
+    turnRange: 0.13,
+    tiltRange: 0.15,
+    changeFrequency: 1.8,
+    smoothingFactor: 0.02,
+  },
+  // Torso movement for breathing effect
+  torso: {
+    swayRange: 0.1,
+    changeFrequency: 2.8,
+    smoothingFactor: 0.01,
+  },
+  // Arm positions to fix T-pose
+  arms: {
+    leftRotationZ: -1.2,
+    rightRotationZ: 1.2,
+  },
+} as const;
+
+const emotionToBlendshape: Record<string, BlendShapeName> = {
+  happy: "Joy",
+  excited: "Fun",
+  content: "Joy",
+  curious: "Aa",
+  surprised: "Surprised",
+  concerned: "Sorrow",
+  sad: "Sorrow",
+  embarrassed: "Blink",
+  affectionate: "Joy",
+  neutral: "Neutral",
+};
+
+const emotionToExpression: Record<string, string> = {
+  happy: "happy",
+  excited: "happy",
+  content: "relaxed",
+  curious: "surprised",
+  surprised: "surprised",
+  concerned: "sad",
+  sad: "sad",
+  embarrassed: "shy",
+  affectionate: "relaxed",
+  neutral: "neutral",
+};
+
+interface VRMAvatarProps {
+  url: string;
+  emotion: EmotionData | null;
+  audioUrl?: string | null;
+}
+
+export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
+  console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl);
+
+  const groupRef = useRef<THREE.Group>(null);
+  const hipsRef = useRef<THREE.Object3D | null>(null);
+  const chestRef = useRef<THREE.Object3D | null>(null);
+  const headRef = useRef<THREE.Object3D | null>(null);
+  const neckRef = useRef<THREE.Object3D | null>(null);
+  const spineRef = useRef<THREE.Object3D | null>(null);
+  const leftUpperArmRef = useRef<THREE.Object3D | null>(null);
+  const rightUpperArmRef = useRef<THREE.Object3D | null>(null);
+  const lipSyncRef = useRef<LipSyncManager | null>(null);
+  const currentAudioRef = useRef<string | null>(null);
+
+  const baseRotations = useRef({
+    hips: new THREE.Euler(),
+    chest: new THREE.Euler(),
+    head: new THREE.Euler(),
+    leftUpperArm: new THREE.Euler(),
+    rightUpperArm: new THREE.Euler(),
+  });
+
+  // Animation state for procedural idle behaviors
+  const animationState = useRef({
+    head: {
+      timer: 0,
+      nextChange: 0,
+      targetRotation: { x: 0, y: 0, z: 0 },
+      currentRotation: { x: 0, y: 0, z: 0 },
+    },
+    torso: {
+      timer: 0,
+      nextChange: 0,
+      targetRotation: { x: 0 },
+      currentRotation: { x: 0 },
+    },
+    eyes: {
+      timer: 0,
+      nextBlink: 0,
+      blinkAmount: 0,
+    },
+  });
+  const gltf = useLoader(
+    GLTFLoader,
+    url,
+    (loader) => loader.register((parser) => new VRMLoaderPlugin(parser))
+  );
+
+  const vrm = useMemo(() => gltf.userData.vrm as VRM | undefined, [gltf]);
+
+  useEffect(() => {
+    if (!vrm || !groupRef.current) return;
+    const group = groupRef.current;
+    group.add(vrm.scene);
+    vrm.scene.rotation.y = 0;
+    vrm.scene.scale.setScalar(1.05);
+    vrm.scene.position.set(0, 0, 0);
+    vrm.scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        if (mesh.material && "toneMapped" in mesh.material) {
+          (mesh.material as THREE.Material & { toneMapped?: boolean }).toneMapped = true;
+        }
+      }
+    });
+
+    const humanoid = vrm.humanoid;
+
+    // Get all bones we need
+    hipsRef.current = humanoid?.getNormalizedBoneNode("hips") ?? null;
+    chestRef.current = humanoid?.getNormalizedBoneNode("chest") ?? null;
+    headRef.current = humanoid?.getNormalizedBoneNode("head") ?? null;
+    neckRef.current = humanoid?.getNormalizedBoneNode("neck") ?? null;
+    spineRef.current = humanoid?.getNormalizedBoneNode("spine") ?? null;
+    leftUpperArmRef.current = humanoid?.getNormalizedBoneNode("leftUpperArm") ?? null;
+    rightUpperArmRef.current = humanoid?.getNormalizedBoneNode("rightUpperArm") ?? null;
+
+    console.log("VRM Bone References:", {
+      hips: hipsRef.current?.name,
+      chest: chestRef.current?.name,
+      head: headRef.current?.name,
+      neck: neckRef.current?.name,
+      spine: spineRef.current?.name,
+      leftUpperArm: leftUpperArmRef.current?.name,
+      rightUpperArm: rightUpperArmRef.current?.name,
+    });
+
+    // If bones not found, try alternative bone names
+    if (!hipsRef.current) {
+      console.warn("Hips bone not found via getNormalizedBoneNode, searching scene...");
+      vrm.scene.traverse((obj) => {
+        const name = obj.name.toLowerCase();
+        if (!hipsRef.current && (name.includes("hips") || name.includes("pelvis"))) {
+          hipsRef.current = obj;
+          console.log("Found hips via traverse:", obj.name);
+        }
+        if (!chestRef.current && (name.includes("chest") || name.includes("spine") || name.includes("upper"))) {
+          chestRef.current = obj;
+          console.log("Found chest via traverse:", obj.name);
+        }
+        if (!headRef.current && name.includes("head")) {
+          headRef.current = obj;
+          console.log("Found head via traverse:", obj.name);
+        }
+      });
+    }
+
+    // Store base rotations
+    if (hipsRef.current) baseRotations.current.hips.copy(hipsRef.current.rotation);
+    if (chestRef.current) baseRotations.current.chest.copy(chestRef.current.rotation);
+    if (headRef.current) baseRotations.current.head.copy(headRef.current.rotation);
+
+    // Fix T-pose by rotating arms to resting position
+    if (leftUpperArmRef.current) {
+      baseRotations.current.leftUpperArm.copy(leftUpperArmRef.current.rotation);
+      leftUpperArmRef.current.rotation.z = ANIMATION_CONFIG.arms.leftRotationZ;
+    }
+    if (rightUpperArmRef.current) {
+      baseRotations.current.rightUpperArm.copy(rightUpperArmRef.current.rotation);
+      rightUpperArmRef.current.rotation.z = ANIMATION_CONFIG.arms.rightRotationZ;
+    }
+
+    return () => {
+      group.remove(vrm.scene);
+      if (typeof vrm.dispose === "function") {
+        vrm.dispose();
+      }
+    };
+  }, [vrm]);
+
+  useEffect(() => {
+    if (!vrm) return;
+    const intensity = emotion
+      ? emotion.intensity === "high"
+        ? 1
+        : emotion.intensity === "medium"
+        ? 0.6
+        : 0.3
+      : 0;
+
+    const proxy = vrm.blendShapeProxy;
+    if (proxy) {
+      const presets = Array.from(new Set(Object.values(emotionToBlendshape)));
+      presets.forEach((preset) => proxy.setValue(preset, 0));
+      const preset = emotion ? emotionToBlendshape[emotion.emotion] ?? "Neutral" : "Neutral";
+      proxy.setValue(preset, intensity);
+    }
+
+    const expressionManager = (vrm as VRM & { expressionManager?: { setValue: (name: string, weight: number) => void } })
+      .expressionManager;
+    if (expressionManager) {
+      const names = Array.from(new Set(Object.values(emotionToExpression)));
+      names.forEach((name) => expressionManager.setValue(name, 0));
+      const expressionName = emotion ? emotionToExpression[emotion.emotion] ?? "neutral" : "neutral";
+      expressionManager.setValue(expressionName, intensity);
+    }
+  }, [emotion, vrm]);
+
+  // Handle audio playback with lip sync
+  useEffect(() => {
+    console.log("🎤 Audio URL useEffect triggered!");
+    console.log("  - audioUrl:", audioUrl);
+    console.log("  - vrm loaded:", !!vrm);
+    console.log("  - currentAudioRef:", currentAudioRef.current);
+
+    if (!vrm) {
+      console.warn("⚠️ VRM not loaded yet, skipping audio");
+      return;
+    }
+
+    // Log available expressions
+    console.log("🎭 Available VRM systems:");
+    console.log("  - expressionManager:", !!vrm.expressionManager);
+
+    if (!audioUrl) {
+      console.log("ℹ️ No audio URL provided");
+      return;
+    }
+
+    // Skip if already playing this audio
+    if (currentAudioRef.current === audioUrl) {
+      console.log("⏭️ Already playing this audio, skipping");
+      return;
+    }
+
+    console.log("▶️ Setting up new audio:", audioUrl);
+    currentAudioRef.current = audioUrl;
+
+    const setupLipSync = async () => {
+      try {
+        // Create or reuse LipSyncManager
+        if (!lipSyncRef.current) {
+          console.log("📦 Creating new LipSyncManager");
+          lipSyncRef.current = new LipSyncManager(vrm, {
+            smoothingFactor: 0.3,
+            amplitudeScale: 15.0, // Tuned for visible lip movement
+            amplitudeThreshold: 0.001, // Lower threshold to trigger more easily
+          });
+        }
+
+        console.log("🔊 Loading audio from:", audioUrl);
+        // Setup and play audio
+        await lipSyncRef.current.setupAudio(audioUrl);
+        console.log("✅ Audio loaded, starting playback");
+        await lipSyncRef.current.play();
+        console.log("✓ Playing audio with lip sync:", audioUrl);
+      } catch (error) {
+        console.error("❌ Failed to play audio:", error);
+      }
+    };
+
+    setupLipSync();
+
+    return () => {
+      // Cleanup on audio change
+      console.log("🧹 Cleaning up previous audio");
+      lipSyncRef.current?.pause();
+      lipSyncRef.current?.resetMouth();
+    };
+  }, [audioUrl, vrm]);
+
+  useFrame((_, delta) => {
+    if (!vrm) return;
+
+    // Update VRM system
+    vrm.update(delta);
+    const expressionManager = (vrm as VRM & { expressionManager?: { update?: (delta: number) => void } }).expressionManager;
+    expressionManager?.update?.(delta);
+
+    // Update lip sync if audio is playing
+    if (lipSyncRef.current) {
+      lipSyncRef.current.update();
+    }
+
+    const anim = animationState.current;
+    const cfg = ANIMATION_CONFIG;
+    const randomInRange = (min: number, max: number) => min + Math.random() * (max - min);
+
+    // Procedural blinking animation
+    anim.eyes.timer += delta;
+    if (anim.eyes.timer > anim.eyes.nextBlink) {
+      anim.eyes.timer = 0;
+      anim.eyes.nextBlink = randomInRange(cfg.blink.minInterval, cfg.blink.maxInterval);
+    }
+
+    const blinkPhase = anim.eyes.timer < cfg.blink.duration ? delta : -delta;
+    anim.eyes.blinkAmount += blinkPhase * cfg.blink.speed;
+    anim.eyes.blinkAmount = Math.max(0, Math.min(1, anim.eyes.blinkAmount));
+
+    if (expressionManager) {
+      expressionManager.setValue('blink', anim.eyes.blinkAmount);
+      expressionManager.setValue('neutral', 1.0);
+    }
+
+    // Keep arms in resting position
+    if (leftUpperArmRef.current) leftUpperArmRef.current.rotation.z = cfg.arms.leftRotationZ;
+    if (rightUpperArmRef.current) rightUpperArmRef.current.rotation.z = cfg.arms.rightRotationZ;
+
+    // Procedural head movement for natural idle behavior
+    anim.head.timer += delta;
+    if (anim.head.timer > cfg.head.changeFrequency) {
+      anim.head.targetRotation.x = randomInRange(-cfg.head.nodRange, cfg.head.nodRange);
+      anim.head.targetRotation.y = randomInRange(-cfg.head.turnRange, cfg.head.turnRange);
+      anim.head.targetRotation.z = randomInRange(-cfg.head.tiltRange, cfg.head.tiltRange);
+      anim.head.timer = 0;
+    }
+
+    // Smooth interpolation toward target
+    anim.head.currentRotation.x += (anim.head.targetRotation.x - anim.head.currentRotation.x) * cfg.head.smoothingFactor;
+    anim.head.currentRotation.y += (anim.head.targetRotation.y - anim.head.currentRotation.y) * cfg.head.smoothingFactor;
+    anim.head.currentRotation.z += (anim.head.targetRotation.z - anim.head.currentRotation.z) * cfg.head.smoothingFactor;
+
+    if (neckRef.current) {
+      neckRef.current.rotation.set(
+        anim.head.currentRotation.x,
+        anim.head.currentRotation.y,
+        anim.head.currentRotation.z
+      );
+    }
+
+    // Procedural torso sway for breathing effect
+    anim.torso.timer += delta;
+    if (anim.torso.timer > cfg.torso.changeFrequency) {
+      anim.torso.targetRotation.x = randomInRange(-cfg.torso.swayRange, cfg.torso.swayRange);
+      anim.torso.timer = 0;
+    }
+
+    anim.torso.currentRotation.x += (anim.torso.targetRotation.x - anim.torso.currentRotation.x) * cfg.torso.smoothingFactor;
+
+    if (spineRef.current) {
+      spineRef.current.rotation.x = anim.torso.currentRotation.x;
+    }
+  });
+
+  if (!vrm) {
+    return null;
+  }
+
+  return <group ref={groupRef} />;
+}

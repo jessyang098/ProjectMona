@@ -1,0 +1,110 @@
+import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { VRM } from "@pixiv/three-vrm";
+import { MIXAMO_TO_VRM_BONE_MAP } from "./mixamoRigMap";
+
+/**
+ * Loads a Mixamo animation file (FBX format) and retargets it for use with VRM avatars.
+ *
+ * @param url - URL or path to the Mixamo FBX animation file
+ * @param vrm - Target VRM avatar instance
+ * @returns Promise resolving to a VRM-compatible AnimationClip
+ */
+export async function loadMixamoAnimation(
+  url: string,
+  vrm: VRM
+): Promise<THREE.AnimationClip> {
+  const fbxLoader = new FBXLoader();
+
+  const animationAsset = await fbxLoader.loadAsync(url);
+
+  // Extract the animation clip from the loaded FBX
+  const sourceClip = THREE.AnimationClip.findByName(
+    animationAsset.animations,
+    "mixamo.com"
+  );
+
+  if (!sourceClip) {
+    throw new Error(`No animation found in ${url}`);
+  }
+
+  // Calculate height scale factor between Mixamo rig and VRM avatar
+  const mixamoHipsNode = animationAsset.getObjectByName("mixamorigHips");
+  if (!mixamoHipsNode) {
+    throw new Error("Mixamo rig not found - missing 'mixamorigHips' node");
+  }
+
+  const mixamoHipsHeight = mixamoHipsNode.position.y;
+  const vrmHipsHeight = vrm.humanoid.normalizedRestPose.hips.position[1];
+  const heightScale = vrmHipsHeight / mixamoHipsHeight;
+
+  // Convert tracks to VRM bone space
+  const vrmTracks: THREE.KeyframeTrack[] = [];
+
+  const restRotationInverse = new THREE.Quaternion();
+  const parentRestWorldRotation = new THREE.Quaternion();
+  const workQuaternion = new THREE.Quaternion();
+
+  for (const track of sourceClip.tracks) {
+    const [mixamoBoneName, propertyName] = track.name.split(".");
+
+    // Map Mixamo bone to VRM bone
+    const vrmBoneName = MIXAMO_TO_VRM_BONE_MAP[mixamoBoneName];
+    if (!vrmBoneName) continue;
+
+    const vrmBoneNode = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName);
+    if (!vrmBoneNode) continue;
+
+    const mixamoBoneNode = animationAsset.getObjectByName(mixamoBoneName);
+    if (!mixamoBoneNode) continue;
+
+    // Store rest pose rotations for retargeting
+    mixamoBoneNode.getWorldQuaternion(restRotationInverse).invert();
+    mixamoBoneNode.parent?.getWorldQuaternion(parentRestWorldRotation);
+
+    if (track instanceof THREE.QuaternionKeyframeTrack) {
+      // Retarget rotation keyframes
+      const retargetedValues = new Float32Array(track.values.length);
+
+      for (let i = 0; i < track.values.length; i += 4) {
+        workQuaternion.fromArray(track.values, i);
+
+        // Apply retargeting: parent rest rotation * track rotation * inverse rest rotation
+        workQuaternion
+          .premultiply(parentRestWorldRotation)
+          .multiply(restRotationInverse);
+
+        workQuaternion.toArray(retargetedValues, i);
+      }
+
+      // Handle VRM 0.x coordinate system flip
+      const finalValues = vrm.meta?.metaVersion === "0"
+        ? retargetedValues.map((v, i) => (i % 4 === 0 ? -v : v))
+        : retargetedValues;
+
+      vrmTracks.push(
+        new THREE.QuaternionKeyframeTrack(
+          `${vrmBoneNode.name}.${propertyName}`,
+          track.times,
+          finalValues
+        )
+      );
+    } else if (track instanceof THREE.VectorKeyframeTrack) {
+      // Retarget position keyframes (primarily for hips)
+      const scaledValues = track.values.map((value, index) => {
+        const shouldFlip = vrm.meta?.metaVersion === "0" && index % 3 !== 1;
+        return (shouldFlip ? -value : value) * heightScale;
+      });
+
+      vrmTracks.push(
+        new THREE.VectorKeyframeTrack(
+          `${vrmBoneNode.name}.${propertyName}`,
+          track.times,
+          scaledValues
+        )
+      );
+    }
+  }
+
+  return new THREE.AnimationClip("gesture", sourceClip.duration, vrmTracks);
+}
