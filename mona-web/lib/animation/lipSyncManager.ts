@@ -1,0 +1,320 @@
+import { VRM } from "@pixiv/three-vrm";
+
+/**
+ * Configuration for lip sync behavior
+ */
+export interface LipSyncConfig {
+  /** Smoothing factor for animation transitions (0-1) */
+  smoothingFactor: number;
+  /** Minimum amplitude threshold to trigger mouth movement */
+  amplitudeThreshold: number;
+  /** Multiplier for mouth opening intensity */
+  amplitudeScale: number;
+  /** Spectral centroid thresholds for phoneme classification */
+  centroidThresholds: {
+    wide: number; // ee sound
+    ih: number; // ih sound
+    oh: number; // oh sound
+  };
+}
+
+const DEFAULT_CONFIG: LipSyncConfig = {
+  smoothingFactor: 0.15, // Faster response to changes
+  amplitudeThreshold: 0.001, // Lowered to trigger on quieter sounds
+  amplitudeScale: 15.0, // Significantly increased for more visible mouth movement
+  centroidThresholds: {
+    wide: 0.65, // Adjusted for better vowel detection
+    ih: 0.45,
+    oh: 0.25,
+  },
+};
+
+type PhonemeValues = {
+  aa: number;
+  ee: number;
+  ih: number;
+  oh: number;
+  ou: number;
+};
+
+/**
+ * Manages real-time lip sync animation based on audio analysis.
+ * Uses amplitude and spectral centroid to estimate phoneme shapes.
+ */
+export class LipSyncManager {
+  private vrm: VRM;
+  private config: LipSyncConfig;
+  private audioElement: HTMLAudioElement | null = null;
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private timeDomainBuffer: Uint8Array | null = null;
+  private frequencyBuffer: Uint8Array | null = null;
+  private previousPhonemeValues: PhonemeValues = {
+    aa: 0,
+    ee: 0,
+    ih: 0,
+    oh: 0,
+    ou: 0,
+  };
+
+  constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
+    this.vrm = vrm;
+    this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * Update lip sync configuration at runtime
+   */
+  updateConfig(newConfig: Partial<LipSyncConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Initialize audio analysis for the given audio URL
+   */
+  async setupAudio(audioUrl: string): Promise<void> {
+    console.log("🎵 LipSyncManager.setupAudio called with:", audioUrl);
+
+    this.audioElement = new Audio(audioUrl);
+    this.audioElement.crossOrigin = "anonymous"; // Enable CORS for Web Audio API
+    console.log("🎵 Audio element created");
+
+    // Wait for audio to be ready
+    await new Promise<void>((resolve, reject) => {
+      if (!this.audioElement) {
+        console.error("❌ Audio element not created");
+        return reject(new Error("Audio element not created"));
+      }
+
+      this.audioElement.oncanplaythrough = () => {
+        console.log("✅ Audio can play through");
+        resolve();
+      };
+
+      this.audioElement.onerror = (error) => {
+        console.error("❌ Failed to load audio:", error);
+        reject(new Error("Failed to load audio"));
+      };
+
+      console.log("🎵 Loading audio...");
+      this.audioElement.load();
+    });
+
+    // Setup Web Audio API analysis chain
+    console.log("🎵 Setting up Web Audio API...");
+    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    console.log("🎵 AudioContext state:", this.audioContext.state);
+
+    const source = this.audioContext.createMediaElementSource(this.audioElement);
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 2048;
+
+    source.connect(this.analyser);
+    this.analyser.connect(this.audioContext.destination);
+
+    this.timeDomainBuffer = new Uint8Array(this.analyser.fftSize);
+    this.frequencyBuffer = new Uint8Array(this.analyser.frequencyBinCount);
+
+    console.log("✅ Web Audio API setup complete");
+  }
+
+  /**
+   * Resume audio context if suspended (required for some browsers)
+   */
+  async resumeAudio(): Promise<void> {
+    if (this.audioContext?.state === "suspended") {
+      console.log("🎵 Resuming suspended AudioContext...");
+      await this.audioContext.resume();
+      console.log("✅ AudioContext resumed, state:", this.audioContext.state);
+    }
+  }
+
+  /**
+   * Play the loaded audio
+   */
+  async play(): Promise<void> {
+    console.log("▶️ LipSyncManager.play() called");
+    await this.resumeAudio();
+
+    if (!this.audioElement) {
+      console.error("❌ No audio element to play");
+      return;
+    }
+
+    console.log("▶️ Calling audioElement.play()...");
+    await this.audioElement.play();
+    console.log("✅ Audio playback started");
+  }
+
+  /**
+   * Pause the loaded audio
+   */
+  pause(): void {
+    this.audioElement?.pause();
+  }
+
+  /**
+   * Reset all mouth expressions to neutral
+   */
+  resetMouth(): void {
+    const phonemes: (keyof PhonemeValues)[] = ["aa", "ee", "ih", "oh", "ou"];
+    const expressionManager = this.vrm.expressionManager;
+
+    if (!expressionManager) return;
+
+    for (const phoneme of phonemes) {
+      expressionManager.setValue(phoneme, 0);
+      this.previousPhonemeValues[phoneme] = 0;
+    }
+  }
+
+  /**
+   * Update lip sync animation based on current audio playback.
+   * Call this every frame in your animation loop.
+   */
+  update(): void {
+    if (!this.analyser || !this.timeDomainBuffer || !this.frequencyBuffer) {
+      return;
+    }
+
+    const expressionManager = this.vrm.expressionManager;
+    if (!expressionManager) {
+      console.warn("⚠️ No expressionManager on VRM, cannot update lip sync");
+      return;
+    }
+
+    // Debug: Log available expressions on first update
+    if (!this.previousPhonemeValues.aa) {
+      const availableExpressions = (expressionManager as any).expressionMap
+        ? Object.keys((expressionManager as any).expressionMap)
+        : "unknown";
+      console.log("📋 Available VRM expressions:", availableExpressions);
+    }
+
+    // Get audio analysis data
+    this.analyser.getByteTimeDomainData(this.timeDomainBuffer);
+    this.analyser.getByteFrequencyData(this.frequencyBuffer);
+
+    // Calculate RMS amplitude
+    const amplitude = this.calculateRMSAmplitude(this.timeDomainBuffer);
+
+    // Calculate spectral centroid (brightness of sound)
+    const centroid = this.calculateSpectralCentroid(this.frequencyBuffer);
+
+    // Map to phoneme shapes
+    const phonemeValues = this.estimatePhonemes(amplitude, centroid);
+
+    // Debug logging (log every 10 frames to see what's happening)
+    if (Math.random() < 0.1) {
+      console.log("🎤 Lip sync values:", {
+        amplitude: amplitude.toFixed(4),
+        centroid: centroid.toFixed(4),
+        phonemes: {
+          aa: phonemeValues.aa.toFixed(3),
+          ee: phonemeValues.ee.toFixed(3),
+          ih: phonemeValues.ih.toFixed(3),
+          oh: phonemeValues.oh.toFixed(3),
+          ou: phonemeValues.ou.toFixed(3),
+        }
+      });
+    }
+
+    // Apply smoothing and update VRM expressions
+    this.applySmoothedPhonemes(phonemeValues, expressionManager);
+  }
+
+  /**
+   * Calculate root mean square amplitude from time domain data
+   */
+  private calculateRMSAmplitude(buffer: Uint8Array): number {
+    let sumSquares = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      const normalized = (buffer[i] - 128) / 128;
+      sumSquares += normalized * normalized;
+    }
+    return Math.sqrt(sumSquares / buffer.length);
+  }
+
+  /**
+   * Calculate spectral centroid (normalized 0-1)
+   */
+  private calculateSpectralCentroid(buffer: Uint8Array): number {
+    let weightedSum = 0;
+    let magnitudeSum = 0;
+
+    for (let i = 0; i < buffer.length; i++) {
+      const magnitude = buffer[i];
+      weightedSum += i * magnitude;
+      magnitudeSum += magnitude;
+    }
+
+    return magnitudeSum > 0 ? weightedSum / magnitudeSum / buffer.length : 0;
+  }
+
+  /**
+   * Estimate phoneme values based on amplitude and spectral centroid
+   */
+  private estimatePhonemes(amplitude: number, centroid: number): PhonemeValues {
+    const { amplitudeThreshold, amplitudeScale, centroidThresholds } = this.config;
+    const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
+
+    if (amplitude > amplitudeThreshold) {
+      const intensity = Math.min(1, (amplitude - amplitudeThreshold) * amplitudeScale);
+
+      // Classify by spectral brightness with more nuanced blending
+      if (centroid > centroidThresholds.wide) {
+        // Bright, wide vowel (ee) - like "see", "tree"
+        phonemes.ee = intensity * 0.8;
+        phonemes.aa = intensity * 0.3; // Small mouth opening
+      } else if (centroid > centroidThresholds.ih) {
+        // Mid-range vowel (ih) - like "sit", "bit"
+        phonemes.ih = intensity * 0.7;
+        phonemes.aa = intensity * 0.5; // Medium mouth opening
+      } else if (centroid > centroidThresholds.oh) {
+        // Darker vowel (oh) - like "go", "no"
+        phonemes.oh = intensity * 0.8;
+        phonemes.aa = intensity * 0.6; // Wider mouth opening
+      } else {
+        // Darkest vowel (ou) - like "you", "blue"
+        phonemes.ou = intensity * 0.9;
+        phonemes.aa = intensity * 0.4; // Rounded mouth
+      }
+    }
+
+    return phonemes;
+  }
+
+  /**
+   * Apply smoothed phoneme values to VRM expression manager
+   */
+  private applySmoothedPhonemes(
+    targetValues: PhonemeValues,
+    expressionManager: NonNullable<VRM["expressionManager"]>
+  ): void {
+    const { smoothingFactor } = this.config;
+
+    for (const phoneme of Object.keys(targetValues) as (keyof PhonemeValues)[]) {
+      const target = targetValues[phoneme];
+      const previous = this.previousPhonemeValues[phoneme];
+
+      // Exponential smoothing
+      const smoothed = previous + smoothingFactor * (target - previous);
+      this.previousPhonemeValues[phoneme] = smoothed;
+
+      expressionManager.setValue(phoneme, smoothed);
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  dispose(): void {
+    this.audioElement?.pause();
+    this.audioElement = null;
+    this.audioContext?.close();
+    this.audioContext = null;
+    this.analyser = null;
+    this.timeDomainBuffer = null;
+    this.frequencyBuffer = null;
+  }
+}
