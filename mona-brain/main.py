@@ -35,6 +35,24 @@ openai_client: Optional[OpenAI] = None
 async def lifespan(_app: FastAPI):
     """Initialize LLM and TTS on startup"""
     global mona_llm, mona_tts, mona_tts_sovits, openai_client
+
+    # Download NLTK data if not present (needed for GPT-SoVITS English support)
+    try:
+        import nltk
+        import ssl
+        try:
+            _create_unverified_https_context = ssl._create_unverified_context
+        except AttributeError:
+            pass
+        else:
+            ssl._create_default_https_context = _create_unverified_https_context
+
+        nltk.download('cmudict', quiet=True)
+        nltk.download('averaged_perceptron_tagger_eng', quiet=True)
+        print("✓ NLTK data ready")
+    except Exception as e:
+        print(f"⚠ NLTK download warning: {e}")
+
     try:
         personality = load_personality_from_yaml()
         mona_llm = MonaLLM(personality=personality)
@@ -46,19 +64,9 @@ async def lifespan(_app: FastAPI):
 
     # Initialize GPT-SoVITS TTS (primary voice system)
     try:
-        # Check if Riko voice sample exists
-        riko_sample = Path("assets/mona_voice/main_sample.wav")
-        if riko_sample.exists():
-            mona_tts_sovits = MonaTTSSoVITS(
-                ref_audio_path=str(riko_sample),
-                prompt_text="This is a sample voice for you to get started with. It sounds kind of cute, but make sure there aren't long silences.",
-                speed_factor=1.3,
-            )
-            print("✓ Mona GPT-SoVITS initialized with Riko voice sample")
-        else:
-            print(f"⚠ Voice sample not found at {riko_sample}")
-            print("⚠ GPT-SoVITS disabled. Will fall back to OpenAI TTS.")
-            mona_tts_sovits = None
+        # Initialize with default settings (uses RunPod server or local if available)
+        mona_tts_sovits = MonaTTSSoVITS()
+        print(f"✓ Mona GPT-SoVITS initialized (using RunPod GPU server)")
     except Exception as e:
         print(f"⚠ Warning: Could not initialize GPT-SoVITS - {e}")
         print("⚠ Will fall back to OpenAI TTS.")
@@ -268,36 +276,50 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
                         elif event["event"] in {"complete", "error"}:
-                            # Generate TTS audio if available
-                            audio_url = None
-                            if event.get("content"):
-                                # Try GPT-SoVITS first (high-quality anime voice)
-                                if mona_tts_sovits:
-                                    audio_path = await mona_tts_sovits.generate_speech(event["content"])
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-                                        print(f"✓ Using GPT-SoVITS audio")
-
-                                # Fall back to OpenAI TTS if SoVITS failed or unavailable
-                                if not audio_url and mona_tts:
-                                    audio_path = await mona_tts.generate_speech(event["content"])
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-                                        print(f"✓ Using OpenAI TTS audio (fallback)")
-
+                            # Send text message immediately (without audio)
                             response_message = {
                                 "type": "message",
                                 "content": event.get("content", ""),
                                 "sender": "mona",
                                 "timestamp": datetime.now().isoformat(),
                                 "emotion": event.get("emotion", {}),
-                                "audioUrl": audio_url,
+                                "audioUrl": None,  # Will update later
                             }
                             # Stop typing indicator before final payload
                             if typing_indicator["isTyping"]:
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
                             await manager.send_message(response_message, client_id)
+
+                            # Generate TTS audio in background (non-blocking)
+                            if event.get("content"):
+                                async def generate_audio_background():
+                                    audio_url = None
+                                    # Try GPT-SoVITS first (high-quality anime voice)
+                                    if mona_tts_sovits:
+                                        audio_path = await mona_tts_sovits.generate_speech(event["content"])
+                                        if audio_path:
+                                            audio_url = f"/audio/{Path(audio_path).name}"
+                                            print(f"✓ Using GPT-SoVITS audio")
+
+                                    # Fall back to OpenAI TTS if SoVITS failed or unavailable
+                                    if not audio_url and mona_tts:
+                                        audio_path = await mona_tts.generate_speech(event["content"])
+                                        if audio_path:
+                                            audio_url = f"/audio/{Path(audio_path).name}"
+                                            print(f"✓ Using OpenAI TTS audio (fallback)")
+
+                                    # Send audio update when ready
+                                    if audio_url:
+                                        audio_update = {
+                                            "type": "audio_ready",
+                                            "audioUrl": audio_url,
+                                            "timestamp": datetime.now().isoformat(),
+                                        }
+                                        await manager.send_message(audio_update, client_id)
+
+                                # Start audio generation without awaiting
+                                asyncio.create_task(generate_audio_background())
                 except Exception as e:
                     print(f"LLM Error: {e}")
                     fallback_message = {

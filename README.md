@@ -70,7 +70,21 @@ ProjectMona/
 
 ## Quick Start
 
-### 1. Start the Backend (mona-brain)
+### Easy Mode: Start Everything at Once
+
+```bash
+# First time setup
+./setup-sovits.sh  # Set up GPT-SoVITS (anime voice) - one time only
+
+# Start all services (GPT-SoVITS + Backend + Frontend)
+./start-mona.sh
+```
+
+This opens 3 Terminal windows and starts all services. Open [http://localhost:3000](http://localhost:3000) when ready!
+
+### Manual Setup (Advanced)
+
+#### 1. Backend Setup (mona-brain)
 
 ```bash
 cd mona-brain
@@ -89,7 +103,7 @@ Backend will run on [http://localhost:8000](http://localhost:8000)
 
 **Note:** Get your OpenAI API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Without an API key, Mona will run in dummy mode. By default she loads the persona from `mona-brain/personality.mona.yaml`; set `PERSONALITY_CONFIG_PATH=/path/to/personality.yaml` to point to your own.
 
-### 2. Start the Frontend (mona-web)
+#### 2. Frontend Setup (mona-web)
 
 ```bash
 cd mona-web
@@ -98,6 +112,10 @@ npm run dev
 ```
 
 Frontend will run on [http://localhost:3000](http://localhost:3000). A temporary VRM (`/avatars/Mona1.vrm`) is bundled for quick testing—override it by setting `NEXT_PUBLIC_VRM_URL` to your own `.vrm` file.
+
+#### 3. Voice Setup (GPT-SoVITS) - Optional
+
+For Riko's anime voice, see [SETUP.md](SETUP.md#gpt-sovits-setup-for-high-quality-anime-voice) for detailed instructions. Without this, Mona uses OpenAI TTS (voice: "nova").
 
 ## Technology Stack
 
@@ -123,9 +141,10 @@ Frontend will run on [http://localhost:3000](http://localhost:3000). A temporary
 - [x] **Week 2** – LLM + persona + emotion engine
 - [x] **Week 3** – Memory + affection + consistent behavior
 - [x] **Week 4** – VRM avatar + procedural idle animations + emotion expressions
-- [ ] **Week 5** – Voice stack (ASR + TTS) + lip sync + gesture animations
-- [ ] **Week 6** – Cosmetics pipeline + personality YAML packs + launch scripts
-- [ ] **Month 2+** – Mobile app, LiveOps, content drops, emotion-aware TTS filters
+- [x] **Week 5** – Voice stack (ASR + TTS) + lip sync + gesture animations ✅
+- [ ] **Week 6** – Polish & launch prep (installer, docs, video demo)
+- [ ] **Month 2** – Community features (personality marketplace, Discord)
+- [ ] **Month 3+** – Mobile app, advanced features, monetization
 
 ## Core Features
 
@@ -157,9 +176,101 @@ Frontend will run on [http://localhost:3000](http://localhost:3000). A temporary
 - Room skins
 - Seasonal events
 
+## Next Actions
+
+### Immediate (Week 6):
+1. **Test the complete system** - Run `./start-mona.sh` and verify all features work
+2. **Download gesture animations** - Get 8 Mixamo FBX files (see [GESTURES.md](mona-web/GESTURES.md))
+3. **Create demo video** - Record Mona in action for showcase
+4. **Write tutorial** - Step-by-step setup guide for new users
+
+### Short-Term (Month 2):
+- Package as desktop app (Electron wrapper for easier distribution)
+- Build personality marketplace (let users share custom characters)
+- Set up Discord community for feedback and support
+- Launch on Product Hunt / HackerNews
+
+### Long-Term (Month 3+):
+- Mobile companion app (iOS/Android)
+- Advanced memory system (better context retention)
+- Multi-character support (talk to different personalities)
+- Plugin ecosystem (let developers extend functionality)
+
+## Future Improvements
+
+### 🚀 Quick Wins:
+- **One-click installer** - `.exe` for Windows, `.dmg` for Mac
+- **Personality editor GUI** - No-code character customization
+- **Voice marketplace** - Buy/sell custom anime voices
+- **Preset packs** - Pre-configured personalities (tsundere, kuudere, etc.)
+
+### 💎 Advanced Features:
+- **Screen awareness** - Mona can see what you're working on (with permission)
+- **Calendar integration** - Reminds you of important events
+- **Learning companion** - Study buddy who quizzes you
+- **AR mode** - See Mona in your room (Apple Vision Pro)
+- **Multi-modal** - Video understanding, gesture recognition
+
+### 🌟 Platform Vision:
+- **Creator tools** - Easy-to-use personality/voice editors
+- **Community marketplace** - Share and monetize custom content
+- **Enterprise features** - Language learning, customer service training
+- **Open plugin system** - Let developers build extensions
+
+### 💰 Monetization Ideas:
+```
+Free Tier:
+- Basic personality
+- Standard voice (OpenAI TTS)
+- Limited memory (last 10 messages)
+
+Premium ($5-10/month):
+- Custom personalities
+- Anime voice cloning (GPT-SoVITS)
+- Unlimited memory
+- Priority support
+- Exclusive avatars
+
+Pro ($20+/month):
+- Multiple characters
+- Advanced AI features
+- Commercial use license
+- API access
+```
+
+## Market Potential
+
+**Target Audiences:**
+- Anime/VTuber fans seeking interactive companions
+- Lonely professionals wanting emotional connection
+- Language learners needing practice partners
+- Developers interested in AI/voice tech
+- Privacy-conscious users (local-first approach)
+
+**Competitive Advantages:**
+- 3D animated avatar (most competitors are text/2D only)
+- Voice cloning with anime voices (rare in market)
+- Local-first privacy (no cloud dependency required)
+- Open-source potential (community contributions)
+- VRM ecosystem support (huge existing asset library)
+
+**Similar Products:**
+- Character.AI (100M+ users, but text-only)
+- Replika ($30M+/year, but no 3D avatar)
+- Various anime waifu apps (niche but proven demand)
+
 ## Contributing
 
-This is an active development project. Each week brings new features following the roadmap above.
+This is an active development project. Contributions welcome!
+
+**Ways to contribute:**
+- Test and report bugs
+- Create personality packs
+- Design custom avatars
+- Improve documentation
+- Build plugins/extensions
+
+Join our community (coming soon) to discuss features and improvements.
 
 ## License
 

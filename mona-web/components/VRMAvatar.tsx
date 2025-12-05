@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
 import type { EmotionData } from "@/types/chat";
 import * as THREE from "three";
 import { LipSyncManager } from "@/lib/animation";
+import { GestureManager, type EmotionType } from "@/lib/animation/gestureManager";
 
 type BlendShapeName = Parameters<NonNullable<NonNullable<VRM["blendShapeProxy"]>["setValue"]>>[0];
 
@@ -84,6 +85,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
   const leftUpperArmRef = useRef<THREE.Object3D | null>(null);
   const rightUpperArmRef = useRef<THREE.Object3D | null>(null);
   const lipSyncRef = useRef<LipSyncManager | null>(null);
+  const gestureManagerRef = useRef<GestureManager | null>(null);
   const currentAudioRef = useRef<string | null>(null);
 
   const baseRotations = useRef({
@@ -196,14 +198,35 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       rightUpperArmRef.current.rotation.z = ANIMATION_CONFIG.arms.rightRotationZ;
     }
 
+    // Initialize gesture manager
+    const initGestures = async () => {
+      if (!gestureManagerRef.current) {
+        console.log("🎭 Creating GestureManager");
+        gestureManagerRef.current = new GestureManager(vrm, {
+          gestureChance: 0.4,
+          minGestureInterval: 10,
+          maxGestureInterval: 20,
+          autoRandomGestures: true,
+        });
+        await gestureManagerRef.current.loadAllGestures();
+      }
+    };
+    initGestures();
+
     return () => {
       group.remove(vrm.scene);
       if (typeof vrm.dispose === "function") {
         vrm.dispose();
       }
+      // Cleanup gesture manager
+      if (gestureManagerRef.current) {
+        gestureManagerRef.current.dispose();
+        gestureManagerRef.current = null;
+      }
     };
   }, [vrm]);
 
+  // Update emotion and trigger gestures
   useEffect(() => {
     if (!vrm) return;
     const intensity = emotion
@@ -229,6 +252,13 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       names.forEach((name) => expressionManager.setValue(name, 0));
       const expressionName = emotion ? emotionToExpression[emotion.emotion] ?? "neutral" : "neutral";
       expressionManager.setValue(expressionName, intensity);
+    }
+
+    // Update gesture manager with current emotion
+    if (gestureManagerRef.current && emotion) {
+      const emotionType = emotion.emotion as EmotionType;
+      gestureManagerRef.current.setEmotion(emotionType);
+      console.log("🎭 Updated gesture emotion:", emotionType);
     }
   }, [emotion, vrm]);
 
@@ -269,7 +299,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
           console.log("📦 Creating new LipSyncManager");
           lipSyncRef.current = new LipSyncManager(vrm, {
             smoothingFactor: 0.3,
-            amplitudeScale: 15.0, // Tuned for visible lip movement
+            amplitudeScale: 1.0, // Match Riko's subtle mouth movement
             amplitudeThreshold: 0.001, // Lower threshold to trigger more easily
           });
         }
@@ -306,6 +336,11 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     // Update lip sync if audio is playing
     if (lipSyncRef.current) {
       lipSyncRef.current.update();
+    }
+
+    // Update gesture manager animations
+    if (gestureManagerRef.current) {
+      gestureManagerRef.current.update(delta);
     }
 
     const anim = animationState.current;
