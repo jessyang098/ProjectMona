@@ -275,3 +275,4 @@ Join our community (coming soon) to discuss features and improvements.
 ## License
 
 MIT License (to be added)
+
