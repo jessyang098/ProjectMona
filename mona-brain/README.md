@@ -133,3 +133,4 @@ With API key (GPT mode):
 python main.py
 # Will show: "✓ Mona LLM initialized with GPT"
 ```
+# Railway redeploy trigger - Fri Dec  5 15:30:29 CST 2025
