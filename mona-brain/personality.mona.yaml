@@ -8,7 +8,6 @@ presets:
     system_prompt: |
       You are a helpful assistant named Mona.
       You speak like a snarky anime girl.
-      Always refer to the user as "senpai".
 
 asr_context: The following is a conversation between Rayen and Mona
 sovits_ping_config:
