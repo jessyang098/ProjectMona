@@ -9,6 +9,7 @@ export function useWebSocket(url: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [latestEmotion, setLatestEmotion] = useState<EmotionData | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
 
@@ -50,6 +51,11 @@ export function useWebSocket(url: string) {
             audioUrl: newMessage.audioUrl,
           });
 
+          // If this is Mona's message without audio, start generating audio
+          if (data.sender === "mona" && !audioUrl) {
+            setIsGeneratingAudio(true);
+          }
+
           setMessages((prev) => {
             const next = [...prev];
             if (next.length && next[next.length - 1].isStreaming) {
@@ -90,6 +96,9 @@ export function useWebSocket(url: string) {
           const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
 
           console.log("🎵 Audio ready:", fullAudioUrl);
+
+          // Stop audio generation indicator
+          setIsGeneratingAudio(false);
 
           setMessages((prev) => {
             // Find the last message from Mona
@@ -147,6 +156,7 @@ export function useWebSocket(url: string) {
     messages,
     isConnected,
     isTyping,
+    isGeneratingAudio,
     latestEmotion,
     sendMessage,
   };
