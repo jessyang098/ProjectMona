@@ -43,7 +43,11 @@ else
     cd GPT-SoVITS
 fi
 
-# 5. Install GPT-SoVITS requirements
+# 5. Fix transformers version compatibility (critical!)
+echo "🔧 Fixing transformers version for GPT-SoVITS compatibility..."
+pip install -q "transformers<4.32.0"
+
+# 5b. Install GPT-SoVITS requirements
 echo "📦 Installing GPT-SoVITS requirements..."
 pip install -q -r requirements.txt
 
