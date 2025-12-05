@@ -9,7 +9,13 @@ echo "🚀 Starting RunPod GPT-SoVITS setup..."
 # 1. Install system dependencies
 echo "📦 Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq ffmpeg git wget curl
+apt-get install -y -qq ffmpeg git wget curl build-essential
+
+# 1b. Install Rust (required for tokenizers compilation)
+echo "🦀 Installing Rust compiler..."
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+export PATH="$HOME/.cargo/bin:$PATH"
 
 # 2. Install Python dependencies
 echo "🐍 Installing Python packages..."
