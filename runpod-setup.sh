@@ -51,45 +51,9 @@ pip install -q -r requirements.txt
 echo "🤖 Downloading pretrained models..."
 mkdir -p GPT_SoVITS/pretrained_models
 
-# Download base models
-python3 -c "
-from huggingface_hub import hf_hub_download
-import os
-
-print('Downloading pretrained models from HuggingFace...')
-
-# S2G model
-if not os.path.exists('GPT_SoVITS/pretrained_models/s2G488k.pth'):
-    hf_hub_download(
-        repo_id='lj1995/GPT-SoVITS',
-        filename='pretrained_models/s2G488k.pth',
-        local_dir='.',
-        local_dir_use_symlinks=False
-    )
-    print('✓ s2G488k.pth')
-
-# S2D model
-if not os.path.exists('GPT_SoVITS/pretrained_models/s2D488k.pth'):
-    hf_hub_download(
-        repo_id='lj1995/GPT-SoVITS',
-        filename='pretrained_models/s2D488k.pth',
-        local_dir='.',
-        local_dir_use_symlinks=False
-    )
-    print('✓ s2D488k.pth')
-
-# S1 BERT model
-if not os.path.exists('GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt'):
-    hf_hub_download(
-        repo_id='lj1995/GPT-SoVITS',
-        filename='pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt',
-        local_dir='.',
-        local_dir_use_symlinks=False
-    )
-    print('✓ s1bert25hz model')
-
-print('✓ All pretrained models downloaded')
-"
+# Note: Pretrained models will be downloaded by GPT-SoVITS on first run
+# if they're needed. The repo structure has changed.
+echo "✓ Model directory created (models download on first API call)"
 
 # 7. Verify voice sample exists
 echo "🔍 Checking for Mona voice sample..."
