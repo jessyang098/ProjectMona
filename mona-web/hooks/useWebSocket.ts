@@ -60,12 +60,13 @@ export function useWebSocket(url: string) {
             setLatestEmotion(data.emotion);
           }
         } else if (data.type === "message_chunk" && data.content) {
+          const chunkContent = data.content || "";
           setMessages((prev) => {
             if (prev.length === 0 || !prev[prev.length - 1].isStreaming) {
               return [
                 ...prev,
                 {
-                  content: data.content,
+                  content: chunkContent,
                   sender: "mona",
                   timestamp: data.timestamp || new Date().toISOString(),
                   isStreaming: true,
@@ -76,7 +77,7 @@ export function useWebSocket(url: string) {
             const next = [...prev];
             next[next.length - 1] = {
               ...next[next.length - 1],
-              content: `${next[next.length - 1].content}${data.content}`,
+              content: `${next[next.length - 1].content}${chunkContent}`,
             };
             return next;
           });
