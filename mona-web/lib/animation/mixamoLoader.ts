@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
-import { VRM } from "@pixiv/three-vrm";
+import { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 import { MIXAMO_TO_VRM_BONE_MAP } from "./mixamoRigMap";
 
 /**
@@ -35,7 +35,11 @@ export async function loadMixamoAnimation(
   }
 
   const mixamoHipsHeight = mixamoHipsNode.position.y;
-  const vrmHipsHeight = vrm.humanoid.normalizedRestPose.hips.position[1];
+  const vrmHipsPosition = vrm.humanoid.normalizedRestPose.hips?.position;
+  if (!vrmHipsPosition) {
+    throw new Error("VRM hips position not found in normalizedRestPose");
+  }
+  const vrmHipsHeight = vrmHipsPosition[1];
   const heightScale = vrmHipsHeight / mixamoHipsHeight;
 
   // Convert tracks to VRM bone space
@@ -49,7 +53,7 @@ export async function loadMixamoAnimation(
     const [mixamoBoneName, propertyName] = track.name.split(".");
 
     // Map Mixamo bone to VRM bone
-    const vrmBoneName = MIXAMO_TO_VRM_BONE_MAP[mixamoBoneName];
+    const vrmBoneName = MIXAMO_TO_VRM_BONE_MAP[mixamoBoneName] as VRMHumanBoneName | undefined;
     if (!vrmBoneName) continue;
 
     const vrmBoneNode = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName);
