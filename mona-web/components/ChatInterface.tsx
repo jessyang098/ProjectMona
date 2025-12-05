@@ -7,7 +7,8 @@ import TypingIndicator from "./TypingIndicator";
 import AvatarStage from "./AvatarStage";
 import { EmotionData } from "@/types/chat";
 
-const WEBSOCKET_URL = "ws://localhost:8000/ws";
+const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export default function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
@@ -90,7 +91,7 @@ export default function ChatInterface() {
       formData.append('audio', audioBlob, 'recording.webm');
 
       // Send to backend for transcription
-      const response = await fetch('http://localhost:8000/transcribe', {
+      const response = await fetch(`${BACKEND_URL}/transcribe`, {
         method: 'POST',
         body: formData,
       });

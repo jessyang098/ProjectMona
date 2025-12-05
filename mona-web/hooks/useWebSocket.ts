@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { EmotionData, Message, WebSocketMessage } from "@/types/chat";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 export function useWebSocket(url: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -32,7 +34,7 @@ export function useWebSocket(url: string) {
 
         if (data.type === "message" && data.content && data.sender) {
           // Construct full audio URL if provided
-          const audioUrl = data.audioUrl ? `http://localhost:8000${data.audioUrl}` : undefined;
+          const audioUrl = data.audioUrl ? `${BACKEND_URL}${data.audioUrl}` : undefined;
 
           const newMessage: Message = {
             content: data.content,
@@ -85,7 +87,7 @@ export function useWebSocket(url: string) {
           setIsTyping(data.isTyping || false);
         } else if (data.type === "audio_ready" && data.audioUrl) {
           // Update the most recent Mona message with the audio URL
-          const fullAudioUrl = `http://localhost:8000${data.audioUrl}`;
+          const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
 
           console.log("🎵 Audio ready:", fullAudioUrl);
 
