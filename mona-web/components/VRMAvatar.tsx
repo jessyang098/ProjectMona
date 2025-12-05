@@ -9,8 +9,6 @@ import * as THREE from "three";
 import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType } from "@/lib/animation/gestureManager";
 
-type BlendShapeName = Parameters<NonNullable<NonNullable<VRM["blendShapeProxy"]>["setValue"]>>[0];
-
 // Procedural animation configuration
 const ANIMATION_CONFIG = {
   // Blinking behavior
@@ -40,19 +38,6 @@ const ANIMATION_CONFIG = {
     rightRotationZ: 1.2,
   },
 } as const;
-
-const emotionToBlendshape: Record<string, BlendShapeName> = {
-  happy: "Joy",
-  excited: "Fun",
-  content: "Joy",
-  curious: "Aa",
-  surprised: "Surprised",
-  concerned: "Sorrow",
-  sad: "Sorrow",
-  embarrassed: "Blink",
-  affectionate: "Joy",
-  neutral: "Neutral",
-};
 
 const emotionToExpression: Record<string, string> = {
   happy: "happy",
@@ -236,14 +221,6 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
         ? 0.6
         : 0.3
       : 0;
-
-    const proxy = vrm.blendShapeProxy;
-    if (proxy) {
-      const presets = Array.from(new Set(Object.values(emotionToBlendshape)));
-      presets.forEach((preset) => proxy.setValue(preset, 0));
-      const preset = emotion ? emotionToBlendshape[emotion.emotion] ?? "Neutral" : "Neutral";
-      proxy.setValue(preset, intensity);
-    }
 
     const expressionManager = (vrm as VRM & { expressionManager?: { setValue: (name: string, weight: number) => void } })
       .expressionManager;
