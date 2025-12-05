@@ -103,7 +103,12 @@ app = FastAPI(title="Mona Brain API", lifespan=lifespan)
 # CORS configuration for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://*.vercel.app",  # Allow all Vercel preview/production URLs
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Regex pattern for Vercel domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -361,8 +366,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 @app.post("/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
     """Transcribe audio using OpenAI Whisper API"""
+    from fastapi.responses import JSONResponse
+
     if not openai_client:
-        return {"error": "ASR not available. Set OPENAI_API_KEY to enable voice input."}, 503
+        return JSONResponse(
+            status_code=503,
+            content={"error": "ASR not available. Set OPENAI_API_KEY to enable voice input."}
+        )
 
     try:
         # Read the audio file
@@ -386,7 +396,10 @@ async def transcribe_audio(audio: UploadFile = File(...)):
 
     except Exception as e:
         print(f"✗ Transcription error: {e}")
-        return {"error": str(e)}, 500
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 
 if __name__ == "__main__":
