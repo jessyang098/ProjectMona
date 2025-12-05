@@ -47,8 +47,8 @@ export class LipSyncManager {
   private audioElement: HTMLAudioElement | null = null;
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
-  private timeDomainBuffer: Uint8Array | null = null;
-  private frequencyBuffer: Uint8Array | null = null;
+  private timeDomainBuffer: Uint8Array<ArrayBuffer> | null = null;
+  private frequencyBuffer: Uint8Array<ArrayBuffer> | null = null;
   private previousPhonemeValues: PhonemeValues = {
     aa: 0,
     ee: 0,
@@ -112,8 +112,8 @@ export class LipSyncManager {
     source.connect(this.analyser);
     this.analyser.connect(this.audioContext.destination);
 
-    this.timeDomainBuffer = new Uint8Array(this.analyser.fftSize);
-    this.frequencyBuffer = new Uint8Array(this.analyser.frequencyBinCount);
+    this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+    this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
 
     console.log("✅ Web Audio API setup complete");
   }
