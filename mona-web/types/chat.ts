@@ -14,7 +14,7 @@ export interface Message {
 }
 
 export interface WebSocketMessage {
-  type: "message" | "message_chunk" | "typing" | "error";
+  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready";
   content?: string;
   sender?: "user" | "mona";
   timestamp?: string;

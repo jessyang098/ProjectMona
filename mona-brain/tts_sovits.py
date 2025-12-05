@@ -14,8 +14,8 @@ class MonaTTSSoVITS:
 
     def __init__(
         self,
-        sovits_url: str = "http://127.0.0.1:9880/tts",
-        ref_audio_path: str = "assets/mona_voice/main_sample.wav",
+        sovits_url: str = "https://4io3lq5laazuh7-9880.proxy.runpod.net/tts",
+        ref_audio_path: str = "/workspace/GPT-SoVITS/assets/mona_voice/main_sample.wav",
         prompt_text: str = "This is a sample voice for you to get started with. It sounds kind of cute, but make sure there aren't long silences.",
         text_lang: str = "en",
         prompt_lang: str = "en",

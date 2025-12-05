@@ -82,6 +82,29 @@ export function useWebSocket(url: string) {
           });
         } else if (data.type === "typing") {
           setIsTyping(data.isTyping || false);
+        } else if (data.type === "audio_ready" && data.audioUrl) {
+          // Update the most recent Mona message with the audio URL
+          const fullAudioUrl = `http://localhost:8000${data.audioUrl}`;
+
+          console.log("🎵 Audio ready:", fullAudioUrl);
+
+          setMessages((prev) => {
+            // Find the last message from Mona
+            const lastMonaIndex = prev.length - 1 - [...prev].reverse().findIndex(m => m.sender === "mona");
+
+            if (lastMonaIndex >= 0 && lastMonaIndex < prev.length) {
+              const next = [...prev];
+              next[lastMonaIndex] = {
+                ...next[lastMonaIndex],
+                audioUrl: fullAudioUrl,
+              };
+
+              console.log("✓ Updated message with audio URL");
+              return next;
+            }
+
+            return prev;
+          });
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
