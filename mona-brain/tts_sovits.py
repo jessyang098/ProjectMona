@@ -85,6 +85,7 @@ class MonaTTSSoVITS:
                 "prompt_lang": self.prompt_lang,
                 "speed_factor": self.speed_factor,
                 "text_split_method": "cut5",  # Required by API
+                "streaming_mode": False,  # Non-streaming mode
             }
 
             # Call GPT-SoVITS API
