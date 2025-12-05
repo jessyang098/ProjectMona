@@ -9,9 +9,18 @@ echo "🚀 Starting RunPod GPT-SoVITS setup..."
 # 1. Install system dependencies
 echo "📦 Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq ffmpeg git wget curl
+apt-get install -y -qq ffmpeg git wget curl pkg-config libssl-dev build-essential
 
-# 2. Install Python dependencies
+# 2. Ensure Rust is available (RunPod usually has it, but check anyway)
+if ! command -v rustc &> /dev/null; then
+    echo "🦀 Installing Rust..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    export PATH="$HOME/.cargo/bin:$PATH"
+else
+    echo "✓ Rust already installed"
+fi
+
+# 3. Install Python dependencies
 echo "🐍 Installing Python packages..."
 pip install -q --upgrade pip
 pip install -q fastapi uvicorn nltk requests pydantic python-multipart
@@ -45,7 +54,7 @@ fi
 
 # 5. Fix transformers and tokenizers version compatibility (avoids Rust requirement!)
 echo "🔧 Installing compatible transformers & tokenizers versions..."
-pip install -q "transformers==4.30.0" "tokenizers==0.13.3"
+pip install -q "transformers==4.30.0" "tokenizers==0.13.2"
 
 # 5b. Install GPT-SoVITS requirements
 echo "📦 Installing GPT-SoVITS requirements..."
