@@ -10,16 +10,27 @@ import * as THREE from "three";
 const VRMAvatar = dynamic(() => import("./VRMAvatar"), { ssr: false });
 
 const emotionPalette: Record<string, { primary: string; accent: string }> = {
+  // Positive emotions
   happy: { primary: "#ff9de6", accent: "#ffd1f7" },
   excited: { primary: "#ffd166", accent: "#ffe29a" },
   content: { primary: "#9be7ff", accent: "#d5f4ff" },
+  affectionate: { primary: "#f472b6", accent: "#fbcfe8" },
+  playful: { primary: "#fbbf24", accent: "#fde68a" },
+
+  // Neutral/Mixed emotions
   curious: { primary: "#a5b4ff", accent: "#d8deff" },
   surprised: { primary: "#ffb7b2", accent: "#ffdada" },
+  embarrassed: { primary: "#f9a8d4", accent: "#fbcfe8" },
+  confused: { primary: "#c7d2fe", accent: "#e0e7ff" },
+  bored: { primary: "#d1d5db", accent: "#e5e7eb" },
+  neutral: { primary: "#c4c4ff", accent: "#e4e4ff" },
+
+  // Negative emotions
   concerned: { primary: "#fca5a5", accent: "#fdd5d5" },
   sad: { primary: "#9ca3af", accent: "#cbd5f5" },
-  embarrassed: { primary: "#f9a8d4", accent: "#fbcfe8" },
-  affectionate: { primary: "#f472b6", accent: "#fbcfe8" },
-  neutral: { primary: "#c4c4ff", accent: "#e4e4ff" },
+  annoyed: { primary: "#fcd34d", accent: "#fef3c7" },
+  angry: { primary: "#ef4444", accent: "#fca5a5" },
+  frustrated: { primary: "#f59e0b", accent: "#fcd34d" },
 };
 
 interface AvatarStageProps {

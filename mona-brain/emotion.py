@@ -12,16 +12,27 @@ from datetime import datetime
 
 class EmotionType(str, Enum):
     """Primary emotion types"""
+    # Positive emotions
     HAPPY = "happy"
     EXCITED = "excited"
     CONTENT = "content"
     CURIOUS = "curious"
+    AFFECTIONATE = "affectionate"
+    PLAYFUL = "playful"
+
+    # Neutral/Mixed emotions
     SURPRISED = "surprised"
+    EMBARRASSED = "embarrassed"
+    CONFUSED = "confused"
+    BORED = "bored"
+    NEUTRAL = "neutral"
+
+    # Negative emotions
     CONCERNED = "concerned"
     SAD = "sad"
-    EMBARRASSED = "embarrassed"
-    AFFECTIONATE = "affectionate"
-    NEUTRAL = "neutral"
+    ANNOYED = "annoyed"
+    ANGRY = "angry"
+    FRUSTRATED = "frustrated"
 
 
 class EmotionIntensity(str, Enum):
@@ -61,33 +72,79 @@ class EmotionEngine:
         """
         message_lower = user_message.lower()
 
+        # TEST COMMANDS - Check first for explicit emotion triggers
+        if message_lower.startswith("test:"):
+            emotion_name = message_lower.replace("test:", "").strip()
+            emotion_map = {
+                "happy": EmotionType.HAPPY,
+                "excited": EmotionType.EXCITED,
+                "content": EmotionType.CONTENT,
+                "curious": EmotionType.CURIOUS,
+                "affectionate": EmotionType.AFFECTIONATE,
+                "playful": EmotionType.PLAYFUL,
+                "surprised": EmotionType.SURPRISED,
+                "embarrassed": EmotionType.EMBARRASSED,
+                "confused": EmotionType.CONFUSED,
+                "bored": EmotionType.BORED,
+                "neutral": EmotionType.NEUTRAL,
+                "concerned": EmotionType.CONCERNED,
+                "sad": EmotionType.SAD,
+                "annoyed": EmotionType.ANNOYED,
+                "angry": EmotionType.ANGRY,
+                "frustrated": EmotionType.FRUSTRATED,
+            }
+            if emotion_name in emotion_map:
+                return emotion_map[emotion_name]
+
+        # Negative emotions (check first - they're more specific)
+        if any(word in message_lower for word in ["angry", "mad", "furious", "pissed", "rage"]):
+            return EmotionType.ANGRY
+
+        if any(word in message_lower for word in ["annoyed", "irritated", "bothered", "annoying", "irritating"]):
+            return EmotionType.ANNOYED
+
+        if any(word in message_lower for word in ["frustrated", "frustrating", "can't figure", "giving up"]):
+            return EmotionType.FRUSTRATED
+
+        if any(word in message_lower for word in ["boring", "bored", "meh", "whatever", "don't care"]):
+            return EmotionType.BORED
+
+        if any(word in message_lower for word in ["sad", "depressed", "unhappy", "down", "cry"]):
+            return EmotionType.SAD
+
+        if any(word in message_lower for word in ["worried", "concerned", "anxious", "nervous"]):
+            return EmotionType.CONCERNED
+
+        if any(word in message_lower for word in ["sorry", "apologize", "my bad", "my fault"]):
+            return EmotionType.CONCERNED
+
         # Positive emotions
-        if any(word in message_lower for word in ["love", "amazing", "awesome", "wonderful", "great"]):
+        if any(word in message_lower for word in ["love", "amazing", "awesome", "wonderful", "great", "fantastic"]):
             return EmotionType.HAPPY
 
-        if any(word in message_lower for word in ["excited", "can't wait", "yay", "omg"]):
+        if any(word in message_lower for word in ["excited", "can't wait", "yay", "omg", "woohoo"]):
             return EmotionType.EXCITED
 
-        if any(word in message_lower for word in ["thank", "thanks", "appreciate"]):
+        if any(word in message_lower for word in ["thank", "thanks", "appreciate", "grateful"]):
             return EmotionType.AFFECTIONATE
 
+        if any(word in message_lower for word in ["haha", "lol", "hehe", "funny", "joke", "tease"]):
+            return EmotionType.PLAYFUL
+
+        # Confused state
+        if any(word in message_lower for word in ["confused", "don't understand", "what do you mean", "huh", "???"]):
+            return EmotionType.CONFUSED
+
         # Questions and curiosity
-        if "?" in user_message or any(word in message_lower for word in ["what", "why", "how", "when", "where"]):
+        if "?" in user_message or any(word in message_lower for word in ["what", "why", "how", "when", "where", "tell me"]):
             return EmotionType.CURIOUS
 
-        # Negative emotions
-        if any(word in message_lower for word in ["sad", "depressed", "unhappy", "down"]):
-            return EmotionType.CONCERNED
-
-        if any(word in message_lower for word in ["sorry", "apologize", "my bad"]):
-            return EmotionType.CONCERNED
-
         # Greetings
-        if any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good evening"]):
+        if any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good evening", "sup"]):
             return EmotionType.HAPPY
 
         # Compliments (makes Mona embarrassed)
-        if any(word in message_lower for word in ["cute", "beautiful", "pretty", "attractive", "lovely"]):
+        if any(word in message_lower for word in ["cute", "beautiful", "pretty", "attractive", "lovely", "gorgeous"]):
             return EmotionType.EMBARRASSED
 
         # Default
@@ -134,14 +191,25 @@ class EmotionEngine:
 
 # Emotion-to-expression mapping for future 3D avatar (Week 4)
 EMOTION_TO_BLENDSHAPES = {
+    # Positive emotions
     EmotionType.HAPPY: {"Joy": 0.8, "Smile": 0.9},
-    EmotionType.EXCITED: {"Joy": 1.0, "Surprise": 0.6},
+    EmotionType.EXCITED: {"Joy": 1.0, "Surprise": 0.6, "EyesWide": 0.5},
     EmotionType.CONTENT: {"Smile": 0.5, "Relaxed": 0.7},
-    EmotionType.CURIOUS: {"Surprise": 0.4, "Focus": 0.8},
-    EmotionType.SURPRISED: {"Surprise": 1.0, "EyesWide": 0.9},
-    EmotionType.CONCERNED: {"Sad": 0.5, "Worry": 0.7},
-    EmotionType.SAD: {"Sad": 0.8, "MouthFrown": 0.6},
-    EmotionType.EMBARRASSED: {"Blush": 0.9, "LookAway": 0.6, "Smile": 0.4},
     EmotionType.AFFECTIONATE: {"Joy": 0.7, "Smile": 0.8, "Blush": 0.3},
+    EmotionType.PLAYFUL: {"Smile": 0.9, "Joy": 0.6, "Wink": 0.7},
+
+    # Neutral/Mixed emotions
+    EmotionType.CURIOUS: {"Surprise": 0.4, "Focus": 0.8, "EyebrowRaise": 0.6},
+    EmotionType.SURPRISED: {"Surprise": 1.0, "EyesWide": 0.9, "MouthO": 0.8},
+    EmotionType.EMBARRASSED: {"Blush": 0.9, "LookAway": 0.6, "Smile": 0.4},
+    EmotionType.CONFUSED: {"Surprise": 0.3, "BrowFurrow": 0.6, "HeadTilt": 0.5},
+    EmotionType.BORED: {"Relaxed": 0.8, "LookAway": 0.7, "EyesHalfClosed": 0.6},
     EmotionType.NEUTRAL: {"Neutral": 1.0},
+
+    # Negative emotions
+    EmotionType.CONCERNED: {"Sad": 0.5, "Worry": 0.7, "BrowFurrow": 0.5},
+    EmotionType.SAD: {"Sad": 0.8, "MouthFrown": 0.6, "EyesSad": 0.7},
+    EmotionType.ANNOYED: {"BrowFurrow": 0.7, "MouthFrown": 0.5, "LookAway": 0.4},
+    EmotionType.ANGRY: {"BrowFurrow": 1.0, "MouthFrown": 0.8, "EyesNarrow": 0.9},
+    EmotionType.FRUSTRATED: {"BrowFurrow": 0.8, "Sad": 0.4, "MouthFrown": 0.6},
 }
