@@ -200,9 +200,6 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
 
     return () => {
       group.remove(vrm.scene);
-      if (typeof vrm.dispose === "function") {
-        vrm.dispose();
-      }
       // Cleanup gesture manager
       if (gestureManagerRef.current) {
         gestureManagerRef.current.dispose();
