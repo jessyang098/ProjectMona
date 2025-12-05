@@ -89,7 +89,15 @@ class MonaTTSSoVITS:
             }
 
             # Call GPT-SoVITS API
+            print(f"📤 Sending payload to {self.sovits_url}:")
+            print(f"   {payload}")
             response = requests.post(self.sovits_url, json=payload, timeout=30)
+
+            # Log response for debugging
+            print(f"📥 Response status: {response.status_code}")
+            if response.status_code != 200:
+                print(f"❌ Error response body: {response.text}")
+
             response.raise_for_status()
 
             # Save audio file
@@ -101,6 +109,10 @@ class MonaTTSSoVITS:
 
         except requests.exceptions.ConnectionError:
             print(f"✗ SoVITS server not running. Start GPT-SoVITS on {self.sovits_url}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            print(f"✗ SoVITS API error: {e}")
+            print(f"✗ Response body: {e.response.text if hasattr(e, 'response') else 'No response body'}")
             return None
         except Exception as e:
             print(f"✗ SoVITS generation failed: {e}")
