@@ -7,3 +7,4 @@ openai==1.54.3
 tiktoken==0.7.0
 httpx==0.26.0
 PyYAML==6.0.2
+python-multipart==0.0.6
