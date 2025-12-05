@@ -15,15 +15,24 @@ apt-get install -y -qq ffmpeg git wget curl pkg-config libssl-dev build-essentia
 if ! command -v rustc &> /dev/null; then
     echo "🦀 Installing Rust..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+# Always export Rust to PATH (whether we just installed it or it was already there)
+export PATH="$HOME/.cargo/bin:$PATH"
+export RUSTUP_HOME="$HOME/.rustup"
+export CARGO_HOME="$HOME/.cargo"
+
+# Verify Rust is accessible
+if command -v rustc &> /dev/null; then
+    echo "✓ Rust available: $(rustc --version)"
 else
-    echo "✓ Rust already installed"
+    echo "⚠️  Warning: Rust not found in PATH"
 fi
 
 # 3. Install Python dependencies
 echo "🐍 Installing Python packages..."
-pip install -q --upgrade pip
-pip install -q fastapi uvicorn nltk requests pydantic python-multipart
+PATH="$HOME/.cargo/bin:$PATH" pip install -q --upgrade pip
+PATH="$HOME/.cargo/bin:$PATH" pip install -q fastapi uvicorn nltk requests pydantic python-multipart
 
 # 3. Download NLTK data (critical for English TTS)
 echo "📚 Downloading NLTK data..."
@@ -54,11 +63,11 @@ fi
 
 # 5. Fix transformers and tokenizers version compatibility (avoids Rust requirement!)
 echo "🔧 Installing compatible transformers & tokenizers versions..."
-pip install -q "transformers==4.30.0" "tokenizers==0.13.2"
+PATH="$HOME/.cargo/bin:$PATH" pip install -q "transformers==4.30.0" "tokenizers==0.13.2"
 
 # 5b. Install GPT-SoVITS requirements
 echo "📦 Installing GPT-SoVITS requirements..."
-pip install -q -r requirements.txt
+PATH="$HOME/.cargo/bin:$PATH" pip install -q -r requirements.txt
 
 # 6. Download pretrained models
 echo "🤖 Downloading pretrained models..."
