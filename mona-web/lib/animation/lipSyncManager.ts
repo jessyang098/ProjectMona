@@ -257,9 +257,16 @@ export class LipSyncManager {
           console.log("✅ Audio playback started successfully");
         })
         .catch((error) => {
-          console.error("❌ Audio playback failed:", error);
-          console.error("   Error name:", (error as Error).name);
-          console.error("   Error message:", (error as Error).message);
+          // NotAllowedError is expected on mobile for first audio (before user interaction)
+          // Silently skip it - subsequent audio after user interaction will work
+          if ((error as Error).name === "NotAllowedError") {
+            console.log("ℹ️ Audio blocked by browser (expected on first load before user interaction)");
+          } else {
+            // Log other errors for debugging
+            console.error("❌ Audio playback failed:", error);
+            console.error("   Error name:", (error as Error).name);
+            console.error("   Error message:", (error as Error).message);
+          }
         });
     }
   }
