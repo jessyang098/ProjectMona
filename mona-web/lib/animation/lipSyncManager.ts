@@ -56,10 +56,18 @@ export class LipSyncManager {
     oh: 0,
     ou: 0,
   };
+  private isMobile: boolean = false;
+  private useFallbackMode: boolean = false;
 
   constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
     this.vrm = vrm;
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Detect mobile devices
+    this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
+    console.log("📱 Mobile device detected:", this.isMobile);
   }
 
   /**
@@ -76,46 +84,80 @@ export class LipSyncManager {
     console.log("🎵 LipSyncManager.setupAudio called with:", audioUrl);
 
     this.audioElement = new Audio(audioUrl);
-    this.audioElement.crossOrigin = "anonymous"; // Enable CORS for Web Audio API
+    this.audioElement.crossOrigin = "anonymous";
+
+    // Mobile-specific attributes for better compatibility
+    if (this.isMobile) {
+      this.audioElement.setAttribute("playsinline", "true");
+      this.audioElement.setAttribute("webkit-playsinline", "true");
+      this.audioElement.preload = "auto";
+      console.log("📱 Mobile audio attributes applied");
+    }
+
     console.log("🎵 Audio element created");
 
-    // Wait for audio to be ready
-    await new Promise<void>((resolve, reject) => {
-      if (!this.audioElement) {
-        console.error("❌ Audio element not created");
-        return reject(new Error("Audio element not created"));
-      }
+    // Wait for audio to be ready with extended timeout for mobile
+    const timeout = this.isMobile ? 15000 : 10000;
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        if (!this.audioElement) {
+          console.error("❌ Audio element not created");
+          return reject(new Error("Audio element not created"));
+        }
 
-      this.audioElement.oncanplaythrough = () => {
-        console.log("✅ Audio can play through");
-        resolve();
-      };
+        this.audioElement.oncanplaythrough = () => {
+          console.log("✅ Audio can play through");
+          resolve();
+        };
 
-      this.audioElement.onerror = (error) => {
-        console.error("❌ Failed to load audio:", error);
-        reject(new Error("Failed to load audio"));
-      };
+        this.audioElement.onerror = (error) => {
+          console.error("❌ Failed to load audio:", error);
+          reject(new Error("Failed to load audio"));
+        };
 
-      console.log("🎵 Loading audio...");
-      this.audioElement.load();
-    });
+        console.log("🎵 Loading audio...");
+        this.audioElement.load();
+      }),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("Audio load timeout")), timeout)
+      ),
+    ]);
 
-    // Setup Web Audio API analysis chain
-    console.log("🎵 Setting up Web Audio API...");
-    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    console.log("🎵 AudioContext state:", this.audioContext.state);
+    // Try to setup Web Audio API, but fallback to simple playback on mobile if it fails
+    if (this.isMobile) {
+      console.log("📱 Using mobile fallback mode (simple audio playback, no lip sync)");
+      this.useFallbackMode = true;
+      // Skip Web Audio API setup on mobile - just use simple audio element
+      return;
+    }
 
-    const source = this.audioContext.createMediaElementSource(this.audioElement);
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 2048;
+    try {
+      // Setup Web Audio API analysis chain for desktop
+      console.log("🎵 Setting up Web Audio API...");
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log("🎵 AudioContext state:", this.audioContext.state);
 
-    source.connect(this.analyser);
-    this.analyser.connect(this.audioContext.destination);
+      const source = this.audioContext.createMediaElementSource(this.audioElement);
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 2048;
 
-    this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
-    this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
+      source.connect(this.analyser);
+      this.analyser.connect(this.audioContext.destination);
 
-    console.log("✅ Web Audio API setup complete");
+      this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+      this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
+
+      console.log("✅ Web Audio API setup complete");
+      this.useFallbackMode = false;
+    } catch (error) {
+      console.warn("⚠️ Web Audio API setup failed, using fallback mode:", error);
+      this.useFallbackMode = true;
+      // Clean up any partial setup
+      this.audioContext = null;
+      this.analyser = null;
+      this.timeDomainBuffer = null;
+      this.frequencyBuffer = null;
+    }
   }
 
   /**
@@ -134,16 +176,27 @@ export class LipSyncManager {
    */
   async play(): Promise<void> {
     console.log("▶️ LipSyncManager.play() called");
-    await this.resumeAudio();
 
     if (!this.audioElement) {
       console.error("❌ No audio element to play");
       return;
     }
 
-    console.log("▶️ Calling audioElement.play()...");
-    await this.audioElement.play();
-    console.log("✅ Audio playback started");
+    // In fallback mode (mobile), skip AudioContext resume
+    if (!this.useFallbackMode) {
+      await this.resumeAudio();
+    } else {
+      console.log("📱 Fallback mode: using simple audio playback");
+    }
+
+    try {
+      console.log("▶️ Calling audioElement.play()...");
+      await this.audioElement.play();
+      console.log("✅ Audio playback started");
+    } catch (error) {
+      console.error("❌ Audio playback failed:", error);
+      throw error;
+    }
   }
 
   /**
@@ -173,6 +226,11 @@ export class LipSyncManager {
    * Call this every frame in your animation loop.
    */
   update(): void {
+    // In fallback mode (mobile), skip lip sync analysis
+    if (this.useFallbackMode) {
+      return;
+    }
+
     if (!this.analyser || !this.timeDomainBuffer || !this.frequencyBuffer) {
       return;
     }
