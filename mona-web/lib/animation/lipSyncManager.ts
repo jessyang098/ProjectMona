@@ -296,6 +296,18 @@ export class LipSyncManager {
   }
 
   /**
+   * Stop and reset the current audio playback.
+   * Used when user sends a new message to prioritize the new response.
+   */
+  stop(): void {
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement.currentTime = 0;
+    }
+    this.resetMouth();
+  }
+
+  /**
    * Reset all mouth expressions to neutral
    */
   resetMouth(): void {
