@@ -47,6 +47,7 @@ export class LipSyncManager {
   private audioElement: HTMLAudioElement | null = null;
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private source: MediaElementAudioSourceNode | null = null;
   private timeDomainBuffer: Uint8Array<ArrayBuffer> | null = null;
   private frequencyBuffer: Uint8Array<ArrayBuffer> | null = null;
   private previousPhonemeValues: PhonemeValues = {
@@ -77,12 +78,15 @@ export class LipSyncManager {
   }
 
   /**
-   * Initialize audio analysis for the given audio URL
+   * Initialize audio analysis for the given audio URL.
+   * MOBILE FIX: Creates audio element synchronously to preserve user interaction context.
+   * Audio loading happens asynchronously in the background.
    */
-  async setupAudio(audioUrl: string): Promise<void> {
+  setupAudio(audioUrl: string): void {
     console.log("🎵 LipSyncManager.setupAudio called with:", audioUrl);
     console.log("🎵 Full audio URL that will be loaded:", new URL(audioUrl, window.location.href).href);
 
+    // CRITICAL: Create Audio element synchronously to preserve user interaction context
     this.audioElement = new Audio(audioUrl);
     this.audioElement.crossOrigin = "anonymous";
 
@@ -98,46 +102,31 @@ export class LipSyncManager {
 
     console.log("🎵 Audio element created");
 
-    // Wait for audio to be ready with extended timeout for mobile
-    const timeout = this.isMobile ? 15000 : 10000;
-    await Promise.race([
-      new Promise<void>((resolve, reject) => {
-        if (!this.audioElement) {
-          console.error("❌ Audio element not created");
-          return reject(new Error("Audio element not created"));
-        }
+    // Setup event listeners (these fire asynchronously but don't block play())
+    this.audioElement.oncanplaythrough = () => {
+      console.log("✅ Audio can play through");
+    };
 
-        this.audioElement.oncanplaythrough = () => {
-          console.log("✅ Audio can play through");
-          resolve();
-        };
+    this.audioElement.onerror = (error) => {
+      console.error("❌ Failed to load audio:", error);
+      console.error("❌ Audio element error details:", {
+        error: this.audioElement?.error,
+        networkState: this.audioElement?.networkState,
+        readyState: this.audioElement?.readyState,
+      });
 
-        this.audioElement.onerror = (error) => {
-          console.error("❌ Failed to load audio:", error);
-          console.error("❌ Audio element error details:", {
-            error: this.audioElement?.error,
-            networkState: this.audioElement?.networkState,
-            readyState: this.audioElement?.readyState,
-          });
+      // Log detailed error information
+      if (this.audioElement?.error) {
+        const mediaError = this.audioElement.error;
+        console.error("❌ MediaError code:", mediaError.code);
+        console.error("❌ MediaError message:", mediaError.message);
+        console.error("❌ MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED");
+      }
+    };
 
-          // Log detailed error information
-          if (this.audioElement?.error) {
-            const mediaError = this.audioElement.error;
-            console.error("❌ MediaError code:", mediaError.code);
-            console.error("❌ MediaError message:", mediaError.message);
-            console.error("❌ MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED");
-          }
-
-          reject(new Error("Failed to load audio"));
-        };
-
-        console.log("🎵 Loading audio...");
-        this.audioElement.load();
-      }),
-      new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error("Audio load timeout")), timeout)
-      ),
-    ]);
+    // Load audio asynchronously (doesn't block play())
+    console.log("🎵 Loading audio...");
+    this.audioElement.load();
 
     // Setup Web Audio API analysis chain
     console.log("🎵 Setting up Web Audio API...");
@@ -158,17 +147,23 @@ export class LipSyncManager {
     console.log("🎵 AudioContext state:", this.audioContext.state);
 
     try {
-      const source = this.audioContext.createMediaElementSource(this.audioElement);
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 2048;
+      // Only create MediaElementSource if we don't already have one
+      // (can only be created once per audio element)
+      if (!this.source) {
+        this.source = this.audioContext.createMediaElementSource(this.audioElement);
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 2048;
 
-      source.connect(this.analyser);
-      this.analyser.connect(this.audioContext.destination);
+        this.source.connect(this.analyser);
+        this.analyser.connect(this.audioContext.destination);
 
-      this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
-      this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
+        this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+        this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
 
-      console.log("✅ Web Audio API setup complete");
+        console.log("✅ Web Audio API setup complete");
+      } else {
+        console.log("✅ Reusing existing Web Audio API connection");
+      }
     } catch (error) {
       console.error("❌ Failed to set up Web Audio API:", error);
       console.error("   This usually happens on mobile when AudioContext wasn't initialized from user interaction");
@@ -224,8 +219,9 @@ export class LipSyncManager {
 
   /**
    * Play the loaded audio
+   * MOBILE FIX: Must be called synchronously within user interaction context
    */
-  async play(): Promise<void> {
+  play(): void {
     console.log("▶️ LipSyncManager.play() called");
 
     if (!this.audioElement) {
@@ -244,20 +240,28 @@ export class LipSyncManager {
       muted: this.audioElement.muted,
     });
 
-    await this.resumeAudio();
+    // Resume AudioContext if needed (must be sync for mobile)
+    if (this.audioContext?.state === "suspended") {
+      console.log("🎵 Resuming suspended AudioContext synchronously...");
+      this.audioContext.resume().catch((error) => {
+        console.error("❌ Failed to resume AudioContext:", error);
+      });
+    }
 
-    try {
-      console.log("▶️ Calling audioElement.play()...");
-      const playPromise = this.audioElement.play();
-      console.log("▶️ Play promise created:", playPromise);
+    // CRITICAL: Call play() synchronously to preserve user interaction context
+    console.log("▶️ Calling audioElement.play() synchronously...");
+    const playPromise = this.audioElement.play();
 
-      await playPromise;
-      console.log("✅ Audio playback started successfully");
-    } catch (error) {
-      console.error("❌ Audio playback failed:", error);
-      console.error("   Error name:", (error as Error).name);
-      console.error("   Error message:", (error as Error).message);
-      throw error;
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log("✅ Audio playback started successfully");
+        })
+        .catch((error) => {
+          console.error("❌ Audio playback failed:", error);
+          console.error("   Error name:", (error as Error).name);
+          console.error("   Error message:", (error as Error).message);
+        });
     }
   }
 
