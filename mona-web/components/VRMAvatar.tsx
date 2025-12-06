@@ -368,7 +368,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     if (leftUpperArmRef.current) {
       const currentZ = leftUpperArmRef.current.rotation.z;
       const restZ = cfg.arms.leftRotationZ;
-      const maxDeviation = 0.6; // Maximum radians arms can deviate from rest pose
+      const maxDeviation = 0.2; // Maximum radians arms can deviate from rest pose (about 11 degrees)
 
       // Clamp rotation to stay within allowed range
       const minZ = restZ - maxDeviation;
@@ -378,7 +378,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     if (rightUpperArmRef.current) {
       const currentZ = rightUpperArmRef.current.rotation.z;
       const restZ = cfg.arms.rightRotationZ;
-      const maxDeviation = 0.6; // Maximum radians arms can deviate from rest pose
+      const maxDeviation = 0.2; // Maximum radians arms can deviate from rest pose (about 11 degrees)
 
       // Clamp rotation to stay within allowed range
       const minZ = restZ - maxDeviation;
