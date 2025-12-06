@@ -147,23 +147,22 @@ export class LipSyncManager {
     console.log("🎵 AudioContext state:", this.audioContext.state);
 
     try {
-      // Only create MediaElementSource if we don't already have one
-      // (can only be created once per audio element)
-      if (!this.source) {
-        this.source = this.audioContext.createMediaElementSource(this.audioElement);
+      // Create new MediaElementSource for this audio element
+      // Note: Each audio element needs its own source
+      this.source = this.audioContext.createMediaElementSource(this.audioElement);
+
+      // Create analyser if we don't have one, or reuse existing
+      if (!this.analyser) {
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 2048;
-
-        this.source.connect(this.analyser);
-        this.analyser.connect(this.audioContext.destination);
-
         this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
         this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
-
-        console.log("✅ Web Audio API setup complete");
-      } else {
-        console.log("✅ Reusing existing Web Audio API connection");
       }
+
+      this.source.connect(this.analyser);
+      this.analyser.connect(this.audioContext.destination);
+
+      console.log("✅ Web Audio API setup complete");
     } catch (error) {
       console.error("❌ Failed to set up Web Audio API:", error);
       console.error("   This usually happens on mobile when AudioContext wasn't initialized from user interaction");
@@ -430,10 +429,18 @@ export class LipSyncManager {
   dispose(): void {
     this.audioElement?.pause();
     this.audioElement = null;
-    this.audioContext?.close();
-    this.audioContext = null;
-    this.analyser = null;
-    this.timeDomainBuffer = null;
-    this.frequencyBuffer = null;
+
+    // Disconnect source if it exists
+    if (this.source) {
+      this.source.disconnect();
+      this.source = null;
+    }
+
+    // Note: Don't close AudioContext or destroy analyser - they're reused
+    // this.audioContext?.close();
+    // this.audioContext = null;
+    // this.analyser = null;
+    // this.timeDomainBuffer = null;
+    // this.frequencyBuffer = null;
   }
 }
