@@ -255,32 +255,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
 
   // Handle audio playback with lip sync
   useEffect(() => {
-    console.log("🎤 Audio URL useEffect triggered!");
-    console.log("  - audioUrl:", audioUrl);
-    console.log("  - vrm loaded:", !!vrm);
-    console.log("  - currentAudioRef:", currentAudioRef.current);
-
-    if (!vrm) {
-      console.warn("⚠️ VRM not loaded yet, skipping audio");
-      return;
-    }
-
-    // Log available expressions
-    console.log("🎭 Available VRM systems:");
-    console.log("  - expressionManager:", !!vrm.expressionManager);
-
-    if (vrm.expressionManager) {
-      const expressions = vrm.expressionManager.expressionMap;
-      console.log("🎭 Available expressions in VRM model:");
-      if (expressions) {
-        Object.keys(expressions).forEach((name) => {
-          console.log(`   - ${name}`);
-        });
-      }
-    }
-
-    if (!audioUrl) {
-      console.log("ℹ️ No audio URL provided");
+    if (!vrm || !audioUrl) {
       return;
     }
 

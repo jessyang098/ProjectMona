@@ -89,10 +89,12 @@ export class LipSyncManager {
     // CRITICAL: Clean up old audio element and source before creating new ones
     if (this.audioElement) {
       console.log("🧹 Cleaning up previous audio element");
-      this.audioElement.pause();
-      this.audioElement.currentTime = 0; // Reset playback position
-      this.audioElement.src = ""; // Release the old audio
-      this.audioElement.load(); // Force browser to release resources
+      const oldAudio = this.audioElement;
+      oldAudio.pause();
+      oldAudio.currentTime = 0; // Reset playback position
+      oldAudio.src = ""; // Release the old audio
+      oldAudio.load(); // Force browser to release resources
+      this.audioElement = null; // Clear reference immediately
     }
 
     if (this.source) {
@@ -100,9 +102,6 @@ export class LipSyncManager {
       this.source.disconnect();
       this.source = null;
     }
-
-    // Set audioElement to null AFTER cleanup to ensure proper release
-    this.audioElement = null;
 
     // CRITICAL: Create Audio element synchronously to preserve user interaction context
     this.audioElement = new Audio(audioUrl);
@@ -126,19 +125,19 @@ export class LipSyncManager {
     };
 
     this.audioElement.onerror = (error) => {
-      console.error("❌ Failed to load audio:", error);
-      console.error("❌ Audio element error details:", {
-        error: this.audioElement?.error,
-        networkState: this.audioElement?.networkState,
-        readyState: this.audioElement?.readyState,
-      });
-
-      // Log detailed error information
+      // Network state 2 (NETWORK_IDLE) with no error often happens when browser aborts loading
+      // This can be normal during rapid audio switching - only log if there's an actual error
       if (this.audioElement?.error) {
         const mediaError = this.audioElement.error;
-        console.error("❌ MediaError code:", mediaError.code);
-        console.error("❌ MediaError message:", mediaError.message);
-        console.error("❌ MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED");
+        console.error("❌ Audio loading failed - MediaError code:", mediaError.code);
+        console.error("   Message:", mediaError.message);
+        console.error("   Codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED");
+      } else if (this.audioElement?.networkState !== 2) {
+        // Only log if it's not the common NETWORK_IDLE state
+        console.warn("⚠️ Audio error (no MediaError):", {
+          networkState: this.audioElement?.networkState,
+          readyState: this.audioElement?.readyState,
+        });
       }
     };
 
@@ -346,21 +345,6 @@ export class LipSyncManager {
 
     // Map to phoneme shapes
     const phonemeValues = this.estimatePhonemes(amplitude, centroid);
-
-    // Debug logging (log every 10 frames to see what's happening)
-    if (Math.random() < 0.1) {
-      console.log("🎤 Lip sync values:", {
-        amplitude: amplitude.toFixed(4),
-        centroid: centroid.toFixed(4),
-        phonemes: {
-          aa: phonemeValues.aa.toFixed(3),
-          ee: phonemeValues.ee.toFixed(3),
-          ih: phonemeValues.ih.toFixed(3),
-          oh: phonemeValues.oh.toFixed(3),
-          ou: phonemeValues.ou.toFixed(3),
-        }
-      });
-    }
 
     // Apply smoothing and update VRM expressions
     this.applySmoothedPhonemes(phonemeValues, expressionManager);
