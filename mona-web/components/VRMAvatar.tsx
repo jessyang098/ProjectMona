@@ -293,30 +293,30 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     console.log("▶️ Setting up new audio:", audioUrl);
     currentAudioRef.current = audioUrl;
 
-    const setupLipSync = async () => {
-      try {
-        // Create or reuse LipSyncManager
-        if (!lipSyncRef.current) {
-          console.log("📦 Creating new LipSyncManager");
-          lipSyncRef.current = new LipSyncManager(vrm, {
-            smoothingFactor: 0.3,
-            amplitudeScale: 1.0, // Match Riko's subtle mouth movement
-            amplitudeThreshold: 0.001, // Lower threshold to trigger more easily
-          });
-        }
-
-        console.log("🔊 Loading audio from:", audioUrl);
-        // Setup and play audio
-        await lipSyncRef.current.setupAudio(audioUrl);
-        console.log("✅ Audio loaded, starting playback");
-        await lipSyncRef.current.play();
-        console.log("✓ Playing audio with lip sync:", audioUrl);
-      } catch (error) {
-        console.error("❌ Failed to play audio:", error);
+    // CRITICAL FOR MOBILE: Setup and play must be called synchronously
+    // to preserve the user interaction context required by mobile browsers
+    try {
+      // Create or reuse LipSyncManager
+      if (!lipSyncRef.current) {
+        console.log("📦 Creating new LipSyncManager");
+        lipSyncRef.current = new LipSyncManager(vrm, {
+          smoothingFactor: 0.3,
+          amplitudeScale: 1.0, // Match Riko's subtle mouth movement
+          amplitudeThreshold: 0.001, // Lower threshold to trigger more easily
+        });
       }
-    };
 
-    setupLipSync();
+      console.log("🔊 Loading audio from:", audioUrl);
+      // Setup audio synchronously (no await)
+      lipSyncRef.current.setupAudio(audioUrl);
+      console.log("✅ Audio setup complete");
+
+      // Call play() synchronously to preserve user interaction context for mobile
+      lipSyncRef.current.play();
+      console.log("✓ Playing audio with lip sync:", audioUrl);
+    } catch (error) {
+      console.error("❌ Failed to play audio:", error);
+    }
 
     return () => {
       // Cleanup on audio change
