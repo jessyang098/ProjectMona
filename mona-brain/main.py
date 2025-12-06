@@ -101,17 +101,14 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Mona Brain API", lifespan=lifespan)
 
 # CORS configuration for Next.js frontend
+# Allow all origins for mobile compatibility (audio playback requires permissive CORS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://*.vercel.app",  # Allow all Vercel preview/production URLs
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Regex pattern for Vercel domains
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for mobile audio playback
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Expose all headers to client
 )
 
 # Create a custom StaticFiles class that adds CORS headers
