@@ -217,6 +217,14 @@ async def health():
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
 
+    # Detect mobile device from User-Agent header
+    user_agent = websocket.headers.get("user-agent", "").lower()
+    is_mobile = any(
+        device in user_agent
+        for device in ["android", "webos", "iphone", "ipad", "ipod", "blackberry", "iemobile", "opera mini"]
+    )
+    print(f"📱 Client {client_id} - Mobile: {is_mobile}, User-Agent: {user_agent[:100]}...")
+
     try:
         # Send welcome message
         if mona_llm:
@@ -246,7 +254,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             if mona_tts_sovits:
                 print(f"🎤 [STARTUP AUDIO] Attempting GPT-SoVITS generation...")
                 try:
-                    audio_path = await mona_tts_sovits.generate_speech(welcome_content)
+                    audio_path = await mona_tts_sovits.generate_speech(welcome_content, convert_to_mp3=is_mobile)
                     print(f"🎤 [STARTUP AUDIO] GPT-SoVITS returned: {audio_path}")
                     if audio_path:
                         audio_url = f"/audio/{Path(audio_path).name}"
@@ -354,7 +362,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                     audio_url = None
                                     # Try GPT-SoVITS first (high-quality anime voice)
                                     if mona_tts_sovits:
-                                        audio_path = await mona_tts_sovits.generate_speech(event["content"])
+                                        audio_path = await mona_tts_sovits.generate_speech(event["content"], convert_to_mp3=is_mobile)
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
                                             print(f"✓ Using GPT-SoVITS audio")
