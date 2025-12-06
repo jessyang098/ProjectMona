@@ -57,7 +57,6 @@ export class LipSyncManager {
     ou: 0,
   };
   private isMobile: boolean = false;
-  private useSimplePlayback: boolean = false;
 
   constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
     this.vrm = vrm;
@@ -123,15 +122,7 @@ export class LipSyncManager {
       ),
     ]);
 
-    // On mobile, use simple playback to ensure audio works
-    // Web Audio API can cause silent failures on mobile browsers
-    if (this.isMobile) {
-      console.log("📱 Using simple audio playback on mobile (no lip sync)");
-      this.useSimplePlayback = true;
-      return;
-    }
-
-    // Setup Web Audio API analysis chain for desktop
+    // Setup Web Audio API analysis chain
     console.log("🎵 Setting up Web Audio API...");
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     console.log("🎵 AudioContext state:", this.audioContext.state);
@@ -165,17 +156,11 @@ export class LipSyncManager {
    */
   async play(): Promise<void> {
     console.log("▶️ LipSyncManager.play() called");
+    await this.resumeAudio();
 
     if (!this.audioElement) {
       console.error("❌ No audio element to play");
       return;
-    }
-
-    // Only resume AudioContext if not using simple playback
-    if (!this.useSimplePlayback) {
-      await this.resumeAudio();
-    } else {
-      console.log("📱 Simple playback mode - skipping AudioContext");
     }
 
     try {
