@@ -318,12 +318,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       console.error("❌ Failed to play audio:", error);
     }
 
-    return () => {
-      // Cleanup on audio change
-      console.log("🧹 Cleaning up previous audio");
-      lipSyncRef.current?.pause();
-      lipSyncRef.current?.resetMouth();
-    };
+    // No cleanup function needed - setupAudio() handles cleanup internally
   }, [audioUrl, vrm]);
 
   useFrame((_, delta) => {
