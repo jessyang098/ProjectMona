@@ -46,20 +46,21 @@ class MonaTTSSoVITS:
         self.audio_dir = Path(audio_dir)
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
-    def _get_cache_path(self, text: str) -> Path:
-        """Generate cache file path based on text hash."""
+    def _get_cache_path(self, text: str, format: str = "wav") -> Path:
+        """Generate cache file path based on text hash and format."""
         text_hash = hashlib.md5(
             f"{text}_{self.ref_audio_path}_{self.speed_factor}".encode()
         ).hexdigest()
-        return self.audio_dir / f"{text_hash}.mp3"
+        return self.audio_dir / f"{text_hash}.{format}"
 
-    async def generate_speech(self, text: str, use_cache: bool = True) -> Optional[str]:
+    async def generate_speech(self, text: str, use_cache: bool = True, convert_to_mp3: bool = False) -> Optional[str]:
         """
         Generate speech audio from text using GPT-SoVITS.
 
         Args:
             text: Text to convert to speech
             use_cache: Whether to use cached audio if available
+            convert_to_mp3: Whether to convert WAV to MP3 (for mobile compatibility)
 
         Returns:
             Path to generated audio file, or None if generation failed
@@ -67,7 +68,9 @@ class MonaTTSSoVITS:
         if not text or not text.strip():
             return None
 
-        cache_path = self._get_cache_path(text)
+        # Determine output format based on conversion flag
+        output_format = "mp3" if convert_to_mp3 else "wav"
+        cache_path = self._get_cache_path(text, format=output_format)
 
         # Return cached file if it exists
         if use_cache and cache_path.exists():
@@ -101,23 +104,30 @@ class MonaTTSSoVITS:
 
             response.raise_for_status()
 
-            # Save WAV file temporarily
-            wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav"
-            with open(wav_path, "wb") as f:
-                f.write(response.content)
+            # Only convert to MP3 if requested (for mobile clients)
+            if convert_to_mp3:
+                # Save WAV file temporarily
+                wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav"
+                with open(wav_path, "wb") as f:
+                    f.write(response.content)
 
-            print(f"✓ SoVITS WAV generated, converting to MP3 for mobile compatibility...")
+                print(f"✓ SoVITS WAV generated, converting to MP3 for mobile compatibility...")
 
-            # Convert WAV to MP3 for mobile browser compatibility
-            try:
-                audio = AudioSegment.from_wav(str(wav_path))
-                audio.export(str(cache_path), format="mp3", bitrate="128k")
-                wav_path.unlink()  # Delete temporary WAV file
-                print(f"✓ SoVITS audio converted to MP3: {cache_path.name}")
-            except Exception as e:
-                print(f"⚠️ MP3 conversion failed, falling back to WAV: {e}")
-                # If conversion fails, rename WAV to MP3 extension (will fail on mobile)
-                wav_path.rename(cache_path)
+                # Convert WAV to MP3 for mobile browser compatibility
+                try:
+                    audio = AudioSegment.from_wav(str(wav_path))
+                    audio.export(str(cache_path), format="mp3", bitrate="128k")
+                    wav_path.unlink()  # Delete temporary WAV file
+                    print(f"✓ SoVITS audio converted to MP3: {cache_path.name}")
+                except Exception as e:
+                    print(f"⚠️ MP3 conversion failed, falling back to WAV: {e}")
+                    # If conversion fails, rename WAV to MP3 extension (will fail on mobile)
+                    wav_path.rename(cache_path)
+            else:
+                # Save WAV directly (for desktop clients)
+                with open(cache_path, "wb") as f:
+                    f.write(response.content)
+                print(f"✓ SoVITS audio saved as WAV: {cache_path.name}")
 
             return str(cache_path)
 
