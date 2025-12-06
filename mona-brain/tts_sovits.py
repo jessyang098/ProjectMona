@@ -7,6 +7,7 @@ import hashlib
 import requests
 from pathlib import Path
 from typing import Optional
+from pydub import AudioSegment
 
 
 class MonaTTSSoVITS:
@@ -50,7 +51,7 @@ class MonaTTSSoVITS:
         text_hash = hashlib.md5(
             f"{text}_{self.ref_audio_path}_{self.speed_factor}".encode()
         ).hexdigest()
-        return self.audio_dir / f"{text_hash}.wav"
+        return self.audio_dir / f"{text_hash}.mp3"
 
     async def generate_speech(self, text: str, use_cache: bool = True) -> Optional[str]:
         """
@@ -100,11 +101,24 @@ class MonaTTSSoVITS:
 
             response.raise_for_status()
 
-            # Save audio file
-            with open(cache_path, "wb") as f:
+            # Save WAV file temporarily
+            wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav"
+            with open(wav_path, "wb") as f:
                 f.write(response.content)
 
-            print(f"✓ SoVITS audio saved: {cache_path.name}")
+            print(f"✓ SoVITS WAV generated, converting to MP3 for mobile compatibility...")
+
+            # Convert WAV to MP3 for mobile browser compatibility
+            try:
+                audio = AudioSegment.from_wav(str(wav_path))
+                audio.export(str(cache_path), format="mp3", bitrate="128k")
+                wav_path.unlink()  # Delete temporary WAV file
+                print(f"✓ SoVITS audio converted to MP3: {cache_path.name}")
+            except Exception as e:
+                print(f"⚠️ MP3 conversion failed, falling back to WAV: {e}")
+                # If conversion fails, rename WAV to MP3 extension (will fail on mobile)
+                wav_path.rename(cache_path)
+
             return str(cache_path)
 
         except requests.exceptions.ConnectionError:
@@ -126,6 +140,10 @@ class MonaTTSSoVITS:
             Number of files deleted
         """
         count = 0
+        for file_path in self.audio_dir.glob("*.mp3"):
+            file_path.unlink()
+            count += 1
+        # Also clear any remaining WAV files from old cache
         for file_path in self.audio_dir.glob("*.wav"):
             file_path.unlink()
             count += 1
@@ -140,6 +158,9 @@ class MonaTTSSoVITS:
             Total cache size in bytes
         """
         total_size = sum(
+            file_path.stat().st_size for file_path in self.audio_dir.glob("*.mp3")
+        )
+        total_size += sum(
             file_path.stat().st_size for file_path in self.audio_dir.glob("*.wav")
         )
         return total_size
