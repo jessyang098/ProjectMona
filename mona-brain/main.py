@@ -225,10 +225,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         if mona_llm:
             # Get initial emotion state
             emotion_data = mona_llm.get_emotion_state(client_id)
-            welcome_content = "Hi! I'm Mona! I'm so happy to meet you! 💖"
+            welcome_content = "Hi! I'm Mona! I'm so happy to meet you!"
         else:
             emotion_data = {}
-            welcome_content = "Hi! I'm Mona! I'm so happy to meet you! 💖 (Running in dummy mode)"
+            welcome_content = "Hi! I'm Mona! I'm so happy to meet you! (Running in dummy mode)"
 
         welcome_message = {
             "type": "message",
@@ -238,6 +238,35 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             "emotion": emotion_data,
         }
         await manager.send_message(welcome_message, client_id)
+
+        # Generate welcome voice in background (non-blocking)
+        async def generate_welcome_audio():
+            audio_url = None
+            # Try GPT-SoVITS first (high-quality anime voice)
+            if mona_tts_sovits:
+                audio_path = await mona_tts_sovits.generate_speech(welcome_content)
+                if audio_path:
+                    audio_url = f"/audio/{Path(audio_path).name}"
+                    print(f"✓ Generated startup greeting voice with GPT-SoVITS")
+
+            # Fall back to OpenAI TTS if SoVITS failed
+            if not audio_url and mona_tts:
+                audio_path = await mona_tts.generate_speech(welcome_content)
+                if audio_url:
+                    audio_url = f"/audio/{Path(audio_path).name}"
+                    print(f"✓ Generated startup greeting voice with OpenAI TTS")
+
+            # Send audio update when ready
+            if audio_url:
+                audio_update = {
+                    "type": "audio_ready",
+                    "audioUrl": audio_url,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                await manager.send_message(audio_update, client_id)
+
+        # Start background task
+        asyncio.create_task(generate_welcome_audio())
 
         while True:
             # Receive message from client
