@@ -210,19 +210,36 @@ export class LipSyncManager {
    */
   async play(): Promise<void> {
     console.log("▶️ LipSyncManager.play() called");
-    await this.resumeAudio();
 
     if (!this.audioElement) {
       console.error("❌ No audio element to play");
       return;
     }
 
+    // Log detailed audio element state
+    console.log("📊 Audio element state:", {
+      src: this.audioElement.src,
+      readyState: this.audioElement.readyState,
+      paused: this.audioElement.paused,
+      currentTime: this.audioElement.currentTime,
+      duration: this.audioElement.duration,
+      volume: this.audioElement.volume,
+      muted: this.audioElement.muted,
+    });
+
+    await this.resumeAudio();
+
     try {
       console.log("▶️ Calling audioElement.play()...");
-      await this.audioElement.play();
-      console.log("✅ Audio playback started");
+      const playPromise = this.audioElement.play();
+      console.log("▶️ Play promise created:", playPromise);
+
+      await playPromise;
+      console.log("✅ Audio playback started successfully");
     } catch (error) {
       console.error("❌ Audio playback failed:", error);
+      console.error("   Error name:", (error as Error).name);
+      console.error("   Error message:", (error as Error).message);
       throw error;
     }
   }
