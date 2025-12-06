@@ -57,7 +57,6 @@ export class LipSyncManager {
     ou: 0,
   };
   private isMobile: boolean = false;
-  private useFallbackMode: boolean = false;
 
   constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
     this.vrm = vrm;
@@ -123,41 +122,22 @@ export class LipSyncManager {
       ),
     ]);
 
-    // Try to setup Web Audio API, but fallback to simple playback on mobile if it fails
-    if (this.isMobile) {
-      console.log("📱 Using mobile fallback mode (simple audio playback, no lip sync)");
-      this.useFallbackMode = true;
-      // Skip Web Audio API setup on mobile - just use simple audio element
-      return;
-    }
+    // Setup Web Audio API analysis chain
+    console.log("🎵 Setting up Web Audio API...");
+    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    console.log("🎵 AudioContext state:", this.audioContext.state);
 
-    try {
-      // Setup Web Audio API analysis chain for desktop
-      console.log("🎵 Setting up Web Audio API...");
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      console.log("🎵 AudioContext state:", this.audioContext.state);
+    const source = this.audioContext.createMediaElementSource(this.audioElement);
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 2048;
 
-      const source = this.audioContext.createMediaElementSource(this.audioElement);
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 2048;
+    source.connect(this.analyser);
+    this.analyser.connect(this.audioContext.destination);
 
-      source.connect(this.analyser);
-      this.analyser.connect(this.audioContext.destination);
+    this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+    this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
 
-      this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
-      this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
-
-      console.log("✅ Web Audio API setup complete");
-      this.useFallbackMode = false;
-    } catch (error) {
-      console.warn("⚠️ Web Audio API setup failed, using fallback mode:", error);
-      this.useFallbackMode = true;
-      // Clean up any partial setup
-      this.audioContext = null;
-      this.analyser = null;
-      this.timeDomainBuffer = null;
-      this.frequencyBuffer = null;
-    }
+    console.log("✅ Web Audio API setup complete");
   }
 
   /**
@@ -176,17 +156,11 @@ export class LipSyncManager {
    */
   async play(): Promise<void> {
     console.log("▶️ LipSyncManager.play() called");
+    await this.resumeAudio();
 
     if (!this.audioElement) {
       console.error("❌ No audio element to play");
       return;
-    }
-
-    // In fallback mode (mobile), skip AudioContext resume
-    if (!this.useFallbackMode) {
-      await this.resumeAudio();
-    } else {
-      console.log("📱 Fallback mode: using simple audio playback");
     }
 
     try {
@@ -226,11 +200,6 @@ export class LipSyncManager {
    * Call this every frame in your animation loop.
    */
   update(): void {
-    // In fallback mode (mobile), skip lip sync analysis
-    if (this.useFallbackMode) {
-      return;
-    }
-
     if (!this.analyser || !this.timeDomainBuffer || !this.frequencyBuffer) {
       return;
     }
