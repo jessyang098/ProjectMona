@@ -259,10 +259,17 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       return;
     }
 
-    // Skip if already playing this audio
+    // If this is the same audio, skip
     if (currentAudioRef.current === audioUrl) {
       console.log("⏭️ Already playing this audio, skipping");
       return;
+    }
+
+    // CRITICAL: Stop current audio immediately when new message arrives
+    // This allows quick responses to prioritize over longer previous responses
+    if (lipSyncRef.current && currentAudioRef.current) {
+      console.log("⏹️ Stopping current audio to prioritize new message");
+      lipSyncRef.current.stop();
     }
 
     console.log("▶️ Setting up new audio:", audioUrl);
