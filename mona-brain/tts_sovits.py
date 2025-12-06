@@ -5,9 +5,9 @@ Uses local GPT-SoVITS server for high-quality anime voice synthesis
 
 import hashlib
 import requests
+import subprocess
 from pathlib import Path
 from typing import Optional
-from pydub import AudioSegment
 
 
 class MonaTTSSoVITS:
@@ -113,16 +113,48 @@ class MonaTTSSoVITS:
 
                 print(f"✓ SoVITS WAV generated, converting to MP3 for mobile compatibility...")
 
-                # Convert WAV to MP3 for mobile browser compatibility
+                # Convert WAV to MP3 using ffmpeg directly for better reliability
                 try:
-                    audio = AudioSegment.from_wav(str(wav_path))
-                    audio.export(str(cache_path), format="mp3", bitrate="128k")
-                    wav_path.unlink()  # Delete temporary WAV file
-                    print(f"✓ SoVITS audio converted to MP3: {cache_path.name}")
+                    result = subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-i", str(wav_path),  # Input WAV file
+                            "-codec:a", "libmp3lame",  # MP3 encoder
+                            "-b:a", "128k",  # 128kbps bitrate
+                            "-ar", "44100",  # 44.1kHz sample rate (standard for web)
+                            "-ac", "1",  # Mono audio
+                            "-y",  # Overwrite output file
+                            str(cache_path)  # Output MP3 file
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+
+                    if result.returncode == 0:
+                        wav_path.unlink()  # Delete temporary WAV file
+                        print(f"✓ SoVITS audio converted to MP3: {cache_path.name}")
+                    else:
+                        print(f"❌ ffmpeg conversion failed with return code {result.returncode}")
+                        print(f"   stderr: {result.stderr[:200]}")
+                        return None
+
+                except subprocess.TimeoutExpired:
+                    print(f"❌ MP3 conversion timed out after 30 seconds")
+                    if wav_path.exists():
+                        wav_path.unlink()
+                    return None
+                except FileNotFoundError:
+                    print(f"❌ ffmpeg not found - cannot convert to MP3 for mobile")
+                    print(f"   Install ffmpeg: apt-get install ffmpeg (or brew install ffmpeg on macOS)")
+                    if wav_path.exists():
+                        wav_path.unlink()
+                    return None
                 except Exception as e:
-                    print(f"⚠️ MP3 conversion failed, falling back to WAV: {e}")
-                    # If conversion fails, rename WAV to MP3 extension (will fail on mobile)
-                    wav_path.rename(cache_path)
+                    print(f"❌ MP3 conversion failed: {e}")
+                    if wav_path.exists():
+                        wav_path.unlink()
+                    return None
             else:
                 # Save WAV directly (for desktop clients)
                 with open(cache_path, "wb") as f:
