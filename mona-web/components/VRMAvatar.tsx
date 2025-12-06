@@ -291,7 +291,6 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     }
 
     console.log("▶️ Setting up new audio:", audioUrl);
-    currentAudioRef.current = audioUrl;
 
     // CRITICAL FOR MOBILE: Setup and play must be called synchronously
     // to preserve the user interaction context required by mobile browsers
@@ -314,8 +313,12 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       // Call play() synchronously to preserve user interaction context for mobile
       lipSyncRef.current.play();
       console.log("✓ Playing audio with lip sync:", audioUrl);
+
+      // Only mark as current after successful setup (prevents retry blocking if setup fails)
+      currentAudioRef.current = audioUrl;
     } catch (error) {
       console.error("❌ Failed to play audio:", error);
+      // Don't set currentAudioRef so we can retry on next update
     }
 
     // No cleanup function needed - setupAudio() handles cleanup internally

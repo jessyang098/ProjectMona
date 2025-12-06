@@ -90,8 +90,9 @@ export class LipSyncManager {
     if (this.audioElement) {
       console.log("🧹 Cleaning up previous audio element");
       this.audioElement.pause();
+      this.audioElement.currentTime = 0; // Reset playback position
       this.audioElement.src = ""; // Release the old audio
-      this.audioElement = null;
+      this.audioElement.load(); // Force browser to release resources
     }
 
     if (this.source) {
@@ -99,6 +100,9 @@ export class LipSyncManager {
       this.source.disconnect();
       this.source = null;
     }
+
+    // Set audioElement to null AFTER cleanup to ensure proper release
+    this.audioElement = null;
 
     // CRITICAL: Create Audio element synchronously to preserve user interaction context
     this.audioElement = new Audio(audioUrl);
