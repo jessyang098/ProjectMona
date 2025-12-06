@@ -134,13 +134,23 @@ export class GestureManager {
     const action = this.mixer.clipAction(clip);
     action.reset();
     action.setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = true;
+    action.clampWhenFinished = false; // Allow return to rest pose
     action.fadeIn(fadeInDuration);
     action.play();
 
     this.currentAction = action;
     this.lastGestureTime = Date.now();
     this.scheduleNextGesture();
+
+    // Auto fade-out at end to return to rest pose
+    const fadeOutDuration = 0.5;
+    const gestureEndTime = clip.duration * 1000 - fadeOutDuration * 1000;
+    setTimeout(() => {
+      if (this.currentAction === action) {
+        action.fadeOut(fadeOutDuration);
+        this.currentAction = null;
+      }
+    }, gestureEndTime);
 
     console.log(`▶ Playing gesture: ${gestureName}`);
     return true;
