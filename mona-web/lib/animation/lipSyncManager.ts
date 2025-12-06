@@ -86,6 +86,20 @@ export class LipSyncManager {
     console.log("🎵 LipSyncManager.setupAudio called with:", audioUrl);
     console.log("🎵 Full audio URL that will be loaded:", new URL(audioUrl, window.location.href).href);
 
+    // CRITICAL: Clean up old audio element and source before creating new ones
+    if (this.audioElement) {
+      console.log("🧹 Cleaning up previous audio element");
+      this.audioElement.pause();
+      this.audioElement.src = ""; // Release the old audio
+      this.audioElement = null;
+    }
+
+    if (this.source) {
+      console.log("🧹 Disconnecting previous audio source");
+      this.source.disconnect();
+      this.source = null;
+    }
+
     // CRITICAL: Create Audio element synchronously to preserve user interaction context
     this.audioElement = new Audio(audioUrl);
     this.audioElement.crossOrigin = "anonymous";
