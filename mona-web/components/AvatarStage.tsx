@@ -46,7 +46,24 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
     return emotionPalette[emotion.emotion] || emotionPalette.neutral;
   }, [emotion]);
 
+  // Convert relative audio URLs to absolute URLs pointing to backend
+  const absoluteAudioUrl = useMemo(() => {
+    if (!audioUrl) return undefined;
+
+    // If it's already an absolute URL, use it as-is
+    if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+      return audioUrl;
+    }
+
+    // If it's a relative URL, prepend the backend URL
+    const backendUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL?.replace('/ws', '').replace('ws://', 'http://').replace('wss://', 'https://') || 'http://localhost:8000';
+    const fullUrl = `${backendUrl}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
+    console.log(`🔗 Converted relative audio URL: ${audioUrl} -> ${fullUrl}`);
+    return fullUrl;
+  }, [audioUrl]);
+
   console.log("🎬 AvatarStage received audioUrl:", audioUrl);
+  console.log("🎬 Absolute audioUrl:", absoluteAudioUrl);
 
   const vrmUrl = process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Mona1.vrm";
 
@@ -62,7 +79,7 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.6} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.9} color="#f3f4ff" />
         <Suspense fallback={null}>
-          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={audioUrl} />
+          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} />
         </Suspense>
         <OrbitControls
           enablePan={false}

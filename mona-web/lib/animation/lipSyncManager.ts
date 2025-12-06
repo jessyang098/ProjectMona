@@ -81,9 +81,12 @@ export class LipSyncManager {
    */
   async setupAudio(audioUrl: string): Promise<void> {
     console.log("🎵 LipSyncManager.setupAudio called with:", audioUrl);
+    console.log("🎵 Full audio URL that will be loaded:", new URL(audioUrl, window.location.href).href);
 
     this.audioElement = new Audio(audioUrl);
     this.audioElement.crossOrigin = "anonymous";
+
+    console.log("🎵 Audio element src set to:", this.audioElement.src);
 
     // Mobile-specific attributes for better compatibility
     if (this.isMobile) {
