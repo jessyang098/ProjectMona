@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useAudioContext } from "@/hooks/useAudioContext";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import AvatarStage from "./AvatarStage";
@@ -22,6 +23,7 @@ export default function ChatInterface() {
   const audioChunksRef = useRef<Blob[]>([]);
 
   const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, sendMessage} = useWebSocket(WEBSOCKET_URL);
+  const { initAudioContext } = useAudioContext();
 
   // Get the latest audio URL from Mona's messages
   const latestAudioUrl = messages
@@ -34,9 +36,15 @@ export default function ChatInterface() {
   }, [latestAudioUrl]);
 
   // Enable audio on first user interaction
-  const enableAudio = () => {
-    setAudioEnabled(true);
-    console.log("🔊 Audio enabled by user interaction");
+  const enableAudio = async () => {
+    try {
+      // Initialize AudioContext from user interaction (CRITICAL for mobile)
+      await initAudioContext();
+      setAudioEnabled(true);
+      console.log("🔊 Audio enabled by user interaction");
+    } catch (error) {
+      console.error("❌ Failed to enable audio:", error);
+    }
   };
 
   const scrollToBottom = () => {

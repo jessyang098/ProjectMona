@@ -124,30 +124,84 @@ export class LipSyncManager {
 
     // Setup Web Audio API analysis chain
     console.log("🎵 Setting up Web Audio API...");
-    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    // Use global AudioContext if available (initialized from user interaction)
+    if (!this.audioContext) {
+      this.audioContext = (window as any).__monaAudioContext;
+      if (this.audioContext) {
+        console.log("✅ Using pre-initialized global AudioContext");
+      } else {
+        console.warn("⚠️ No global AudioContext found! This may fail on mobile.");
+        // Create it anyway, but this might fail on mobile
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log("⚠️ AudioContext created without user interaction (may fail on mobile)");
+      }
+    }
+
     console.log("🎵 AudioContext state:", this.audioContext.state);
 
-    const source = this.audioContext.createMediaElementSource(this.audioElement);
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 2048;
+    try {
+      const source = this.audioContext.createMediaElementSource(this.audioElement);
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 2048;
 
-    source.connect(this.analyser);
-    this.analyser.connect(this.audioContext.destination);
+      source.connect(this.analyser);
+      this.analyser.connect(this.audioContext.destination);
 
-    this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
-    this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
+      this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+      this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
 
-    console.log("✅ Web Audio API setup complete");
+      console.log("✅ Web Audio API setup complete");
+    } catch (error) {
+      console.error("❌ Failed to set up Web Audio API:", error);
+      console.error("   This usually happens on mobile when AudioContext wasn't initialized from user interaction");
+      throw error;
+    }
   }
 
   /**
    * Resume audio context if suspended (required for some browsers)
+   * CRITICAL for mobile: Must be called in direct user interaction context
    */
   async resumeAudio(): Promise<void> {
     if (this.audioContext?.state === "suspended") {
       console.log("🎵 Resuming suspended AudioContext...");
-      await this.audioContext.resume();
-      console.log("✅ AudioContext resumed, state:", this.audioContext.state);
+      try {
+        await this.audioContext.resume();
+        console.log("✅ AudioContext resumed, state:", this.audioContext.state);
+      } catch (error) {
+        console.error("❌ Failed to resume AudioContext:", error);
+        throw error;
+      }
+    } else {
+      console.log("ℹ️ AudioContext state:", this.audioContext?.state || "no context");
+    }
+  }
+
+  /**
+   * Initialize AudioContext in direct user interaction.
+   * MUST be called from a user gesture handler on mobile.
+   */
+  async initAudioContext(): Promise<void> {
+    if (this.audioContext) {
+      console.log("ℹ️ AudioContext already exists, resuming if needed");
+      await this.resumeAudio();
+      return;
+    }
+
+    console.log("🎵 Creating AudioContext from user interaction...");
+    try {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log("✅ AudioContext created, state:", this.audioContext.state);
+
+      // Mobile browsers require immediate resume
+      if (this.audioContext.state === "suspended") {
+        await this.audioContext.resume();
+        console.log("✅ AudioContext resumed after creation, state:", this.audioContext.state);
+      }
+    } catch (error) {
+      console.error("❌ Failed to create AudioContext:", error);
+      throw error;
     }
   }
 
