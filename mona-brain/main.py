@@ -241,20 +241,41 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
         # Generate welcome voice in background (non-blocking)
         async def generate_welcome_audio():
+            print(f"🎤 [STARTUP AUDIO] Starting audio generation for client {client_id}")
+            print(f"🎤 [STARTUP AUDIO] Text to generate: '{welcome_content}'")
             audio_url = None
+
             # Try GPT-SoVITS first (high-quality anime voice)
             if mona_tts_sovits:
-                audio_path = await mona_tts_sovits.generate_speech(welcome_content)
-                if audio_path:
-                    audio_url = f"/audio/{Path(audio_path).name}"
-                    print(f"✓ Generated startup greeting voice with GPT-SoVITS")
+                print(f"🎤 [STARTUP AUDIO] Attempting GPT-SoVITS generation...")
+                try:
+                    audio_path = await mona_tts_sovits.generate_speech(welcome_content)
+                    print(f"🎤 [STARTUP AUDIO] GPT-SoVITS returned: {audio_path}")
+                    if audio_path:
+                        audio_url = f"/audio/{Path(audio_path).name}"
+                        print(f"✓ [STARTUP AUDIO] Generated startup greeting voice with GPT-SoVITS: {audio_url}")
+                    else:
+                        print(f"⚠️ [STARTUP AUDIO] GPT-SoVITS returned None")
+                except Exception as e:
+                    print(f"❌ [STARTUP AUDIO] GPT-SoVITS error: {e}")
+            else:
+                print(f"⚠️ [STARTUP AUDIO] GPT-SoVITS not available (mona_tts_sovits is None)")
 
             # Fall back to OpenAI TTS if SoVITS failed
             if not audio_url and mona_tts:
-                audio_path = await mona_tts.generate_speech(welcome_content)
-                if audio_path:
-                    audio_url = f"/audio/{Path(audio_path).name}"
-                    print(f"✓ Generated startup greeting voice with OpenAI TTS")
+                print(f"🎤 [STARTUP AUDIO] Attempting OpenAI TTS fallback...")
+                try:
+                    audio_path = await mona_tts.generate_speech(welcome_content)
+                    print(f"🎤 [STARTUP AUDIO] OpenAI TTS returned: {audio_path}")
+                    if audio_path:
+                        audio_url = f"/audio/{Path(audio_path).name}"
+                        print(f"✓ [STARTUP AUDIO] Generated startup greeting voice with OpenAI TTS: {audio_url}")
+                    else:
+                        print(f"⚠️ [STARTUP AUDIO] OpenAI TTS returned None")
+                except Exception as e:
+                    print(f"❌ [STARTUP AUDIO] OpenAI TTS error: {e}")
+            elif not audio_url:
+                print(f"⚠️ [STARTUP AUDIO] OpenAI TTS not available (mona_tts is None)")
 
             # Send audio update when ready
             if audio_url:
@@ -263,9 +284,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     "audioUrl": audio_url,
                     "timestamp": datetime.now().isoformat(),
                 }
+                print(f"📤 [STARTUP AUDIO] Sending audio_ready message: {audio_update}")
                 await manager.send_message(audio_update, client_id)
+                print(f"✓ [STARTUP AUDIO] Audio update sent successfully")
+            else:
+                print(f"❌ [STARTUP AUDIO] No audio URL generated - no audio will be sent")
 
         # Start background task
+        print(f"🚀 [STARTUP AUDIO] Creating background task for audio generation")
         asyncio.create_task(generate_welcome_audio())
 
         while True:
