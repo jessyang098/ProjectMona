@@ -114,6 +114,20 @@ export class LipSyncManager {
 
         this.audioElement.onerror = (error) => {
           console.error("❌ Failed to load audio:", error);
+          console.error("❌ Audio element error details:", {
+            error: this.audioElement?.error,
+            networkState: this.audioElement?.networkState,
+            readyState: this.audioElement?.readyState,
+          });
+
+          // Log detailed error information
+          if (this.audioElement?.error) {
+            const mediaError = this.audioElement.error;
+            console.error("❌ MediaError code:", mediaError.code);
+            console.error("❌ MediaError message:", mediaError.message);
+            console.error("❌ MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED");
+          }
+
           reject(new Error("Failed to load audio"));
         };
 
