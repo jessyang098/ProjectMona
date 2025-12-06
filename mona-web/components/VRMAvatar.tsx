@@ -40,16 +40,27 @@ const ANIMATION_CONFIG = {
 } as const;
 
 const emotionToExpression: Record<string, string> = {
+  // Positive emotions
   happy: "happy",
   excited: "happy",
   content: "relaxed",
+  affectionate: "relaxed",
+  playful: "happy",
+
+  // Neutral/Mixed emotions
   curious: "surprised",
   surprised: "surprised",
+  embarrassed: "shy",
+  confused: "surprised",
+  bored: "neutral",
+  neutral: "neutral",
+
+  // Negative emotions
   concerned: "sad",
   sad: "sad",
-  embarrassed: "shy",
-  affectionate: "relaxed",
-  neutral: "neutral",
+  annoyed: "sad",      // VRM may not have 'angry', use 'sad' with furrowed brow
+  angry: "sad",        // VRM may not have 'angry', use 'sad' with furrowed brow
+  frustrated: "sad",
 };
 
 interface VRMAvatarProps {
@@ -194,6 +205,12 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
           autoRandomGestures: true,
         });
         await gestureManagerRef.current.loadAllGestures();
+
+        // Play greeting wave animation on startup
+        console.log("👋 Playing startup greeting wave");
+        setTimeout(() => {
+          gestureManagerRef.current?.playGesture("wave", 0.5);
+        }, 500); // Small delay to let VRM fully load
       }
     };
     initGestures();
@@ -251,6 +268,16 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     // Log available expressions
     console.log("🎭 Available VRM systems:");
     console.log("  - expressionManager:", !!vrm.expressionManager);
+
+    if (vrm.expressionManager) {
+      const expressions = vrm.expressionManager.expressionMap;
+      console.log("🎭 Available expressions in VRM model:");
+      if (expressions) {
+        Object.keys(expressions).forEach((name) => {
+          console.log(`   - ${name}`);
+        });
+      }
+    }
 
     if (!audioUrl) {
       console.log("ℹ️ No audio URL provided");

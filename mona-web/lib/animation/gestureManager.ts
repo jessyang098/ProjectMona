@@ -28,8 +28,10 @@ interface GestureConfig {
 }
 
 const GESTURE_CONFIGS: GestureConfig[] = [
+  // Wave - Only for manual greeting, not auto-triggered
+  { name: "wave", path: "/animations/wave.fbx", triggerEmotions: [], priority: 10 },
+
   // Happy/Excited gestures
-  { name: "wave", path: "/animations/wave.fbx", triggerEmotions: ["happy", "excited"], priority: 8 },
   { name: "excited_jump", path: "/animations/excited.fbx", triggerEmotions: ["excited"], priority: 9 },
 
   // Curious gestures
