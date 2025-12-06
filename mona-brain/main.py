@@ -252,7 +252,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             # Fall back to OpenAI TTS if SoVITS failed
             if not audio_url and mona_tts:
                 audio_path = await mona_tts.generate_speech(welcome_content)
-                if audio_url:
+                if audio_path:
                     audio_url = f"/audio/{Path(audio_path).name}"
                     print(f"✓ Generated startup greeting voice with OpenAI TTS")
 
