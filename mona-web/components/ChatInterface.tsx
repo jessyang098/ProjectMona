@@ -15,6 +15,7 @@ export default function ChatInterface() {
   const [showChat, setShowChat] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -32,6 +33,12 @@ export default function ChatInterface() {
     console.log("🎵 Latest audio URL updated:", latestAudioUrl);
   }, [latestAudioUrl]);
 
+  // Enable audio on first user interaction
+  const enableAudio = () => {
+    setAudioEnabled(true);
+    console.log("🔊 Audio enabled by user interaction");
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -42,6 +49,7 @@ export default function ChatInterface() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!audioEnabled) enableAudio(); // Enable audio on first interaction
     if (inputValue.trim() && isConnected) {
       sendMessage(inputValue.trim());
       setInputValue("");
@@ -50,6 +58,7 @@ export default function ChatInterface() {
   };
 
   const startRecording = async () => {
+    if (!audioEnabled) enableAudio(); // Enable audio on first interaction
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -125,9 +134,25 @@ export default function ChatInterface() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-white text-slate-900">
+      {/* Audio enablement overlay - shown until user clicks */}
+      {!audioEnabled && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
+          onClick={enableAudio}
+        >
+          <div className="rounded-3xl border border-white/30 bg-white/95 px-8 py-6 shadow-2xl text-center">
+            <svg className="mx-auto h-12 w-12 text-purple-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            </svg>
+            <h3 className="text-xl font-semibold mb-2">Click to Enable Audio</h3>
+            <p className="text-sm text-slate-600">Mona wants to say hello!</p>
+          </div>
+        </div>
+      )}
+
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={latestAudioUrl} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} />
       </div>
 
       <div className="relative z-10 flex h-screen flex-col">
@@ -241,7 +266,10 @@ export default function ChatInterface() {
             </form>
             <button
               type="button"
-              onClick={() => setShowChat((prev) => !prev)}
+              onClick={() => {
+                if (!audioEnabled) enableAudio(); // Enable audio on first interaction
+                setShowChat((prev) => !prev);
+              }}
               className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow"
             >
               {showChat ? "Hide Chat" : "Show Chat"}
