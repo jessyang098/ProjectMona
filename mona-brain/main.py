@@ -22,6 +22,7 @@ from llm import MonaLLM
 from personality_loader import load_personality_from_yaml
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
+from text_utils import preprocess_tts_text
 from openai import OpenAI
 
 # Initialize LLM and TTS (will be created on startup)
@@ -250,11 +251,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             print(f"🎤 [STARTUP AUDIO] Text to generate: '{welcome_content}'")
             audio_url = None
 
+            # Preprocess text to remove problematic phonemes like "tch"
+            tts_text = preprocess_tts_text(welcome_content)
+
             # Try GPT-SoVITS first (high-quality anime voice)
             if mona_tts_sovits:
                 print(f"🎤 [STARTUP AUDIO] Attempting GPT-SoVITS generation...")
                 try:
-                    audio_path = await mona_tts_sovits.generate_speech(welcome_content, convert_to_mp3=is_mobile)
+                    audio_path = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
                     print(f"🎤 [STARTUP AUDIO] GPT-SoVITS returned: {audio_path}")
                     if audio_path:
                         audio_url = f"/audio/{Path(audio_path).name}"
@@ -270,7 +274,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             if not audio_url and mona_tts:
                 print(f"🎤 [STARTUP AUDIO] Attempting OpenAI TTS fallback...")
                 try:
-                    audio_path = await mona_tts.generate_speech(welcome_content)
+                    audio_path = await mona_tts.generate_speech(tts_text)
                     print(f"🎤 [STARTUP AUDIO] OpenAI TTS returned: {audio_path}")
                     if audio_path:
                         audio_url = f"/audio/{Path(audio_path).name}"
@@ -359,17 +363,20 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             # Generate TTS audio in background (non-blocking)
                             if event.get("content"):
                                 async def generate_audio_background():
+                                    # Preprocess text to remove problematic phonemes
+                                    tts_text = preprocess_tts_text(event["content"])
+
                                     audio_url = None
                                     # Try GPT-SoVITS first (high-quality anime voice)
                                     if mona_tts_sovits:
-                                        audio_path = await mona_tts_sovits.generate_speech(event["content"], convert_to_mp3=is_mobile)
+                                        audio_path = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
                                             print(f"✓ Using GPT-SoVITS audio")
 
                                     # Fall back to OpenAI TTS if SoVITS failed or unavailable
                                     if not audio_url and mona_tts:
-                                        audio_path = await mona_tts.generate_speech(event["content"])
+                                        audio_path = await mona_tts.generate_speech(tts_text)
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
                                             print(f"✓ Using OpenAI TTS audio (fallback)")
