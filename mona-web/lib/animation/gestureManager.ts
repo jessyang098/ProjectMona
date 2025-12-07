@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { loadMixamoAnimation } from "./mixamoLoader";
 
-export type EmotionType = "happy" | "excited" | "curious" | "embarrassed" | "sad" | "concerned" | "neutral";
+export type EmotionType = "happy" | "excited" | "curious" | "embarrassed" | "sad" | "concerned" | "neutral" | "angry" | "annoyed" | "frustrated";
 export type GestureName =
   | "wave"
   | "nod"
@@ -17,7 +17,8 @@ export type GestureName =
   | "sad_idle"
   | "looking_around"
   | "dismissing"
-  | "standing_idle";
+  | "standing_idle"
+  | "angry";
 
 interface GestureConfig {
   name: GestureName;
@@ -44,6 +45,9 @@ const GESTURE_CONFIGS: GestureConfig[] = [
 
   // Sad/Concerned gestures
   { name: "sad_idle", path: "/animations/sad_idle.fbx", triggerEmotions: ["sad", "concerned"], priority: 6 },
+
+  // Angry/Frustrated gestures
+  { name: "angry", path: "/animations/angry.fbx", triggerEmotions: ["angry", "annoyed", "frustrated"], priority: 9 },
 
   // Neutral fallback
   { name: "standing_idle", path: "/animations/standing_idle.fbx", triggerEmotions: ["neutral"], priority: 5 },
