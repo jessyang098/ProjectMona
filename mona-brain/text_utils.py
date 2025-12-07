@@ -19,33 +19,10 @@ def preprocess_tts_text(text: str) -> str:
     if not text:
         return text
 
-    # Replace "tch" sound with alternatives
-    # "watch" -> "wah" (phonetic approximation)
-    # "catch" -> "cah"
-    # "match" -> "mah"
+    # Replace standalone "tch" tsundere expression only
+    # Words containing "tch" (watch, catch, etc.) are fine - TTS handles them
     replacements = {
-        # Common "tch" words
-        r'\bwatch\b': 'wah',
-        r'\bwatching\b': 'wahing',
-        r'\bwatched\b': 'wahed',
-        r'\bcatch\b': 'cah',
-        r'\bcatching\b': 'cahing',
-        r'\bcaught\b': 'cawt',
-        r'\bmatch\b': 'mah',
-        r'\bmatching\b': 'mahing',
-        r'\bmatched\b': 'mahed',
-        r'\bpatch\b': 'pah',
-        r'\bscrat(ch|ching)\b': 'scrahing',
-        r'\bstret(ch|ching)\b': 'strehing',
-        r'\bswit(ch|ching)\b': 'swihing',
-        r'\bkit(chen)\b': 'kihen',
-        r'\bpit(ch|ching)\b': 'pihing',
-        r'\bdit(ch)\b': 'dih',
-        r'\btwit(ch)\b': 'twih',
-        r'\bglitch\b': 'glih',
-        r'\bhatch\b': 'hah',
-        r'\blatch\b': 'lah',
-        r'\bbatch\b': 'bah',
+        r'\btch\b': 'tsk',
     }
 
     # Apply replacements (case-insensitive)
