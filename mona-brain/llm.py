@@ -21,6 +21,7 @@ class ConversationMessage(BaseModel):
     """A single message in the conversation history"""
     role: str  # "system", "user", or "assistant"
     content: str
+    image_url: Optional[str] = None  # Base64 data URL for images
 
 
 class MonaLLM:
@@ -103,6 +104,7 @@ class MonaLLM:
         self,
         user_id: str,
         user_message: str,
+        image_base64: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, object], None]:
         """Stream Mona's response chunks and final metadata."""
 
@@ -116,13 +118,31 @@ class MonaLLM:
 
         self._update_system_prompt(user_id)
 
-        conversation.append(ConversationMessage(role="user", content=user_message))
+        # Add user message with optional image
+        conversation.append(ConversationMessage(
+            role="user",
+            content=user_message,
+            image_url=image_base64
+        ))
 
         if len(conversation) > self.max_history:
             conversation = [conversation[0]] + conversation[-(self.max_history - 1):]
             self.conversations[user_id] = conversation
 
-        messages = [{"role": msg.role, "content": msg.content} for msg in conversation]
+        # Build messages for API - handle vision format for images
+        messages = []
+        for msg in conversation:
+            if msg.image_url and msg.role == "user":
+                # GPT-4o vision format: content is a list with text and image
+                messages.append({
+                    "role": msg.role,
+                    "content": [
+                        {"type": "text", "text": msg.content or "What do you see in this image?"},
+                        {"type": "image_url", "image_url": {"url": msg.image_url}}
+                    ]
+                })
+            else:
+                messages.append({"role": msg.role, "content": msg.content})
 
         assistant_message = ""
 
@@ -160,12 +180,14 @@ class MonaLLM:
             conversation.append(ConversationMessage(role="assistant", content=fallback))
             yield {"event": "error", "content": fallback, "emotion": {}}
 
-    async def get_response(self, user_id: str, user_message: str) -> tuple[str, dict]:
+    async def get_response(
+        self, user_id: str, user_message: str, image_base64: Optional[str] = None
+    ) -> tuple[str, dict]:
         """Non-streaming helper kept for compatibility."""
 
         full_text = ""
         emotion: dict = {}
-        async for event in self.stream_response(user_id, user_message):
+        async for event in self.stream_response(user_id, user_message, image_base64):
             if event["event"] == "chunk":
                 full_text += str(event.get("content", ""))
             elif event["event"] in {"complete", "error"}:

@@ -7,6 +7,7 @@ import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import AvatarStage from "./AvatarStage";
 import { EmotionData } from "@/types/chat";
+import Image from "next/image";
 
 const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -17,8 +18,10 @@ export default function ChatInterface() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -55,12 +58,51 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image must be less than 10MB');
+      return;
+    }
+
+    // Create preview URL
+    const preview = URL.createObjectURL(file);
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setSelectedImage({ file, preview, base64 });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearSelectedImage = () => {
+    if (selectedImage?.preview) {
+      URL.revokeObjectURL(selectedImage.preview);
+    }
+    setSelectedImage(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!audioEnabled) enableAudio(); // Enable audio on first interaction
-    if (inputValue.trim() && isConnected) {
-      sendMessage(inputValue.trim());
+    if ((inputValue.trim() || selectedImage) && isConnected) {
+      sendMessage(inputValue.trim(), selectedImage?.base64);
       setInputValue("");
+      clearSelectedImage();
       inputRef.current?.focus();
     }
   };
@@ -232,45 +274,90 @@ export default function ChatInterface() {
         {/* Input */}
         <footer className="px-4 pb-8 sm:px-10">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-            <form onSubmit={handleSubmit} className="flex flex-1 items-center gap-3 rounded-full border border-slate-200 bg-white/90 px-4 py-3 shadow-xl">
-              <button
-                type="button"
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={!isConnected || isProcessing}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-                  isRecording
-                    ? 'animate-pulse bg-red-500 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                } disabled:cursor-not-allowed disabled:opacity-50`}
-                title={isRecording ? 'Stop recording' : 'Start voice input'}
-              >
-                {isProcessing ? (
-                  <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                ) : (
+            <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 shadow-xl">
+              {/* Image preview */}
+              {selectedImage && (
+                <div className="relative inline-block">
+                  <Image
+                    src={selectedImage.preview}
+                    alt="Selected image"
+                    width={120}
+                    height={120}
+                    className="rounded-lg object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={clearSelectedImage}
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md hover:bg-red-600"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Input row */}
+              <div className="flex items-center gap-3">
+                {/* Hidden file input */}
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                {/* Image upload button */}
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={!isConnected || isRecording}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Upload image"
+                >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                )}
-              </button>
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
-                disabled={!isConnected || isRecording}
-                className="flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={!isConnected || !inputValue.trim() || isRecording}
-                className="rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Send
-              </button>
+                </button>
+                {/* Voice recording button */}
+                <button
+                  type="button"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={!isConnected || isProcessing}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                    isRecording
+                      ? 'animate-pulse bg-red-500 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                  title={isRecording ? 'Stop recording' : 'Start voice input'}
+                >
+                  {isProcessing ? (
+                    <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
+                  disabled={!isConnected || isRecording}
+                  className="flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
+                  className="rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
             </form>
             <button
               type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { Message } from "@/types/chat";
+import Image from "next/image";
 
 interface ChatMessageProps {
   message: Message;
@@ -14,6 +15,9 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         hour: "2-digit",
         minute: "2-digit",
       });
+
+  const hasImage = !!message.imageUrl;
+  const hasContent = !!message.content?.trim();
 
   return (
     <div
@@ -40,7 +44,27 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 : "bg-gray-800 text-gray-100 rounded-tl-none"
             } ${message.isStreaming ? "animate-pulseGlow" : ""}`}
           >
-            <p className="text-sm leading-relaxed">{message.content}</p>
+            {/* Display image if present */}
+            {hasImage && (
+              <div className="mb-2">
+                <Image
+                  src={message.imageUrl!}
+                  alt="Uploaded image"
+                  width={200}
+                  height={200}
+                  className="rounded-lg object-cover max-w-full"
+                  unoptimized // Required for base64 images
+                />
+              </div>
+            )}
+            {/* Display text content */}
+            {hasContent && (
+              <p className="text-sm leading-relaxed">{message.content}</p>
+            )}
+            {/* If no content and no image, show placeholder */}
+            {!hasContent && !hasImage && (
+              <p className="text-sm leading-relaxed italic opacity-70">...</p>
+            )}
           </div>
           <div className={`mt-1 flex flex-wrap items-center gap-2 text-xs ${isUser ? "justify-end" : "justify-start"}`}>
             <span className="text-gray-500">{timestamp}</span>
