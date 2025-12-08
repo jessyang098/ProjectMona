@@ -11,6 +11,7 @@ export interface Message {
   emotion?: EmotionData;
   isStreaming?: boolean;
   audioUrl?: string;
+  imageUrl?: string;  // For displaying uploaded images in chat
 }
 
 export interface WebSocketMessage {
@@ -22,4 +23,5 @@ export interface WebSocketMessage {
   emotion?: EmotionData;
   error?: string;
   audioUrl?: string;
+  imageUrl?: string;  // For displaying uploaded images
 }

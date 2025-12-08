@@ -12,6 +12,7 @@ export function useWebSocket(url: string) {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [latestEmotion, setLatestEmotion] = useState<EmotionData | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
+  const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
 
   useEffect(() => {
     // Generate a unique client ID
@@ -33,21 +34,30 @@ export function useWebSocket(url: string) {
         const data: WebSocketMessage = JSON.parse(event.data);
         console.log("Received message:", data);
 
-        if (data.type === "message" && data.content && data.sender) {
+        if (data.type === "message" && data.sender) {
           // Construct full audio URL if provided
           const audioUrl = data.audioUrl ? `${BACKEND_URL}${data.audioUrl}` : undefined;
 
+          // For user messages, attach any pending image
+          let imageUrl: string | undefined;
+          if (data.sender === "user" && pendingImageRef.current) {
+            imageUrl = pendingImageRef.current;
+            pendingImageRef.current = null;  // Clear after using
+          }
+
           const newMessage: Message = {
-            content: data.content,
+            content: data.content || "",
             sender: data.sender,
             timestamp: data.timestamp || new Date().toISOString(),
             emotion: data.emotion,
             audioUrl: audioUrl,
+            imageUrl: imageUrl,
           };
 
           console.log("📨 Message received:", {
             sender: newMessage.sender,
             hasEmotion: !!newMessage.emotion,
+            hasImage: !!newMessage.imageUrl,
             audioUrl: newMessage.audioUrl,
           });
 
@@ -139,14 +149,22 @@ export function useWebSocket(url: string) {
     };
   }, [url]);
 
-  const sendMessage = useCallback((content: string) => {
+  const sendMessage = useCallback((content: string, imageBase64?: string) => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
-      const message = {
-        content,
+      // Store image for when we receive the echoed message back
+      if (imageBase64) {
+        pendingImageRef.current = imageBase64;
+      }
+
+      const message: { content: string; timestamp: string; image?: string } = {
+        content: content || (imageBase64 ? "What do you think of this?" : ""),
         timestamp: new Date().toISOString(),
       };
+      if (imageBase64) {
+        message.image = imageBase64;
+      }
       websocketRef.current.send(JSON.stringify(message));
-      console.log("Sent message:", message);
+      console.log("Sent message:", { ...message, image: imageBase64 ? "[base64 image]" : undefined });
     } else {
       console.error("WebSocket is not connected");
     }

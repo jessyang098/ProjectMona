@@ -308,14 +308,19 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             data = await websocket.receive_text()
             message_data = json.loads(data)
 
-            print(f"Received from {client_id}: {message_data}")
+            # Extract image data if present
+            image_base64 = message_data.get("image")
+            has_image = bool(image_base64)
+            user_content = message_data.get("content", "") or ""
+            print(f"Received from {client_id}: {user_content[:100]}... (has_image: {has_image})")
 
             # Echo user message back (for confirmation)
             user_message = {
                 "type": "message",
-                "content": message_data["content"],
+                "content": user_content,
                 "sender": "user",
                 "timestamp": datetime.now().isoformat(),
+                "hasImage": has_image,
             }
             await manager.send_message(user_message, client_id)
 
@@ -332,7 +337,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             # Generate response using LLM or fallback to dummy
             if mona_llm:
                 try:
-                    async for event in mona_llm.stream_response(client_id, message_data["content"]):
+                    async for event in mona_llm.stream_response(client_id, user_content, image_base64):
                         if event["event"] == "chunk":
                             chunk_message = {
                                 "type": "message_chunk",
@@ -405,7 +410,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     await manager.send_message(typing_indicator, client_id)
                     await manager.send_message(fallback_message, client_id)
             else:
-                mona_response = get_dummy_response(message_data["content"])
+                mona_response = get_dummy_response(user_content)
                 emotion_data = {}
 
                 response_message = {
