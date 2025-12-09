@@ -272,9 +272,9 @@ export default function ChatInterface() {
         )}
 
         {/* Input */}
-        <footer className="px-4 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-            <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 shadow-xl">
+        <footer className="px-3 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
+            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-3 sm:px-4 py-2 sm:py-3 shadow-xl">
               {/* Image preview */}
               {selectedImage && (
                 <div className="relative inline-block">
@@ -297,7 +297,7 @@ export default function ChatInterface() {
                 </div>
               )}
               {/* Input row */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {/* Hidden file input */}
                 <input
                   ref={imageInputRef}
@@ -311,10 +311,10 @@ export default function ChatInterface() {
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={!isConnected || isRecording}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
                   title="Upload image"
                 >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </button>
@@ -323,7 +323,7 @@ export default function ChatInterface() {
                   type="button"
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={!isConnected || isProcessing}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                  className={`flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full transition ${
                     isRecording
                       ? 'animate-pulse bg-red-500 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -331,12 +331,12 @@ export default function ChatInterface() {
                   title={isRecording ? 'Stop recording' : 'Start voice input'}
                 >
                   {isProcessing ? (
-                    <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
                   )}
@@ -353,7 +353,7 @@ export default function ChatInterface() {
                 <button
                   type="submit"
                   disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
-                  className="rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-shrink-0 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Send
                 </button>
@@ -365,9 +365,9 @@ export default function ChatInterface() {
                 if (!audioEnabled) enableAudio(); // Enable audio on first interaction
                 setShowChat((prev) => !prev);
               }}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow"
+              className="flex-shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm sm:px-4 font-semibold text-slate-700 shadow whitespace-nowrap"
             >
-              {showChat ? "Hide Chat" : "Show Chat"}
+              {showChat ? "Hide" : "Chat"}
             </button>
           </div>
         </footer>
