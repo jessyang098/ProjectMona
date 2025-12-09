@@ -103,7 +103,8 @@ export default function ChatInterface() {
       sendMessage(inputValue.trim(), selectedImage?.base64);
       setInputValue("");
       clearSelectedImage();
-      inputRef.current?.focus();
+      // Blur input to close mobile keyboard and reset scroll position
+      inputRef.current?.blur();
     }
   };
 
@@ -346,6 +347,12 @@ export default function ChatInterface() {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
+                  onBlur={() => {
+                    // Fix iOS Safari keyboard dismiss - reset scroll position
+                    setTimeout(() => {
+                      window.scrollTo(0, 0);
+                    }, 100);
+                  }}
                   placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
                   disabled={!isConnected || isRecording}
                   className="flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
