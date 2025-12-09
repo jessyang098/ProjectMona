@@ -205,9 +205,9 @@ export default function ChatInterface() {
         <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} />
       </div>
 
-      <div className="relative z-10 flex h-screen flex-col pointer-events-none">
+      <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
         {/* Status */}
-        <header className="px-6 pt-6 sm:px-10">
+        <header className="px-6 pt-4 sm:px-10">
           <div className="inline-flex items-center gap-3 rounded-full border border-black/60 bg-black/80 px-4 py-2 text-white shadow-2xl pointer-events-auto">
             <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 text-center text-lg font-semibold leading-[40px]">
               M
@@ -272,7 +272,7 @@ export default function ChatInterface() {
         )}
 
         {/* Input */}
-        <footer className="px-4 pb-8 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}>
+        <footer className="px-4 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
             <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 shadow-xl">
               {/* Image preview */}
