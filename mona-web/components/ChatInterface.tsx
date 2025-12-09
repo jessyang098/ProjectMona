@@ -233,16 +233,18 @@ export default function ChatInterface() {
           </div>
         </header>
 
-        {/* Conversation overlay */}
-        {showChat ? (
-          <main className="flex-1 overflow-hidden px-4 py-4 sm:px-10">
-            <div className="flex h-full w-full justify-end">
-              <div className="flex h-full w-full max-w-2xl flex-col rounded-3xl border border-white/20 bg-white/20 p-6 shadow-2xl backdrop-blur-sm pointer-events-auto">
+        {/* Spacer to push chat to bottom */}
+        <div className="flex-1" />
+
+        {/* Compact conversation overlay - positioned just above input */}
+        {showChat && (
+          <div className="px-3 pb-2 sm:px-10 pointer-events-auto">
+            <div className="mx-auto w-full max-w-3xl">
+              <div className="flex max-h-48 sm:max-h-56 flex-col rounded-2xl border border-white/20 bg-white/20 p-3 sm:p-4 shadow-xl backdrop-blur-sm">
                 <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
                   {messages.length === 0 && isConnected && (
-                    <div className="mt-32 text-center text-slate-500">
-                      <p className="text-xl font-semibold">Say hi to Mona</p>
-                      <p className="text-sm">Her mood + aura will react in real time.</p>
+                    <div className="py-4 text-center text-slate-500">
+                      <p className="text-sm font-medium">Say hi to Mona</p>
                     </div>
                   )}
 
@@ -253,9 +255,9 @@ export default function ChatInterface() {
                   {isTyping && <TypingIndicator />}
 
                   {isGeneratingAudio && !isTyping && (
-                    <div className="flex mb-4 justify-start">
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-100 text-purple-700 text-sm">
-                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <div className="flex mb-2 justify-start">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-100 text-purple-700 text-xs">
+                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -268,9 +270,7 @@ export default function ChatInterface() {
                 </div>
               </div>
             </div>
-          </main>
-        ) : (
-          <div className="flex-1" />
+          </div>
         )}
 
         {/* Input */}
