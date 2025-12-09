@@ -272,7 +272,7 @@ export default function ChatInterface() {
         )}
 
         {/* Input */}
-        <footer className="px-4 pb-8 sm:px-10 pointer-events-auto">
+        <footer className="px-4 pb-8 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}>
           <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
             <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 shadow-xl">
               {/* Image preview */}
