@@ -205,10 +205,10 @@ export default function ChatInterface() {
         <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} />
       </div>
 
-      <div className="relative z-10 flex h-screen flex-col">
+      <div className="relative z-10 flex h-screen flex-col pointer-events-none">
         {/* Status */}
         <header className="px-6 pt-6 sm:px-10">
-          <div className="inline-flex items-center gap-3 rounded-full border border-black/60 bg-black/80 px-4 py-2 text-white shadow-2xl">
+          <div className="inline-flex items-center gap-3 rounded-full border border-black/60 bg-black/80 px-4 py-2 text-white shadow-2xl pointer-events-auto">
             <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 text-center text-lg font-semibold leading-[40px]">
               M
             </div>
@@ -235,7 +235,7 @@ export default function ChatInterface() {
         {showChat ? (
           <main className="flex-1 overflow-hidden px-4 py-4 sm:px-10">
             <div className="flex h-full w-full justify-end">
-              <div className="flex h-full w-full max-w-2xl flex-col rounded-3xl border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-md">
+              <div className="flex h-full w-full max-w-2xl flex-col rounded-3xl border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-md pointer-events-auto">
                 <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
                   {messages.length === 0 && isConnected && (
                     <div className="mt-32 text-center text-slate-500">
@@ -272,7 +272,7 @@ export default function ChatInterface() {
         )}
 
         {/* Input */}
-        <footer className="px-4 pb-8 sm:px-10">
+        <footer className="px-4 pb-8 sm:px-10 pointer-events-auto">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
             <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 shadow-xl">
               {/* Image preview */}
