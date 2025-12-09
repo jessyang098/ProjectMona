@@ -82,10 +82,14 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
           <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} />
         </Suspense>
         <OrbitControls
-          enablePan={false}
-          enableZoom={false}
-          enableRotate={false}
+          enablePan={true}
+          enableZoom={true}
+          enableRotate={true}
           target={[0, 0.8, 0]}
+          minDistance={1.5}
+          maxDistance={5}
+          minPolarAngle={Math.PI / 4}
+          maxPolarAngle={Math.PI / 1.5}
         />
       </Canvas>
     </div>
