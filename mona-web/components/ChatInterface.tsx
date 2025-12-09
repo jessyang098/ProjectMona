@@ -233,45 +233,43 @@ export default function ChatInterface() {
           </div>
         </header>
 
-        {/* Spacer to push chat to bottom */}
-        <div className="flex-1" />
-
-        {/* Compact conversation overlay - positioned just above input */}
+        {/* Chat panel - positioned to the right side to not block avatar */}
         {showChat && (
-          <div className="px-3 pb-2 sm:px-10 pointer-events-auto">
-            <div className="mx-auto w-full max-w-3xl">
-              <div className="flex max-h-48 sm:max-h-56 flex-col rounded-2xl border border-white/20 bg-white/20 p-3 sm:p-4 shadow-xl backdrop-blur-sm">
-                <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
-                  {messages.length === 0 && isConnected && (
-                    <div className="py-4 text-center text-slate-500">
-                      <p className="text-sm font-medium">Say hi to Mona</p>
+          <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-72 sm:w-80 pointer-events-auto">
+            <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl border border-white/20 bg-white/20 p-3 sm:p-4 shadow-xl backdrop-blur-sm">
+              <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
+                {messages.length === 0 && isConnected && (
+                  <div className="py-4 text-center text-slate-500">
+                    <p className="text-sm font-medium">Say hi to Mona</p>
+                  </div>
+                )}
+
+                {messages.map((message, index) => (
+                  <ChatMessage key={`${message.timestamp}-${index}`} message={message} />
+                ))}
+
+                {isTyping && <TypingIndicator />}
+
+                {isGeneratingAudio && !isTyping && (
+                  <div className="flex mb-2 justify-start">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-100 text-purple-700 text-xs">
+                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Generating voice...</span>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {messages.map((message, index) => (
-                    <ChatMessage key={`${message.timestamp}-${index}`} message={message} />
-                  ))}
-
-                  {isTyping && <TypingIndicator />}
-
-                  {isGeneratingAudio && !isTyping && (
-                    <div className="flex mb-2 justify-start">
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-100 text-purple-700 text-xs">
-                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Generating voice...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
+                <div ref={messagesEndRef} />
               </div>
             </div>
           </div>
         )}
+
+        {/* Spacer to push input to bottom */}
+        <div className="flex-1" />
 
         {/* Input */}
         <footer className="px-3 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
