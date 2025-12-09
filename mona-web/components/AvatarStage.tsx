@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useMemo, useRef, useEffect } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import dynamic from "next/dynamic";
 import type { EmotionData } from "@/types/chat";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 const VRMAvatar = dynamic(() => import("./VRMAvatar"), { ssr: false });
 
@@ -36,9 +37,75 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
 interface AvatarStageProps {
   emotion: EmotionData | null;
   audioUrl?: string;
+  viewMode?: "portrait" | "full";
 }
 
-export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
+// Camera presets for different view modes
+const VIEW_PRESETS = {
+  portrait: {
+    position: new THREE.Vector3(0, 1.35, 1.2),
+    target: new THREE.Vector3(0, 1.25, 0),
+  },
+  full: {
+    position: new THREE.Vector3(0, 0.85, 1.8),
+    target: new THREE.Vector3(0, 0.75, 0),
+  },
+};
+
+// Component to handle camera transitions
+function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
+  const { camera } = useThree();
+  const controlsRef = useRef<OrbitControlsImpl>(null);
+
+  useEffect(() => {
+    const preset = VIEW_PRESETS[viewMode];
+
+    // Animate camera position
+    const startPos = camera.position.clone();
+    const endPos = preset.position;
+    const startTime = performance.now();
+    const duration = 500; // ms
+
+    const animate = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      camera.position.lerpVectors(startPos, endPos, eased);
+
+      if (controlsRef.current) {
+        controlsRef.current.target.lerp(preset.target, eased);
+        controlsRef.current.update();
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+  }, [viewMode, camera]);
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      makeDefault
+      enablePan={true}
+      enableZoom={true}
+      enableRotate={true}
+      target={VIEW_PRESETS[viewMode].target.toArray() as [number, number, number]}
+      minDistance={0.8}
+      maxDistance={5}
+      minPolarAngle={Math.PI / 4}
+      maxPolarAngle={Math.PI / 1.5}
+      enableDamping={true}
+      dampingFactor={0.05}
+    />
+  );
+}
+
+export default function AvatarStage({ emotion, audioUrl, viewMode = "full" }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
@@ -66,12 +133,13 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
   console.log("🎬 Absolute audioUrl:", absoluteAudioUrl);
 
   const vrmUrl = process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Mona1.vrm";
+  const initialPreset = VIEW_PRESETS[viewMode];
 
   return (
     <div className="h-full w-full">
       <Canvas
         shadows
-        camera={{ position: [0, 0.85, 1.8], fov: 42 }}
+        camera={{ position: initialPreset.position.toArray() as [number, number, number], fov: 42 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
       >
         <color attach="background" args={["#f7f8ff"]} />
@@ -81,19 +149,7 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
         <Suspense fallback={null}>
           <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} />
         </Suspense>
-        <OrbitControls
-          makeDefault
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          target={[0, 0.75, 0]}
-          minDistance={1.5}
-          maxDistance={5}
-          minPolarAngle={Math.PI / 4}
-          maxPolarAngle={Math.PI / 1.5}
-          enableDamping={true}
-          dampingFactor={0.05}
-        />
+        <CameraController viewMode={viewMode} />
       </Canvas>
     </div>
   );

@@ -18,6 +18,7 @@ export default function ChatInterface() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [viewMode, setViewMode] = useState<"portrait" | "full">("full");
   const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -203,7 +204,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} viewMode={viewMode} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
@@ -366,6 +367,27 @@ export default function ChatInterface() {
                 </button>
               </div>
             </form>
+            {/* View mode toggle */}
+            <button
+              type="button"
+              onClick={() => setViewMode((prev) => prev === "full" ? "portrait" : "full")}
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow"
+              title={viewMode === "full" ? "Switch to portrait view" : "Switch to full view"}
+            >
+              {viewMode === "full" ? (
+                // Portrait icon (face/bust)
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="8" r="4" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
+                </svg>
+              ) : (
+                // Full body icon
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="5" r="2.5" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 7.5v5m0 0l-3 4m3-4l3 4m-6-7h6" />
+                </svg>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => {
