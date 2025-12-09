@@ -71,7 +71,7 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
     <div className="h-full w-full">
       <Canvas
         shadows
-        camera={{ position: [0, 0.9, 1.8], fov: 26 }}
+        camera={{ position: [0, 0.85, 3.2], fov: 30 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
       >
         <color attach="background" args={["#f7f8ff"]} />
@@ -85,7 +85,7 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
           enablePan={false}
           enableZoom={false}
           enableRotate={false}
-          target={[0, 1.0, 0]}
+          target={[0, 0.85, 0]}
         />
       </Canvas>
     </div>
