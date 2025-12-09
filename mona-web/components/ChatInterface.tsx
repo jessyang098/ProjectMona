@@ -233,9 +233,9 @@ export default function ChatInterface() {
           </div>
         </header>
 
-        {/* Chat panel - positioned to the right side to not block avatar */}
+        {/* Chat panel - extends up from the chat button */}
         {showChat && (
-          <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-72 sm:w-80 pointer-events-auto">
+          <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-80 sm:w-96 pointer-events-auto">
             <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl border border-white/20 bg-white/20 p-3 sm:p-4 shadow-xl backdrop-blur-sm">
               <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
                 {messages.length === 0 && isConnected && (
