@@ -18,7 +18,10 @@ export type GestureName =
   | "looking_around"
   | "dismissing"
   | "standing_idle"
-  | "angry";
+  | "angry"
+  | "crouch"
+  | "lay"
+  | "stand1";
 
 interface GestureConfig {
   name: GestureName;
@@ -26,6 +29,7 @@ interface GestureConfig {
   triggerEmotions: EmotionType[];
   priority: number; // Higher = more likely to play
   duration?: number; // Optional override
+  isHoldPose?: boolean; // If true, holds the pose until manually stopped
 }
 
 const GESTURE_CONFIGS: GestureConfig[] = [
@@ -51,6 +55,11 @@ const GESTURE_CONFIGS: GestureConfig[] = [
 
   // Neutral fallback
   { name: "standing_idle", path: "/animations/standing_idle.fbx", triggerEmotions: ["neutral"], priority: 5 },
+
+  // Test poses - manual trigger only, hold until stopped
+  { name: "crouch", path: "/animations/crouch.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
+  { name: "lay", path: "/animations/lay.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
+  { name: "stand1", path: "/animations/stand1.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
 ];
 
 export interface GestureManagerConfig {
@@ -70,6 +79,7 @@ export class GestureManager {
   private loadedGestures: Map<GestureName, THREE.AnimationClip> = new Map();
   private mixer: THREE.AnimationMixer;
   private currentAction: THREE.AnimationAction | null = null;
+  private currentGestureName: GestureName | null = null;
   private lastGestureTime: number = 0;
   private nextGestureTime: number = 0;
   private currentEmotion: EmotionType = "neutral";
@@ -121,43 +131,82 @@ export class GestureManager {
 
   /**
    * Manually trigger a specific gesture
+   * @param gestureName The gesture to play
+   * @param fadeInDuration Duration of fade-in transition (longer = smoother)
    */
-  playGesture(gestureName: GestureName, fadeInDuration: number = 0.3): boolean {
+  playGesture(gestureName: GestureName, fadeInDuration: number = 0.5): boolean {
     const clip = this.loadedGestures.get(gestureName);
     if (!clip) {
       console.warn(`Gesture ${gestureName} not loaded`);
       return false;
     }
 
-    // Stop current gesture if playing
+    // Find config for this gesture
+    const config = GESTURE_CONFIGS.find(c => c.name === gestureName);
+    const isHoldPose = config?.isHoldPose ?? false;
+
+    // Stop current gesture with smooth crossfade
     if (this.currentAction) {
-      this.currentAction.fadeOut(0.2);
+      this.currentAction.fadeOut(fadeInDuration);
     }
 
     // Play new gesture
     const action = this.mixer.clipAction(clip);
     action.reset();
-    action.setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = false; // Allow return to rest pose
+
+    if (isHoldPose) {
+      // Hold poses: loop and clamp at end for static pose
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true; // Hold the final pose
+    } else {
+      // Regular gestures: play once and return to rest
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = false;
+    }
+
+    // Smooth fade-in for realistic transition
     action.fadeIn(fadeInDuration);
     action.play();
 
     this.currentAction = action;
+    this.currentGestureName = gestureName;
     this.lastGestureTime = Date.now();
     this.scheduleNextGesture();
 
-    // Auto fade-out at end to return to rest pose
-    const fadeOutDuration = 0.5;
-    const gestureEndTime = clip.duration * 1000 - fadeOutDuration * 1000;
-    setTimeout(() => {
-      if (this.currentAction === action) {
-        action.fadeOut(fadeOutDuration);
-        this.currentAction = null;
-      }
-    }, gestureEndTime);
+    // Only auto fade-out for non-hold poses
+    if (!isHoldPose) {
+      const fadeOutDuration = 0.5;
+      const gestureEndTime = clip.duration * 1000 - fadeOutDuration * 1000;
+      setTimeout(() => {
+        if (this.currentAction === action) {
+          action.fadeOut(fadeOutDuration);
+          this.currentAction = null;
+          this.currentGestureName = null;
+        }
+      }, Math.max(0, gestureEndTime));
+    }
 
-    console.log(`▶ Playing gesture: ${gestureName}`);
+    console.log(`▶ Playing gesture: ${gestureName}${isHoldPose ? ' (holding)' : ''}`);
     return true;
+  }
+
+  /**
+   * Return to rest pose from a hold pose
+   */
+  returnToRest(fadeOutDuration: number = 0.8): void {
+    if (this.currentAction) {
+      console.log(`↩ Returning to rest pose from: ${this.currentGestureName}`);
+      this.currentAction.fadeOut(fadeOutDuration);
+      this.currentAction = null;
+      this.currentGestureName = null;
+    }
+  }
+
+  /**
+   * Get current gesture name (if any)
+   */
+  getCurrentGesture(): GestureName | null {
+    return this.currentGestureName;
   }
 
   /**

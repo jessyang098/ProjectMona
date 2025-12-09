@@ -8,6 +8,7 @@ import TypingIndicator from "./TypingIndicator";
 import AvatarStage from "./AvatarStage";
 import { EmotionData } from "@/types/chat";
 import Image from "next/image";
+import { parseTestCommand, triggerPose, returnToRest } from "@/lib/poseCommands";
 
 const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -100,6 +101,20 @@ export default function ChatInterface() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!audioEnabled) enableAudio(); // Enable audio on first interaction
+
+    // Check for test commands (test:crouch, test:lay, test:stand, test:rest)
+    const { command, remainingText } = parseTestCommand(inputValue);
+    if (command) {
+      if (command.type === "play" && command.pose) {
+        triggerPose(command.pose);
+      } else if (command.type === "stop") {
+        returnToRest();
+      }
+      setInputValue("");
+      inputRef.current?.blur();
+      return;
+    }
+
     if ((inputValue.trim() || selectedImage) && isConnected) {
       sendMessage(inputValue.trim(), selectedImage?.base64);
       setInputValue("");

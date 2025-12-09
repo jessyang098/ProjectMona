@@ -7,7 +7,8 @@ import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
 import type { EmotionData } from "@/types/chat";
 import * as THREE from "three";
 import { LipSyncManager } from "@/lib/animation";
-import { GestureManager, type EmotionType } from "@/lib/animation/gestureManager";
+import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
+import { onPoseCommand, type PoseCommand } from "@/lib/poseCommands";
 
 // Procedural animation configuration
 const ANIMATION_CONFIG = {
@@ -252,6 +253,25 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       console.log("🎭 Updated gesture emotion:", emotionType);
     }
   }, [emotion, vrm]);
+
+  // Listen for pose test commands
+  useEffect(() => {
+    const cleanup = onPoseCommand((command: PoseCommand) => {
+      if (!gestureManagerRef.current) {
+        console.warn("GestureManager not ready for pose command");
+        return;
+      }
+
+      if (command.type === "play" && command.pose) {
+        // Use longer fade for smoother transitions to hold poses
+        gestureManagerRef.current.playGesture(command.pose as GestureName, 0.8);
+      } else if (command.type === "stop") {
+        gestureManagerRef.current.returnToRest(0.8);
+      }
+    });
+
+    return cleanup;
+  }, []);
 
   // Handle audio playback with lip sync
   useEffect(() => {
