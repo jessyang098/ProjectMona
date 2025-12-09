@@ -235,7 +235,7 @@ export default function ChatInterface() {
         {showChat ? (
           <main className="flex-1 overflow-hidden px-4 py-4 sm:px-10">
             <div className="flex h-full w-full justify-end">
-              <div className="flex h-full w-full max-w-2xl flex-col rounded-3xl border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-md pointer-events-auto">
+              <div className="flex h-full w-full max-w-2xl flex-col rounded-3xl border border-white/40 bg-white/60 p-6 shadow-2xl backdrop-blur-md pointer-events-auto">
                 <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
                   {messages.length === 0 && isConnected && (
                     <div className="mt-32 text-center text-slate-500">
