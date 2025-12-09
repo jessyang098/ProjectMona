@@ -71,7 +71,7 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
     <div className="h-full w-full">
       <Canvas
         shadows
-        camera={{ position: [0, 0.8, 2.4], fov: 38 }}
+        camera={{ position: [0, 0.85, 1.8], fov: 42 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
       >
         <color attach="background" args={["#f7f8ff"]} />
@@ -82,14 +82,17 @@ export default function AvatarStage({ emotion, audioUrl }: AvatarStageProps) {
           <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} />
         </Suspense>
         <OrbitControls
+          makeDefault
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
-          target={[0, 0.8, 0]}
+          target={[0, 0.75, 0]}
           minDistance={1.5}
           maxDistance={5}
           minPolarAngle={Math.PI / 4}
           maxPolarAngle={Math.PI / 1.5}
+          enableDamping={true}
+          dampingFactor={0.05}
         />
       </Canvas>
     </div>
