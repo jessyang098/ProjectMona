@@ -43,12 +43,14 @@ interface AvatarStageProps {
 // Camera presets for different view modes
 const VIEW_PRESETS = {
   portrait: {
-    position: new THREE.Vector3(0, 1.35, 1.2),
-    target: new THREE.Vector3(0, 1.25, 0),
+    position: new THREE.Vector3(0, 0.9, 1.8),
+    target: new THREE.Vector3(0, 1.0, 0),
+    fov: 26, // Narrower FOV = more zoomed in, larger character
   },
   full: {
     position: new THREE.Vector3(0, 0.85, 1.8),
     target: new THREE.Vector3(0, 0.75, 0),
+    fov: 42, // Default wider FOV
   },
 };
 
@@ -60,9 +62,11 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
   useEffect(() => {
     const preset = VIEW_PRESETS[viewMode];
 
-    // Animate camera position
+    // Animate camera position and FOV
     const startPos = camera.position.clone();
     const endPos = preset.position;
+    const startFov = (camera as THREE.PerspectiveCamera).fov;
+    const endFov = preset.fov;
     const startTime = performance.now();
     const duration = 500; // ms
 
@@ -73,6 +77,11 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
       const eased = 1 - Math.pow(1 - progress, 3);
 
       camera.position.lerpVectors(startPos, endPos, eased);
+
+      // Animate FOV for zoom effect
+      const perspCamera = camera as THREE.PerspectiveCamera;
+      perspCamera.fov = startFov + (endFov - startFov) * eased;
+      perspCamera.updateProjectionMatrix();
 
       if (controlsRef.current) {
         controlsRef.current.target.lerp(preset.target, eased);
