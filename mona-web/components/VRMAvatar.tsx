@@ -125,7 +125,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     const group = groupRef.current;
     group.add(vrm.scene);
     vrm.scene.rotation.y = 0;
-    vrm.scene.scale.setScalar(1.05);
+    vrm.scene.scale.setScalar(0.95);
     vrm.scene.position.set(0, 0.10, 0);
     vrm.scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
