@@ -281,9 +281,9 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       if (!lipSyncRef.current) {
         console.log("📦 Creating new LipSyncManager");
         lipSyncRef.current = new LipSyncManager(vrm, {
-          smoothingFactor: 0.3,
-          amplitudeScale: 1.0, // Match Riko's subtle mouth movement
-          amplitudeThreshold: 0.001, // Lower threshold to trigger more easily
+          smoothingFactor: 0.2,
+          amplitudeScale: 12.0, // Increased for more visible mouth movement
+          amplitudeThreshold: 0.0005, // Lower threshold to catch quieter audio (like OpenAI TTS fallback)
         });
       }
 
