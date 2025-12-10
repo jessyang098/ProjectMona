@@ -337,14 +337,6 @@ export class LipSyncManager {
       return;
     }
 
-    // Debug: Log available expressions on first update
-    if (!this.previousPhonemeValues.aa) {
-      const availableExpressions = (expressionManager as any).expressionMap
-        ? Object.keys((expressionManager as any).expressionMap)
-        : "unknown";
-      console.log("📋 Available VRM expressions:", availableExpressions);
-    }
-
     // Get audio analysis data
     this.analyser.getByteTimeDomainData(this.timeDomainBuffer);
     this.analyser.getByteFrequencyData(this.frequencyBuffer);
