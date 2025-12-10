@@ -20,19 +20,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Eruda mobile debugging console - only loads on mobile devices */}
+        {/* Eruda mobile debugging console - only loads when ?debug=true or localStorage has mona_debug */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                // Only load Eruda on mobile devices
-                var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                if (isMobile) {
+                var params = new URLSearchParams(window.location.search);
+                var debugEnabled = params.get('debug') === 'true' || localStorage.getItem('mona_debug') === 'true';
+
+                // Save debug mode to localStorage if enabled via URL
+                if (params.get('debug') === 'true') {
+                  localStorage.setItem('mona_debug', 'true');
+                }
+
+                if (debugEnabled) {
                   var script = document.createElement('script');
                   script.src = 'https://cdn.jsdelivr.net/npm/eruda';
                   script.onload = function() {
                     eruda.init();
-                    console.log('📱 Eruda mobile console initialized - tap the green icon to open');
+                    console.log('📱 Eruda mobile console initialized');
                   };
                   document.head.appendChild(script);
                 }
