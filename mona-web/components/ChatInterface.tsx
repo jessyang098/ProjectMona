@@ -312,7 +312,7 @@ export default function ChatInterface() {
                 </div>
               )}
               {/* Input row */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {/* Hidden file input */}
                 <input
                   ref={imageInputRef}
@@ -369,12 +369,12 @@ export default function ChatInterface() {
                   }}
                   placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
                   disabled={!isConnected || isRecording}
-                  className="flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
+                  className="min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
-                  className="flex-shrink-0 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-shrink-0 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-2.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Send
                 </button>
