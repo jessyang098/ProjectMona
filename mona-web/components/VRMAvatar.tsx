@@ -181,10 +181,29 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     });
     console.log("🎭 VRM Meshes found:", meshNames);
 
-    // Log all blend shapes/expressions
+    // Log all blend shapes/expressions with full details
     if (vrm.expressionManager) {
       const expressions = vrm.expressionManager.expressions;
-      console.log("🎭 VRM Expressions:", expressions.map(e => e.expressionName));
+      console.log("🎭 VRM Expressions available:", expressions.map(e => e.expressionName));
+
+      // Log detailed info about each expression
+      console.log("🎭 VRM Expression Details:");
+      expressions.forEach(expr => {
+        const binds = (expr as unknown as { _binds?: Array<{ type: string; index?: number; weight?: number }> })._binds || [];
+        console.log(`  - ${expr.expressionName}: ${binds.length} morph target binds`);
+      });
+
+      // Also log the morph targets from the meshes directly
+      console.log("🎭 Mesh Morph Targets (blend shapes):");
+      vrm.scene.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mesh = obj as THREE.Mesh;
+          const morphDict = mesh.morphTargetDictionary;
+          if (morphDict && Object.keys(morphDict).length > 0) {
+            console.log(`  Mesh "${mesh.name}":`, Object.keys(morphDict));
+          }
+        }
+      });
     }
 
     const humanoid = vrm.humanoid;

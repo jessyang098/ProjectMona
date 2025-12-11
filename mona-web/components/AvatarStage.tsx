@@ -163,11 +163,11 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
       <Canvas
         shadows
         camera={{ position: initialPreset.position.toArray() as [number, number, number], fov: 42 }}
-        gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.25 }}
+        gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.9 }}
       >
-        <color attach="background" args={["#f7f8ff"]} />
-        <ambientLight intensity={1.1} color="#ffffff" />
-        <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.5} color="#ffffff" />
+        <color attach="background" args={["#f5f3ff"]} />
+        <ambientLight intensity={0.6} color="#ffffff" />
+        <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
         <Suspense fallback={null}>
           <VRMAvatar key={vrmUrl} url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
