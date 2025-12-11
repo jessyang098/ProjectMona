@@ -469,26 +469,19 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       expressionManager.setValue('neutral', 1.0);
     }
 
-    // Constrain arms to stay near resting position (limit range during gestures)
+    // Force arms towards resting position (fixes Y-pose/T-pose from animations)
+    const armLerpSpeed = 0.1; // How fast arms return to rest (0-1, higher = faster)
     if (leftUpperArmRef.current) {
       const currentZ = leftUpperArmRef.current.rotation.z;
       const restZ = cfg.arms.leftRotationZ;
-      const maxDeviation = 0.2; // Maximum radians arms can deviate from rest pose (about 11 degrees)
-
-      // Clamp rotation to stay within allowed range
-      const minZ = restZ - maxDeviation;
-      const maxZ = restZ + maxDeviation;
-      leftUpperArmRef.current.rotation.z = Math.max(minZ, Math.min(maxZ, currentZ));
+      // Smoothly interpolate towards rest position
+      leftUpperArmRef.current.rotation.z = currentZ + (restZ - currentZ) * armLerpSpeed;
     }
     if (rightUpperArmRef.current) {
       const currentZ = rightUpperArmRef.current.rotation.z;
       const restZ = cfg.arms.rightRotationZ;
-      const maxDeviation = 0.2; // Maximum radians arms can deviate from rest pose (about 11 degrees)
-
-      // Clamp rotation to stay within allowed range
-      const minZ = restZ - maxDeviation;
-      const maxZ = restZ + maxDeviation;
-      rightUpperArmRef.current.rotation.z = Math.max(minZ, Math.min(maxZ, currentZ));
+      // Smoothly interpolate towards rest position
+      rightUpperArmRef.current.rotation.z = currentZ + (restZ - currentZ) * armLerpSpeed;
     }
 
     // Procedural head movement for natural idle behavior
