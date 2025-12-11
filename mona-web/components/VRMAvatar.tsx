@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
-import type { EmotionData } from "@/types/chat";
+import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
@@ -68,10 +68,11 @@ interface VRMAvatarProps {
   url: string;
   emotion: EmotionData | null;
   audioUrl?: string | null;
+  lipSync?: LipSyncCue[];
 }
 
-export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
-  console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl);
+export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatarProps) {
+  console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl, "lipSync:", lipSync?.length ?? 0, "cues");
 
   const groupRef = useRef<THREE.Group>(null);
   const hipsRef = useRef<THREE.Object3D | null>(null);
@@ -312,6 +313,9 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
       lipSyncRef.current.setupAudio(audioUrl);
       console.log("✅ Audio setup complete");
 
+      // Set lip sync timing data if available (for accurate word sync)
+      lipSyncRef.current.setLipSyncData(lipSync ?? null);
+
       // Call play() synchronously to preserve user interaction context for mobile
       lipSyncRef.current.play();
       console.log("✓ Playing audio with lip sync:", audioUrl);
@@ -324,7 +328,7 @@ export default function VRMAvatar({ url, emotion, audioUrl }: VRMAvatarProps) {
     }
 
     // No cleanup function needed - setupAudio() handles cleanup internally
-  }, [audioUrl, vrm]);
+  }, [audioUrl, lipSync, vrm]);
 
   useFrame((_, delta) => {
     if (!vrm) return;

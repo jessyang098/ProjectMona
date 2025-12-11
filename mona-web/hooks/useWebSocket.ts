@@ -102,10 +102,13 @@ export function useWebSocket(url: string) {
         } else if (data.type === "typing") {
           setIsTyping(data.isTyping || false);
         } else if (data.type === "audio_ready" && data.audioUrl) {
-          // Update the most recent Mona message with the audio URL
+          // Update the most recent Mona message with the audio URL and lip sync data
           const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
 
           console.log("🎵 Audio ready:", fullAudioUrl);
+          if (data.lipSync) {
+            console.log("👄 Lip sync data:", data.lipSync.length, "cues");
+          }
 
           // Stop audio generation indicator
           setIsGeneratingAudio(false);
@@ -119,9 +122,10 @@ export function useWebSocket(url: string) {
               next[lastMonaIndex] = {
                 ...next[lastMonaIndex],
                 audioUrl: fullAudioUrl,
+                lipSync: data.lipSync,  // Include lip sync timing data
               };
 
-              console.log("✓ Updated message with audio URL");
+              console.log("✓ Updated message with audio URL and lip sync");
               return next;
             }
 

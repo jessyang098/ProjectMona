@@ -1,4 +1,5 @@
 import { VRM } from "@pixiv/three-vrm";
+import { LipSyncCue } from "@/types/chat";
 
 /**
  * Configuration for lip sync behavior
@@ -41,8 +42,10 @@ type PhonemeValues = {
 };
 
 /**
- * Manages real-time lip sync animation based on audio analysis.
- * Uses amplitude and spectral centroid to estimate phoneme shapes.
+ * Manages lip sync animation for VRM avatars.
+ * Supports two modes:
+ * 1. Phoneme-timed: Uses pre-computed timing data from Rhubarb for accurate word sync
+ * 2. Real-time audio analysis: Fallback using amplitude and spectral centroid
  */
 export class LipSyncManager {
   private vrm: VRM;
@@ -62,6 +65,10 @@ export class LipSyncManager {
   };
   private isMobile: boolean = false;
 
+  // Phoneme-timed lip sync data
+  private lipSyncCues: LipSyncCue[] | null = null;
+  private useTimedLipSync: boolean = false;
+
   constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
     this.vrm = vrm;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -78,6 +85,27 @@ export class LipSyncManager {
    */
   updateConfig(newConfig: Partial<LipSyncConfig>): void {
     this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Set lip sync timing data from Rhubarb analysis.
+   * When set, the manager will use phoneme-timed animation instead of real-time audio analysis.
+   */
+  setLipSyncData(cues: LipSyncCue[] | null): void {
+    this.lipSyncCues = cues;
+    this.useTimedLipSync = cues !== null && cues.length > 0;
+    if (this.useTimedLipSync) {
+      console.log(`👄 Lip sync: Using ${cues!.length} phoneme cues for accurate word sync`);
+    } else {
+      console.log("👄 Lip sync: Falling back to real-time audio analysis");
+    }
+  }
+
+  /**
+   * Check if phoneme-timed lip sync is available
+   */
+  hasTimedLipSync(): boolean {
+    return this.useTimedLipSync;
   }
 
   /**
@@ -330,13 +358,19 @@ export class LipSyncManager {
    * Call this every frame in your animation loop.
    */
   update(): void {
-    if (!this.analyser || !this.timeDomainBuffer || !this.frequencyBuffer) {
+    const expressionManager = this.vrm.expressionManager;
+    if (!expressionManager) {
       return;
     }
 
-    const expressionManager = this.vrm.expressionManager;
-    if (!expressionManager) {
-      console.warn("⚠️ No expressionManager on VRM, cannot update lip sync");
+    // Use phoneme-timed lip sync if available
+    if (this.useTimedLipSync && this.lipSyncCues && this.audioElement) {
+      this.updateTimedLipSync(expressionManager);
+      return;
+    }
+
+    // Fallback to real-time audio analysis
+    if (!this.analyser || !this.timeDomainBuffer || !this.frequencyBuffer) {
       return;
     }
 
@@ -355,6 +389,39 @@ export class LipSyncManager {
 
     // Apply smoothing and update VRM expressions
     this.applySmoothedPhonemes(phonemeValues, expressionManager);
+  }
+
+  /**
+   * Update lip sync using pre-computed phoneme timing data.
+   * Much more accurate than real-time audio analysis.
+   */
+  private updateTimedLipSync(
+    expressionManager: NonNullable<VRM["expressionManager"]>
+  ): void {
+    if (!this.audioElement || !this.lipSyncCues) return;
+
+    const currentTime = this.audioElement.currentTime;
+
+    // Find the current cue based on audio playback time
+    let currentCue: LipSyncCue | null = null;
+    for (const cue of this.lipSyncCues) {
+      if (currentTime >= cue.start && currentTime < cue.end) {
+        currentCue = cue;
+        break;
+      }
+    }
+
+    // Get target phoneme values from cue or default to closed mouth
+    const targetValues: PhonemeValues = currentCue?.phonemes ?? {
+      aa: 0,
+      ee: 0,
+      ih: 0,
+      oh: 0,
+      ou: 0,
+    };
+
+    // Apply smoothing for natural transitions
+    this.applySmoothedPhonemes(targetValues, expressionManager);
   }
 
   /**

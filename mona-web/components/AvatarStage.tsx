@@ -4,7 +4,7 @@ import { Suspense, useMemo, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import dynamic from "next/dynamic";
-import type { EmotionData } from "@/types/chat";
+import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
@@ -37,6 +37,7 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
 interface AvatarStageProps {
   emotion: EmotionData | null;
   audioUrl?: string;
+  lipSync?: LipSyncCue[];
   viewMode?: "portrait" | "full";
 }
 
@@ -114,7 +115,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
   );
 }
 
-export default function AvatarStage({ emotion, audioUrl, viewMode = "full" }: AvatarStageProps) {
+export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full" }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
@@ -156,7 +157,7 @@ export default function AvatarStage({ emotion, audioUrl, viewMode = "full" }: Av
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.6} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.9} color="#f3f4ff" />
         <Suspense fallback={null}>
-          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} />
+          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} />
         </Suspense>
         <CameraController viewMode={viewMode} />
       </Canvas>
