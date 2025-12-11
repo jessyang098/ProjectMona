@@ -28,6 +28,7 @@ export default function ChatInterface() {
     socks: true,
     shoes: true,
     colorVariant: false,
+    lingerie: false,
   });
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarId>("moe");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -467,7 +468,7 @@ export default function ChatInterface() {
                     </label>
                   ))}
                   <hr className="my-2 border-slate-200" />
-                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Color</p>
+                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Style</p>
                   <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
                     <input
                       type="checkbox"
@@ -481,6 +482,20 @@ export default function ChatInterface() {
                       className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500"
                     />
                     <span className="text-sm text-slate-700">Alternate Color</span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
+                    <input
+                      type="checkbox"
+                      checked={outfitVisibility.lingerie}
+                      onChange={(e) =>
+                        setOutfitVisibility((prev) => ({
+                          ...prev,
+                          lingerie: e.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500"
+                    />
+                    <span className="text-sm text-slate-700">Lingerie</span>
                   </label>
                 </div>
               )}
