@@ -83,7 +83,7 @@ export interface OutfitVisibility {
   skirt: boolean;
   socks: boolean;
   shoes: boolean;
-  bodyVariant: 0 | 1 | 2; // 0 = Bodybaked, 1 = Bodybaked_1, 2 = Body_all
+  colorVariant: boolean; // Toggle for ChangeColor expression (alternate color scheme)
 }
 
 interface VRMAvatarProps {
@@ -99,7 +99,7 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
   skirt: true,
   socks: true,
   shoes: true,
-  bodyVariant: 0,
+  colorVariant: false,
 };
 
 export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
@@ -304,17 +304,13 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   useEffect(() => {
     if (!vrm) return;
 
-    // Map outfit keys to mesh names (excludes bodyVariant which is handled separately)
+    // Map outfit keys to mesh names
     const outfitMeshMap: Record<string, string> = {
       shirt: "Shirt",
       skirt: "Skirt",
       socks: "Knee_Socks",
       shoes: "Shoes",
     };
-
-    // Body variant mesh names
-    const bodyMeshes = ["Bodybaked", "Bodybaked_1", "Body_all"];
-    const selectedBodyMesh = bodyMeshes[outfitVisibility.bodyVariant];
 
     vrm.scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
@@ -323,16 +319,17 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         // Handle outfit toggles
         for (const [key, meshName] of Object.entries(outfitMeshMap)) {
           if (mesh.name === meshName) {
-            mesh.visible = outfitVisibility[key as keyof Omit<OutfitVisibility, 'bodyVariant'>];
+            mesh.visible = outfitVisibility[key as keyof Omit<OutfitVisibility, 'colorVariant'>];
           }
-        }
-
-        // Handle body variant switching - show only the selected body mesh
-        if (bodyMeshes.includes(mesh.name)) {
-          mesh.visible = mesh.name === selectedBodyMesh;
         }
       }
     });
+
+    // Handle color variant via VRM expression (ChangeColor blend shape)
+    const expressionManager = vrm.expressionManager;
+    if (expressionManager) {
+      expressionManager.setValue("ChangeColor", outfitVisibility.colorVariant ? 1 : 0);
+    }
   }, [outfitVisibility, vrm]);
 
   // Listen for pose test commands
