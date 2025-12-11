@@ -6,6 +6,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
+import { VRMLookAtQuaternionProxy } from "@pixiv/three-vrm-animation";
 import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
 import { onPoseCommand, type PoseCommand } from "@/lib/poseCommands";
@@ -31,20 +32,20 @@ const ANIMATION_CONFIG = {
     talkFrequency: 0.8,
     talkSmoothing: 0.04,
   },
-  // Torso movement for subtle breathing effect (idle vs talking)
+  // Torso movement for subtle breathing/sway effect (idle vs talking)
   torso: {
-    swayRange: 0.02, // Very subtle - ~1 degree max
+    swayRange: 0.08, // More noticeable sway like Riko (0.1 was too much)
     // Idle: slow, gentle breathing
-    idleFrequency: 3.5,
-    idleSmoothing: 0.005,
+    idleFrequency: 2.8,
+    idleSmoothing: 0.01,
     // Talking: slightly more animated
-    talkFrequency: 2.5,
-    talkSmoothing: 0.01,
+    talkFrequency: 1.8,
+    talkSmoothing: 0.02,
   },
-  // Arm positions - gentle rest pose (not too rigid)
+  // Arm positions - natural rest pose at sides
   arms: {
-    leftRotationZ: -0.4,  // ~23 degrees - relaxed, not pressed against body
-    rightRotationZ: 0.4,
+    leftRotationZ: -1.0,  // ~57 degrees - arms naturally at sides (Riko uses 1.2)
+    rightRotationZ: 1.0,
   },
 } as const;
 
@@ -154,6 +155,11 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       nextBlink: 0,
       blinkAmount: 0,
     },
+    // Track when a gesture ends to apply faster arm correction
+    gestureTransition: {
+      wasGesturePlaying: false,
+      transitionTimer: 0,
+    },
   });
   const gltf = useLoader(
     GLTFLoader,
@@ -171,6 +177,14 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     // These significantly improve rendering performance
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
     VRMUtils.combineSkeletons(gltf.scene);
+    VRMUtils.combineMorphs(vrm);
+
+    // Add VRMLookAtQuaternionProxy for eye tracking support in animations
+    if (vrm.lookAt) {
+      const lookAtQuatProxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
+      lookAtQuatProxy.name = 'lookAtQuaternionProxy';
+      vrm.scene.add(lookAtQuatProxy);
+    }
 
     group.add(vrm.scene);
 
@@ -504,28 +518,50 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       expressionManager.setValue('neutral', 1.0);
     }
 
-    // Gently guide arms towards resting position (fixes Y-pose/T-pose)
-    // Skip entirely when a gesture is playing - let the animation have full control
+    // Always guide arms towards resting position (fixes T-pose)
+    // This runs continuously to counteract animation mixer resetting to T-pose
     const currentGesture = gestureManagerRef.current?.getCurrentGesture();
-    if (!currentGesture) {
-      const armLerpSpeed = 0.05; // Slow, gentle correction - doesn't fight animations
+    const gestureTransition = anim.gestureTransition;
 
-      // Get avatar config to check if model is rotated (affects arm rotation direction)
-      const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
-      const isRotated = Math.abs(avatarConfig.rotateY) > 0.1; // Model rotated 180 degrees
+    // Detect when a gesture just ended and start transition
+    if (gestureTransition.wasGesturePlaying && !currentGesture) {
+      gestureTransition.transitionTimer = 1.0; // 1 second transition period with faster lerp
+    }
+    gestureTransition.wasGesturePlaying = !!currentGesture;
 
-      // For rotated models (like Moe), the arm Z rotations need to be inverted
-      const leftRestZ = isRotated ? -cfg.arms.leftRotationZ : cfg.arms.leftRotationZ;
-      const rightRestZ = isRotated ? -cfg.arms.rightRotationZ : cfg.arms.rightRotationZ;
+    // Decrease transition timer
+    if (gestureTransition.transitionTimer > 0) {
+      gestureTransition.transitionTimer -= delta;
+    }
 
+    // Get avatar config to check if model is rotated (affects arm rotation direction)
+    const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
+    const isRotated = Math.abs(avatarConfig.rotateY) > 0.1; // Model rotated 180 degrees
+
+    // For rotated models (like Moe), the arm Z rotations need to be inverted
+    const leftRestZ = isRotated ? -cfg.arms.leftRotationZ : cfg.arms.leftRotationZ;
+    const rightRestZ = isRotated ? -cfg.arms.rightRotationZ : cfg.arms.rightRotationZ;
+
+    // Determine arm correction speed based on state:
+    // - During gesture: skip (let animation control)
+    // - During transition (after gesture ends): fast correction to override fadeOut
+    // - Normal idle: gentle correction
+    let armLerpSpeed = 0;
+    if (currentGesture) {
+      armLerpSpeed = 0; // Let gesture animation have full control
+    } else if (gestureTransition.transitionTimer > 0) {
+      armLerpSpeed = 0.25; // Fast correction during post-gesture transition
+    } else {
+      armLerpSpeed = 0.08; // Normal gentle correction
+    }
+
+    if (armLerpSpeed > 0) {
       if (leftUpperArmRef.current) {
         const currentZ = leftUpperArmRef.current.rotation.z;
-        // Gently guide towards rest position
         leftUpperArmRef.current.rotation.z = currentZ + (leftRestZ - currentZ) * armLerpSpeed;
       }
       if (rightUpperArmRef.current) {
         const currentZ = rightUpperArmRef.current.rotation.z;
-        // Gently guide towards rest position
         rightUpperArmRef.current.rotation.z = currentZ + (rightRestZ - currentZ) * armLerpSpeed;
       }
     }
