@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { loadMixamoAnimation } from "./mixamoLoader";
 
-export type EmotionType = "happy" | "excited" | "curious" | "embarrassed" | "sad" | "concerned" | "neutral" | "angry" | "annoyed" | "frustrated";
+export type EmotionType = "happy" | "excited" | "curious" | "embarrassed" | "sad" | "concerned" | "neutral" | "annoyed" | "frustrated";
 export type GestureName =
   | "wave"
   | "nod"
@@ -18,7 +18,6 @@ export type GestureName =
   | "looking_around"
   | "dismissing"
   | "standing_idle"
-  | "angry"
   | "crouch"
   | "lay"
   | "stand1";
@@ -48,10 +47,7 @@ const GESTURE_CONFIGS: GestureConfig[] = [
   { name: "dismissing", path: "/animations/dismissing.fbx", triggerEmotions: ["embarrassed"], priority: 7 },
 
   // Sad/Concerned gestures
-  { name: "sad_idle", path: "/animations/sad_idle.fbx", triggerEmotions: ["sad", "concerned"], priority: 6 },
-
-  // Angry/Frustrated gestures
-  { name: "angry", path: "/animations/angry.fbx", triggerEmotions: ["angry", "annoyed", "frustrated"], priority: 9 },
+  { name: "sad_idle", path: "/animations/sad_idle.fbx", triggerEmotions: ["sad", "concerned", "annoyed", "frustrated"], priority: 6 },
 
   // Neutral fallback
   { name: "standing_idle", path: "/animations/standing_idle.fbx", triggerEmotions: ["neutral"], priority: 5 },
