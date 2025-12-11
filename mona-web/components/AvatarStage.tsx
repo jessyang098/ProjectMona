@@ -142,7 +142,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
   console.log("🎬 AvatarStage received audioUrl:", audioUrl);
   console.log("🎬 Absolute audioUrl:", absoluteAudioUrl);
 
-  const vrmUrl = process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Mona1.vrm";
+  const vrmUrl = process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
   const initialPreset = VIEW_PRESETS[viewMode];
 
   return (
