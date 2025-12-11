@@ -250,6 +250,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             print(f"🎤 [STARTUP AUDIO] Starting audio generation for client {client_id}")
             print(f"🎤 [STARTUP AUDIO] Text to generate: '{welcome_content}'")
             audio_url = None
+            lip_sync_data = None
 
             # Preprocess text to remove problematic phonemes like "tch"
             tts_text = preprocess_tts_text(welcome_content)
@@ -258,11 +259,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             if mona_tts_sovits:
                 print(f"🎤 [STARTUP AUDIO] Attempting GPT-SoVITS generation...")
                 try:
-                    audio_path = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                    audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
                     print(f"🎤 [STARTUP AUDIO] GPT-SoVITS returned: {audio_path}")
                     if audio_path:
                         audio_url = f"/audio/{Path(audio_path).name}"
                         print(f"✓ [STARTUP AUDIO] Generated startup greeting voice with GPT-SoVITS: {audio_url}")
+                        if lip_sync_data:
+                            print(f"✓ [STARTUP AUDIO] Lip sync data: {len(lip_sync_data)} cues")
                     else:
                         print(f"⚠️ [STARTUP AUDIO] GPT-SoVITS returned None")
                 except Exception as e:
@@ -291,6 +294,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 audio_update = {
                     "type": "audio_ready",
                     "audioUrl": audio_url,
+                    "lipSync": lip_sync_data,  # Include lip sync timing data
                     "timestamp": datetime.now().isoformat(),
                 }
                 print(f"📤 [STARTUP AUDIO] Sending audio_ready message: {audio_update}")
@@ -372,12 +376,15 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                     tts_text = preprocess_tts_text(event["content"])
 
                                     audio_url = None
+                                    lip_sync_data = None
                                     # Try GPT-SoVITS first (high-quality anime voice)
                                     if mona_tts_sovits:
-                                        audio_path = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
                                             print(f"✓ Using GPT-SoVITS audio")
+                                            if lip_sync_data:
+                                                print(f"✓ Lip sync: {len(lip_sync_data)} cues")
 
                                     # Fall back to OpenAI TTS if SoVITS failed or unavailable
                                     if not audio_url and mona_tts:
@@ -391,6 +398,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                         audio_update = {
                                             "type": "audio_ready",
                                             "audioUrl": audio_url,
+                                            "lipSync": lip_sync_data,  # Include lip sync timing data
                                             "timestamp": datetime.now().isoformat(),
                                         }
                                         await manager.send_message(audio_update, client_id)

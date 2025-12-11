@@ -6,7 +6,7 @@ import { useAudioContext } from "@/hooks/useAudioContext";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import AvatarStage from "./AvatarStage";
-import { EmotionData } from "@/types/chat";
+import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest } from "@/lib/poseCommands";
 
@@ -30,11 +30,14 @@ export default function ChatInterface() {
   const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, sendMessage} = useWebSocket(WEBSOCKET_URL);
   const { initAudioContext } = useAudioContext();
 
-  // Get the latest audio URL from Mona's messages
-  const latestAudioUrl = messages
+  // Get the latest audio URL and lip sync data from Mona's messages
+  const latestMonaMessageWithAudio = messages
     .slice()
     .reverse()
-    .find((msg) => msg.sender === "mona" && msg.audioUrl)?.audioUrl;
+    .find((msg) => msg.sender === "mona" && msg.audioUrl);
+
+  const latestAudioUrl = latestMonaMessageWithAudio?.audioUrl;
+  const latestLipSync = latestMonaMessageWithAudio?.lipSync;
 
   useEffect(() => {
     console.log("🎵 Latest audio URL updated:", latestAudioUrl);
@@ -219,7 +222,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} viewMode={viewMode} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} viewMode={viewMode} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>

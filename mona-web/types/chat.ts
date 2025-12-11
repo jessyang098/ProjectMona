@@ -4,6 +4,20 @@ export interface EmotionData {
   timestamp: string;
 }
 
+// Lip sync cue from Rhubarb - timing data for mouth shapes
+export interface LipSyncCue {
+  start: number;  // Start time in seconds
+  end: number;    // End time in seconds
+  shape: string;  // Rhubarb mouth shape (A-H, X)
+  phonemes: {     // VRM blend shape values
+    aa: number;
+    ee: number;
+    ih: number;
+    oh: number;
+    ou: number;
+  };
+}
+
 export interface Message {
   content: string;
   sender: "user" | "mona";
@@ -12,6 +26,7 @@ export interface Message {
   isStreaming?: boolean;
   audioUrl?: string;
   imageUrl?: string;  // For displaying uploaded images in chat
+  lipSync?: LipSyncCue[];  // Lip sync timing data
 }
 
 export interface WebSocketMessage {
@@ -24,4 +39,5 @@ export interface WebSocketMessage {
   error?: string;
   audioUrl?: string;
   imageUrl?: string;  // For displaying uploaded images
+  lipSync?: LipSyncCue[];  // Lip sync timing data
 }

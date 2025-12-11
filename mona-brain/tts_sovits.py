@@ -4,11 +4,14 @@ Uses local GPT-SoVITS server for high-quality anime voice synthesis
 """
 
 import hashlib
+import json
 import os
 import requests
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any, Tuple
+
+from lip_sync import get_lip_sync_generator
 
 
 class MonaTTSSoVITS:
@@ -54,7 +57,20 @@ class MonaTTSSoVITS:
         ).hexdigest()
         return self.audio_dir / f"{text_hash}.{format}"
 
-    async def generate_speech(self, text: str, use_cache: bool = True, convert_to_mp3: bool = False) -> Optional[str]:
+    def _get_lip_sync_cache_path(self, text: str) -> Path:
+        """Generate cache file path for lip sync data."""
+        text_hash = hashlib.md5(
+            f"{text}_{self.ref_audio_path}_{self.speed_factor}".encode()
+        ).hexdigest()
+        return self.audio_dir / f"{text_hash}.lipsync.json"
+
+    async def generate_speech(
+        self,
+        text: str,
+        use_cache: bool = True,
+        convert_to_mp3: bool = False,
+        generate_lip_sync: bool = True
+    ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
         """
         Generate speech audio from text using GPT-SoVITS.
 
@@ -62,21 +78,31 @@ class MonaTTSSoVITS:
             text: Text to convert to speech
             use_cache: Whether to use cached audio if available
             convert_to_mp3: Whether to convert WAV to MP3 (for mobile compatibility)
+            generate_lip_sync: Whether to generate lip sync timing data
 
         Returns:
-            Path to generated audio file, or None if generation failed
+            Tuple of (path to generated audio file, lip sync data) or (None, None) if failed
         """
         if not text or not text.strip():
-            return None
+            return None, None
 
         # Determine output format based on conversion flag
         output_format = "mp3" if convert_to_mp3 else "wav"
         cache_path = self._get_cache_path(text, format=output_format)
+        lip_sync_cache_path = self._get_lip_sync_cache_path(text)
 
         # Return cached file if it exists
         if use_cache and cache_path.exists():
             print(f"✓ Using cached SoVITS audio: {cache_path.name}")
-            return str(cache_path)
+            # Also load cached lip sync if available
+            lip_sync_data = None
+            if lip_sync_cache_path.exists():
+                try:
+                    lip_sync_data = json.loads(lip_sync_cache_path.read_text())
+                    print(f"✓ Using cached lip sync data: {len(lip_sync_data)} cues")
+                except Exception:
+                    pass
+            return str(cache_path), lip_sync_data
 
         try:
             print(f"⚡ Generating SoVITS speech for: {text[:50]}...")
@@ -105,16 +131,29 @@ class MonaTTSSoVITS:
 
             response.raise_for_status()
 
-            # Only convert to MP3 if requested (for mobile clients)
+            # Always save WAV first (needed for lip sync analysis)
+            wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav" if convert_to_mp3 else cache_path
+            with open(wav_path, "wb") as f:
+                f.write(response.content)
+            print(f"✓ SoVITS WAV generated: {wav_path.name}")
+
+            # Generate lip sync data from the WAV file BEFORE MP3 conversion
+            lip_sync_data = None
+            if generate_lip_sync:
+                lip_sync_generator = get_lip_sync_generator()
+                if lip_sync_generator.is_available():
+                    lip_sync_data = lip_sync_generator.generate_lip_sync(
+                        str(wav_path),
+                        dialog_text=text
+                    )
+                    if lip_sync_data:
+                        # Cache the lip sync data
+                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+                        print(f"✓ Lip sync data cached: {len(lip_sync_data)} cues")
+
+            # Convert to MP3 if requested (for mobile clients)
             if convert_to_mp3:
-                # Save WAV file temporarily
-                wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav"
-                with open(wav_path, "wb") as f:
-                    f.write(response.content)
-
-                print(f"✓ SoVITS WAV generated, converting to MP3 for mobile compatibility...")
-
-                # Convert WAV to MP3 using ffmpeg directly for better reliability
+                print(f"✓ Converting to MP3 for mobile compatibility...")
                 try:
                     result = subprocess.run(
                         [
@@ -138,42 +177,37 @@ class MonaTTSSoVITS:
                     else:
                         print(f"❌ ffmpeg conversion failed with return code {result.returncode}")
                         print(f"   stderr: {result.stderr[:200]}")
-                        return None
+                        return None, None
 
                 except subprocess.TimeoutExpired:
                     print(f"❌ MP3 conversion timed out after 30 seconds")
                     if wav_path.exists():
                         wav_path.unlink()
-                    return None
+                    return None, None
                 except FileNotFoundError:
                     print(f"❌ ffmpeg not found - cannot convert to MP3 for mobile")
                     print(f"   Install ffmpeg: apt-get install ffmpeg (or brew install ffmpeg on macOS)")
                     if wav_path.exists():
                         wav_path.unlink()
-                    return None
+                    return None, None
                 except Exception as e:
                     print(f"❌ MP3 conversion failed: {e}")
                     if wav_path.exists():
                         wav_path.unlink()
-                    return None
-            else:
-                # Save WAV directly (for desktop clients)
-                with open(cache_path, "wb") as f:
-                    f.write(response.content)
-                print(f"✓ SoVITS audio saved as WAV: {cache_path.name}")
+                    return None, None
 
-            return str(cache_path)
+            return str(cache_path), lip_sync_data
 
         except requests.exceptions.ConnectionError:
             print(f"✗ SoVITS server not running. Start GPT-SoVITS on {self.sovits_url}")
-            return None
+            return None, None
         except requests.exceptions.HTTPError as e:
             print(f"✗ SoVITS API error: {e}")
             print(f"✗ Response body: {e.response.text if hasattr(e, 'response') else 'No response body'}")
-            return None
+            return None, None
         except Exception as e:
             print(f"✗ SoVITS generation failed: {e}")
-            return None
+            return None, None
 
     def clear_cache(self) -> int:
         """
