@@ -40,6 +40,19 @@ const ANIMATION_CONFIG = {
   },
 } as const;
 
+// Per-avatar configuration for different VRM models
+const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number, number]; rotateY: number }> = {
+  // Moe.vrm - new contractor avatar, needs 180 rotation and smaller scale
+  "Moe.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/Moe.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
+  // mona1.vrm - original avatar, no rotation needed
+  "mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
+  "/avatars/mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
+};
+
+// Default config for unknown avatars
+const DEFAULT_AVATAR_CONFIG = { scale: 0.95, position: [0, 0.10, 0] as [number, number, number], rotateY: 0 };
+
 const emotionToExpression: Record<string, string> = {
   // Positive emotions
   happy: "happy",
@@ -64,14 +77,32 @@ const emotionToExpression: Record<string, string> = {
   frustrated: "sad",
 };
 
+// Outfit visibility configuration
+export interface OutfitVisibility {
+  shirt: boolean;
+  skirt: boolean;
+  socks: boolean;
+  shoes: boolean;
+  bodyVariant: 0 | 1 | 2; // 0 = Bodybaked, 1 = Bodybaked_1, 2 = Body_all
+}
+
 interface VRMAvatarProps {
   url: string;
   emotion: EmotionData | null;
   audioUrl?: string | null;
   lipSync?: LipSyncCue[];
+  outfitVisibility?: OutfitVisibility;
 }
 
-export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatarProps) {
+const DEFAULT_OUTFIT: OutfitVisibility = {
+  shirt: true,
+  skirt: true,
+  socks: true,
+  shoes: true,
+  bodyVariant: 0,
+};
+
+export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
   console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl, "lipSync:", lipSync?.length ?? 0, "cues");
 
   const groupRef = useRef<THREE.Group>(null);
@@ -126,9 +157,13 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatar
     if (!vrm || !groupRef.current) return;
     const group = groupRef.current;
     group.add(vrm.scene);
-    vrm.scene.rotation.y = 0;
-    vrm.scene.scale.setScalar(0.95);
-    vrm.scene.position.set(0, 0.10, 0);
+
+    // Apply per-avatar configuration
+    const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
+    vrm.scene.rotation.y = avatarConfig.rotateY;
+    vrm.scene.scale.setScalar(avatarConfig.scale);
+    vrm.scene.position.set(...avatarConfig.position);
+    console.log("🎭 Applied avatar config for:", url, avatarConfig);
     // Log all meshes to find outfit toggles
     const meshNames: string[] = [];
     vrm.scene.traverse((obj) => {
@@ -235,7 +270,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatar
         gestureManagerRef.current = null;
       }
     };
-  }, [vrm]);
+  }, [vrm, url]);
 
   // Update emotion and trigger gestures
   useEffect(() => {
@@ -264,6 +299,41 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatar
       console.log("🎭 Updated gesture emotion:", emotionType);
     }
   }, [emotion, vrm]);
+
+  // Handle outfit visibility toggles
+  useEffect(() => {
+    if (!vrm) return;
+
+    // Map outfit keys to mesh names (excludes bodyVariant which is handled separately)
+    const outfitMeshMap: Record<string, string> = {
+      shirt: "Shirt",
+      skirt: "Skirt",
+      socks: "Knee_Socks",
+      shoes: "Shoes",
+    };
+
+    // Body variant mesh names
+    const bodyMeshes = ["Bodybaked", "Bodybaked_1", "Body_all"];
+    const selectedBodyMesh = bodyMeshes[outfitVisibility.bodyVariant];
+
+    vrm.scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh;
+
+        // Handle outfit toggles
+        for (const [key, meshName] of Object.entries(outfitMeshMap)) {
+          if (mesh.name === meshName) {
+            mesh.visible = outfitVisibility[key as keyof Omit<OutfitVisibility, 'bodyVariant'>];
+          }
+        }
+
+        // Handle body variant switching - show only the selected body mesh
+        if (bodyMeshes.includes(mesh.name)) {
+          mesh.visible = mesh.name === selectedBodyMesh;
+        }
+      }
+    });
+  }, [outfitVisibility, vrm]);
 
   // Listen for pose test commands
   useEffect(() => {

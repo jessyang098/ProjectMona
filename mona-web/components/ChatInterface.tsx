@@ -5,7 +5,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAudioContext } from "@/hooks/useAudioContext";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
-import AvatarStage from "./AvatarStage";
+import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./AvatarStage";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest } from "@/lib/poseCommands";
@@ -21,6 +21,15 @@ export default function ChatInterface() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [viewMode, setViewMode] = useState<"portrait" | "full">("full");
   const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
+  const [showOutfitMenu, setShowOutfitMenu] = useState(false);
+  const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
+    shirt: true,
+    skirt: true,
+    socks: true,
+    shoes: true,
+    bodyVariant: 0,
+  });
+  const [selectedAvatar, setSelectedAvatar] = useState<AvatarId>("moe");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -222,7 +231,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} viewMode={viewMode} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
@@ -404,6 +413,86 @@ export default function ChatInterface() {
                 </svg>
               )}
             </button>
+            {/* Outfit toggle button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowOutfitMenu((prev) => !prev)}
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow"
+                title="Outfit options"
+              >
+                {/* Clothing/hanger icon */}
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l-1 1m1-1l1 1m-1-1v3m0 0l-7 4v10a1 1 0 001 1h12a1 1 0 001-1V10l-7-4z" />
+                </svg>
+              </button>
+              {/* Outfit menu dropdown */}
+              {showOutfitMenu && (
+                <div className="absolute bottom-12 right-0 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Avatar</p>
+                  {AVATAR_OPTIONS.map((avatar) => (
+                    <label
+                      key={avatar.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+                    >
+                      <input
+                        type="radio"
+                        name="avatar"
+                        checked={selectedAvatar === avatar.id}
+                        onChange={() => setSelectedAvatar(avatar.id)}
+                        className="h-4 w-4 border-slate-300 text-purple-500 focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-slate-700">{avatar.label}</span>
+                    </label>
+                  ))}
+                  <hr className="my-2 border-slate-200" />
+                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Outfit</p>
+                  {(["shirt", "skirt", "socks", "shoes"] as const).map((item) => (
+                    <label
+                      key={item}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={outfitVisibility[item]}
+                        onChange={(e) =>
+                          setOutfitVisibility((prev) => ({
+                            ...prev,
+                            [item]: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500"
+                      />
+                      <span className="text-sm capitalize text-slate-700">{item}</span>
+                    </label>
+                  ))}
+                  <hr className="my-2 border-slate-200" />
+                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Body Variant</p>
+                  {([0, 1, 2] as const).map((variant) => (
+                    <label
+                      key={variant}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+                    >
+                      <input
+                        type="radio"
+                        name="bodyVariant"
+                        checked={outfitVisibility.bodyVariant === variant}
+                        onChange={() =>
+                          setOutfitVisibility((prev) => ({
+                            ...prev,
+                            bodyVariant: variant,
+                          }))
+                        }
+                        className="h-4 w-4 border-slate-300 text-purple-500 focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-slate-700">
+                        {variant === 0 ? "Default" : variant === 1 ? "Variant 1" : "Variant 2"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {
