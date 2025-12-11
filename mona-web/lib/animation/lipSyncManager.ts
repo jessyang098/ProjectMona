@@ -19,15 +19,18 @@ export interface LipSyncConfig {
 }
 
 const DEFAULT_CONFIG: LipSyncConfig = {
-  smoothingFactor: 0.2, // Match Riko's smoothing
-  amplitudeThreshold: 0.005, // Match Riko's threshold
-  amplitudeScale: 1.0, // Match Riko's scale (was 4.0)
+  smoothingFactor: 0.3, // Higher = smoother transitions
+  amplitudeThreshold: 0.02, // Higher threshold to ignore quiet sounds
+  amplitudeScale: 0.5, // Reduced scale for smaller mouth movements
   centroidThresholds: {
-    wide: 0.75, // Match Riko's thresholds
+    wide: 0.75,
     ih: 0.5,
     oh: 0.25,
   },
 };
+
+// Maximum mouth opening (0-1). Caps all phoneme values.
+const MAX_MOUTH_OPEN = 0.4;
 
 type PhonemeValues = {
   aa: number;
@@ -390,18 +393,20 @@ export class LipSyncManager {
     const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
 
     if (amplitude > amplitudeThreshold) {
-      const level = Math.min(1, (amplitude - amplitudeThreshold) * amplitudeScale);
+      // Calculate level and cap it to prevent mouth opening too wide
+      const rawLevel = (amplitude - amplitudeThreshold) * amplitudeScale;
+      const level = Math.min(MAX_MOUTH_OPEN, rawLevel);
 
-      // Match Riko's simpler approach: aa always gets the level
+      // aa (jaw open) always gets some level for any speech
       phonemes.aa = level;
 
       // Classify vowel shape by spectral brightness
       if (centroid > centroidThresholds.wide) {
-        phonemes.ee = level; // Bright vowel (ee)
+        phonemes.ee = level * 0.7; // Bright vowel (ee) - slightly less
       } else if (centroid > centroidThresholds.ih) {
-        phonemes.ih = level; // Mid vowel (ih)
+        phonemes.ih = level * 0.8; // Mid vowel (ih)
       } else if (centroid > centroidThresholds.oh) {
-        phonemes.oh = level; // Dark vowel (oh)
+        phonemes.oh = level * 0.9; // Dark vowel (oh)
       } else {
         phonemes.ou = level; // Darkest vowel (ou)
       }
