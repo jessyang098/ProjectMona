@@ -135,17 +135,29 @@ export class LipSyncManager {
     }
 
     // CRITICAL: Create Audio element synchronously to preserve user interaction context
-    this.audioElement = new Audio(audioUrl);
-    this.audioElement.crossOrigin = "anonymous";
+    this.audioElement = new Audio();
+
+    // Mobile Chrome fix: Only use crossOrigin if NOT on mobile
+    // crossOrigin="anonymous" can cause issues on some mobile browsers
+    if (!this.isMobile) {
+      this.audioElement.crossOrigin = "anonymous";
+    }
+
+    // Set source after crossOrigin configuration
+    this.audioElement.src = audioUrl;
 
     console.log("🎵 Audio element src set to:", this.audioElement.src);
+    console.log("🎵 crossOrigin:", this.audioElement.crossOrigin || "not set (mobile)");
 
     // Mobile-specific attributes for better compatibility
     if (this.isMobile) {
       this.audioElement.setAttribute("playsinline", "true");
       this.audioElement.setAttribute("webkit-playsinline", "true");
-      this.audioElement.preload = "auto";
+      // Use metadata preload for mobile to reduce data usage and avoid issues
+      this.audioElement.preload = "metadata";
       console.log("📱 Mobile audio attributes applied");
+    } else {
+      this.audioElement.preload = "auto";
     }
 
     console.log("🎵 Audio element created");
@@ -176,7 +188,15 @@ export class LipSyncManager {
     console.log("🎵 Loading audio...");
     this.audioElement.load();
 
-    // Setup Web Audio API analysis chain
+    // MOBILE: Skip Web Audio API setup - just use HTMLAudioElement for playback
+    // Web Audio API requires crossOrigin which breaks CORS on some mobile browsers
+    // We use pre-computed lip sync data from the server instead
+    if (this.isMobile) {
+      console.log("📱 Mobile mode: Skipping Web Audio API (using server lip sync data)");
+      return;
+    }
+
+    // DESKTOP: Setup Web Audio API analysis chain for real-time lip sync fallback
     console.log("🎵 Setting up Web Audio API...");
 
     // Use global AudioContext if available (initialized from user interaction)
@@ -214,6 +234,7 @@ export class LipSyncManager {
     } catch (error) {
       console.error("❌ Failed to set up Web Audio API:", error);
       console.error("   This usually happens on mobile when AudioContext wasn't initialized from user interaction");
+      // On desktop, this is a real error. On mobile, we already returned above.
       throw error;
     }
   }
@@ -285,10 +306,11 @@ export class LipSyncManager {
       duration: this.audioElement.duration,
       volume: this.audioElement.volume,
       muted: this.audioElement.muted,
+      isMobile: this.isMobile,
     });
 
-    // Resume AudioContext if needed (must be sync for mobile)
-    if (this.audioContext?.state === "suspended") {
+    // Resume AudioContext if needed (desktop only - mobile skips Web Audio API)
+    if (!this.isMobile && this.audioContext?.state === "suspended") {
       console.log("🎵 Resuming suspended AudioContext synchronously...");
       this.audioContext.resume().catch((error) => {
         console.error("❌ Failed to resume AudioContext:", error);
