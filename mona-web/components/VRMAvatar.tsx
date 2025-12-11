@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { VRM, VRMLoaderPlugin } from "@pixiv/three-vrm";
+import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import { LipSyncManager } from "@/lib/animation";
@@ -19,19 +19,27 @@ const ANIMATION_CONFIG = {
     speed: 8.0,
     duration: 0.1,
   },
-  // Head movement ranges and timing
+  // Head movement ranges and timing (idle vs talking)
   head: {
     nodRange: 0.2,
     turnRange: 0.13,
     tiltRange: 0.15,
-    changeFrequency: 1.8,
-    smoothingFactor: 0.02,
+    // Idle: slower, less frequent movements
+    idleFrequency: 1.8,
+    idleSmoothing: 0.02,
+    // Talking: faster, more dynamic movements
+    talkFrequency: 0.8,
+    talkSmoothing: 0.04,
   },
-  // Torso movement for breathing effect
+  // Torso movement for breathing effect (idle vs talking)
   torso: {
     swayRange: 0.1,
-    changeFrequency: 2.8,
-    smoothingFactor: 0.01,
+    // Idle: slow, subtle sway
+    idleFrequency: 2.8,
+    idleSmoothing: 0.01,
+    // Talking: more animated body language
+    talkFrequency: 1.8,
+    talkSmoothing: 0.02,
   },
   // Arm positions to fix T-pose
   arms: {
@@ -158,6 +166,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   useEffect(() => {
     if (!vrm || !groupRef.current) return;
     const group = groupRef.current;
+
+    // VRMUtils performance optimizations (from riko project)
+    // These significantly improve rendering performance
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    VRMUtils.combineSkeletons(gltf.scene);
+
     group.add(vrm.scene);
 
     // Apply per-avatar configuration
@@ -312,7 +326,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         gestureManagerRef.current = null;
       }
     };
-  }, [vrm, url]);
+  }, [vrm, url, gltf]);
 
   // Update emotion and trigger gestures
   useEffect(() => {
@@ -490,36 +504,48 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       expressionManager.setValue('neutral', 1.0);
     }
 
-    // Force arms towards resting position (fixes Y-pose/T-pose from animations)
-    // Must run AFTER gesture manager update to override animation poses
-    const armLerpSpeed = 0.2; // How fast arms return to rest (0-1, higher = faster)
+    // Force arms towards resting position (fixes Y-pose/T-pose)
+    // BUT skip this when a gesture is actively playing - let the animation control the arms
+    const currentGesture = gestureManagerRef.current?.getCurrentGesture();
+    if (!currentGesture) {
+      const armLerpSpeed = 0.2; // How fast arms return to rest (0-1, higher = faster)
 
-    // Get avatar config to check if model is rotated (affects arm rotation direction)
-    const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
-    const isRotated = Math.abs(avatarConfig.rotateY) > 0.1; // Model rotated 180 degrees
+      // Get avatar config to check if model is rotated (affects arm rotation direction)
+      const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
+      const isRotated = Math.abs(avatarConfig.rotateY) > 0.1; // Model rotated 180 degrees
 
-    // For rotated models (like Moe), the arm Z rotations need to be inverted
-    const leftRestZ = isRotated ? -cfg.arms.leftRotationZ : cfg.arms.leftRotationZ;
-    const rightRestZ = isRotated ? -cfg.arms.rightRotationZ : cfg.arms.rightRotationZ;
+      // For rotated models (like Moe), the arm Z rotations need to be inverted
+      const leftRestZ = isRotated ? -cfg.arms.leftRotationZ : cfg.arms.leftRotationZ;
+      const rightRestZ = isRotated ? -cfg.arms.rightRotationZ : cfg.arms.rightRotationZ;
 
-    if (leftUpperArmRef.current) {
-      const currentZ = leftUpperArmRef.current.rotation.z;
-      // Smoothly interpolate towards rest position
-      leftUpperArmRef.current.rotation.z = currentZ + (leftRestZ - currentZ) * armLerpSpeed;
-      // Dampen X rotation for more natural pose
-      leftUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
+      if (leftUpperArmRef.current) {
+        const currentZ = leftUpperArmRef.current.rotation.z;
+        // Smoothly interpolate towards rest position
+        leftUpperArmRef.current.rotation.z = currentZ + (leftRestZ - currentZ) * armLerpSpeed;
+        // Dampen X rotation for more natural pose
+        leftUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
+      }
+      if (rightUpperArmRef.current) {
+        const currentZ = rightUpperArmRef.current.rotation.z;
+        // Smoothly interpolate towards rest position
+        rightUpperArmRef.current.rotation.z = currentZ + (rightRestZ - currentZ) * armLerpSpeed;
+        // Dampen X rotation for more natural pose
+        rightUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
+      }
     }
-    if (rightUpperArmRef.current) {
-      const currentZ = rightUpperArmRef.current.rotation.z;
-      // Smoothly interpolate towards rest position
-      rightUpperArmRef.current.rotation.z = currentZ + (rightRestZ - currentZ) * armLerpSpeed;
-      // Dampen X rotation for more natural pose
-      rightUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
-    }
+
+    // Check if avatar is currently talking (audio playing)
+    const isTalking = lipSyncRef.current?.isPlaying() ?? false;
+
+    // Get animation params based on talking state (more dynamic when speaking)
+    const headFreq = isTalking ? cfg.head.talkFrequency : cfg.head.idleFrequency;
+    const headSmooth = isTalking ? cfg.head.talkSmoothing : cfg.head.idleSmoothing;
+    const torsoFreq = isTalking ? cfg.torso.talkFrequency : cfg.torso.idleFrequency;
+    const torsoSmooth = isTalking ? cfg.torso.talkSmoothing : cfg.torso.idleSmoothing;
 
     // Procedural head movement for natural idle behavior
     anim.head.timer += delta;
-    if (anim.head.timer > cfg.head.changeFrequency) {
+    if (anim.head.timer > headFreq) {
       anim.head.targetRotation.x = randomInRange(-cfg.head.nodRange, cfg.head.nodRange);
       anim.head.targetRotation.y = randomInRange(-cfg.head.turnRange, cfg.head.turnRange);
       anim.head.targetRotation.z = randomInRange(-cfg.head.tiltRange, cfg.head.tiltRange);
@@ -527,9 +553,9 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     }
 
     // Smooth interpolation toward target
-    anim.head.currentRotation.x += (anim.head.targetRotation.x - anim.head.currentRotation.x) * cfg.head.smoothingFactor;
-    anim.head.currentRotation.y += (anim.head.targetRotation.y - anim.head.currentRotation.y) * cfg.head.smoothingFactor;
-    anim.head.currentRotation.z += (anim.head.targetRotation.z - anim.head.currentRotation.z) * cfg.head.smoothingFactor;
+    anim.head.currentRotation.x += (anim.head.targetRotation.x - anim.head.currentRotation.x) * headSmooth;
+    anim.head.currentRotation.y += (anim.head.targetRotation.y - anim.head.currentRotation.y) * headSmooth;
+    anim.head.currentRotation.z += (anim.head.targetRotation.z - anim.head.currentRotation.z) * headSmooth;
 
     if (neckRef.current) {
       neckRef.current.rotation.set(
@@ -541,12 +567,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     // Procedural torso sway for breathing effect
     anim.torso.timer += delta;
-    if (anim.torso.timer > cfg.torso.changeFrequency) {
+    if (anim.torso.timer > torsoFreq) {
       anim.torso.targetRotation.x = randomInRange(-cfg.torso.swayRange, cfg.torso.swayRange);
       anim.torso.timer = 0;
     }
 
-    anim.torso.currentRotation.x += (anim.torso.targetRotation.x - anim.torso.currentRotation.x) * cfg.torso.smoothingFactor;
+    anim.torso.currentRotation.x += (anim.torso.targetRotation.x - anim.torso.currentRotation.x) * torsoSmooth;
 
     if (spineRef.current) {
       spineRef.current.rotation.x = anim.torso.currentRotation.x;

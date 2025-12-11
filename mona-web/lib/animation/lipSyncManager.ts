@@ -361,6 +361,16 @@ export class LipSyncManager {
   }
 
   /**
+   * Check if audio is currently playing
+   * Used to adjust animation parameters (more dynamic when talking)
+   */
+  isPlaying(): boolean {
+    return this.audioElement !== null &&
+           !this.audioElement.paused &&
+           !this.audioElement.ended;
+  }
+
+  /**
    * Reset all mouth expressions to neutral
    */
   resetMouth(): void {
