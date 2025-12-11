@@ -1,11 +1,13 @@
 /**
  * Gesture Animation Manager
- * Handles loading and triggering Mixamo gesture animations based on emotions
+ * Handles loading and triggering animations based on emotions
+ * Supports both Mixamo FBX and VRMA (VRM-native) animation formats
  */
 
 import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { loadMixamoAnimation } from "./mixamoLoader";
+import { loadVRMAAnimation, isVRMAFile } from "./vrmaLoader";
 
 export type EmotionType = "happy" | "excited" | "curious" | "embarrassed" | "sad" | "concerned" | "neutral" | "annoyed" | "frustrated";
 export type GestureName =
@@ -95,13 +97,23 @@ export class GestureManager {
 
   /**
    * Load a single gesture animation
+   * Automatically detects format (VRMA vs Mixamo FBX) based on file extension
    */
   async loadGesture(gesture: GestureConfig): Promise<void> {
     try {
-      const clip = await loadMixamoAnimation(gesture.path, this.vrm);
+      let clip: THREE.AnimationClip | null = null;
+
+      if (isVRMAFile(gesture.path)) {
+        // Load VRM-native animation
+        clip = await loadVRMAAnimation(gesture.path, this.vrm);
+      } else {
+        // Load Mixamo FBX animation
+        clip = await loadMixamoAnimation(gesture.path, this.vrm);
+      }
+
       if (clip) {
         this.loadedGestures.set(gesture.name, clip);
-        console.log(`✓ Loaded gesture: ${gesture.name}`);
+        console.log(`✓ Loaded gesture: ${gesture.name} (${isVRMAFile(gesture.path) ? 'VRMA' : 'Mixamo'})`);
       }
     } catch (error) {
       console.warn(`Failed to load gesture ${gesture.name}:`, error);
