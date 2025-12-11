@@ -45,9 +45,9 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Moe.vrm - new contractor avatar, needs 180 rotation and smaller scale
   "Moe.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
   "/avatars/Moe.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
-  // mona1.vrm - original avatar, no rotation needed
-  "mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
-  "/avatars/mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
+  // Mona1.vrm - original avatar, no rotation needed
+  "Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
+  "/avatars/Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
 };
 
 // Default config for unknown avatars
