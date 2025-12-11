@@ -7,6 +7,8 @@ import dynamic from "next/dynamic";
 import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import type { OutfitVisibility } from "./VRMAvatar";
+export type { OutfitVisibility };
 
 const VRMAvatar = dynamic(() => import("./VRMAvatar"), { ssr: false });
 
@@ -34,11 +36,21 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
   frustrated: { primary: "#f59e0b", accent: "#fcd34d" },
 };
 
+// Available avatar options
+export const AVATAR_OPTIONS = [
+  { id: "moe", label: "Moe", url: "/avatars/Moe.vrm" },
+  { id: "mona1", label: "Mona", url: "/avatars/mona1.vrm" },
+] as const;
+
+export type AvatarId = typeof AVATAR_OPTIONS[number]["id"];
+
 interface AvatarStageProps {
   emotion: EmotionData | null;
   audioUrl?: string;
   lipSync?: LipSyncCue[];
   viewMode?: "portrait" | "full";
+  outfitVisibility?: OutfitVisibility;
+  avatarUrl?: string;
 }
 
 // Camera presets for different view modes
@@ -115,7 +127,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
   );
 }
 
-export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full" }: AvatarStageProps) {
+export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
@@ -142,7 +154,8 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
   console.log("🎬 AvatarStage received audioUrl:", audioUrl);
   console.log("🎬 Absolute audioUrl:", absoluteAudioUrl);
 
-  const vrmUrl = process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
+  // Use provided avatarUrl, then env var, then default to Moe
+  const vrmUrl = avatarUrl || process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
   const initialPreset = VIEW_PRESETS[viewMode];
 
   return (
@@ -157,7 +170,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.6} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.9} color="#f3f4ff" />
         <Suspense fallback={null}>
-          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} />
+          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
         </Suspense>
         <CameraController viewMode={viewMode} />
       </Canvas>
