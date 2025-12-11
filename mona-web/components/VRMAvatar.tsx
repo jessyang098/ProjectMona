@@ -84,6 +84,7 @@ export interface OutfitVisibility {
   socks: boolean;
   shoes: boolean;
   colorVariant: boolean; // Toggle for ChangeColor expression (alternate color scheme)
+  lingerie: boolean; // Toggle for Lencerie expression
 }
 
 interface VRMAvatarProps {
@@ -100,6 +101,7 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
   socks: true,
   shoes: true,
   colorVariant: false,
+  lingerie: false,
 };
 
 export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
@@ -325,10 +327,13 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       }
     });
 
-    // Handle color variant via VRM expression (ChangeColor blend shape)
+    // Handle VRM expressions for customization
     const expressionManager = vrm.expressionManager;
     if (expressionManager) {
+      // ChangeColor - alternate color scheme
       expressionManager.setValue("ChangeColor", outfitVisibility.colorVariant ? 1 : 0);
+      // Lingerie visibility (note: VRM expression is misspelled as "Lencerie" in the model)
+      expressionManager.setValue("Lencerie", outfitVisibility.lingerie ? 1 : 0);
     }
   }, [outfitVisibility, vrm]);
 
