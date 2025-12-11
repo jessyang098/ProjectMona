@@ -129,9 +129,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatar
     vrm.scene.rotation.y = 0;
     vrm.scene.scale.setScalar(0.95);
     vrm.scene.position.set(0, 0.10, 0);
+    // Log all meshes to find outfit toggles
+    const meshNames: string[] = [];
     vrm.scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         const mesh = obj as THREE.Mesh;
+        meshNames.push(mesh.name);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         if (mesh.material && "toneMapped" in mesh.material) {
@@ -139,6 +142,13 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync }: VRMAvatar
         }
       }
     });
+    console.log("🎭 VRM Meshes found:", meshNames);
+
+    // Log all blend shapes/expressions
+    if (vrm.expressionManager) {
+      const expressions = vrm.expressionManager.expressions;
+      console.log("🎭 VRM Expressions:", expressions.map(e => e.expressionName));
+    }
 
     const humanoid = vrm.humanoid;
 
