@@ -12,9 +12,27 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from personality import MonaPersonality, default_mona
-from emotion import EmotionEngine
+from emotion import EmotionEngine, GestureType
 from memory import MemoryManager
 from affection import AffectionEngine
+
+
+# Available gestures for LLM selection
+GESTURE_DESCRIPTIONS = """
+Available gestures (choose the most appropriate one):
+- wave: Greeting or saying hi/bye
+- clapping: Celebrating, congratulating, excited about good news
+- excited_jump: Very excited, can't contain excitement
+- thinking: Pondering, considering something, curious
+- looking_around: Curious, searching, wondering
+- blush: Embarrassed, flustered, receiving compliment
+- sad: Sad, sympathetic, bad news
+- angry: Frustrated, annoyed, upset
+- surprised: Shocked, surprised by something unexpected
+- relax: Calm, content, peaceful moment
+- sleepy: Tired, bored, drowsy
+- none: No gesture needed (most common - use for normal conversation)
+"""
 
 
 class ConversationMessage(BaseModel):
@@ -168,6 +186,16 @@ class MonaLLM:
 
             conversation.append(ConversationMessage(role="assistant", content=assistant_message))
             emotion_data = emotion_engine.get_emotion_for_expression()
+
+            # Use LLM to select the most appropriate gesture based on context
+            selected_gesture = await self._select_gesture(
+                assistant_message,
+                user_message,
+                emotion_data.get("emotion", "neutral")
+            )
+            emotion_data["gesture"] = selected_gesture
+            print(f"🎬 LLM selected gesture: {selected_gesture}")
+
             yield {
                 "event": "complete",
                 "content": assistant_message,
@@ -194,6 +222,52 @@ class MonaLLM:
                 full_text = str(event.get("content", "")) or full_text
                 emotion = event.get("emotion", {}) or emotion
         return full_text, emotion
+
+    async def _select_gesture(self, mona_response: str, user_message: str, emotion: str) -> str:
+        """
+        Use a fast LLM call to select the most appropriate gesture for Mona's response.
+        This runs in parallel with TTS generation to minimize latency.
+        """
+        try:
+            prompt = f"""You are selecting a body gesture animation for a virtual girlfriend character.
+
+User said: "{user_message}"
+She responds: "{mona_response}"
+Her current emotion: {emotion}
+
+{GESTURE_DESCRIPTIONS}
+
+IMPORTANT: Most normal conversation should use "none". Only use a gesture when it really fits.
+- Greetings → wave
+- Great news/celebration → clapping or excited_jump
+- Thinking about something → thinking
+- Embarrassed by compliment → blush
+- Comforting sad news → sad
+- Frustrated/annoyed → angry
+- Shocked by something → surprised
+
+Respond with ONLY the gesture name, nothing else."""
+
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",  # Fast and cheap for this simple task
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=20,
+            )
+
+            gesture = response.choices[0].message.content.strip().lower()
+
+            # Validate the gesture is in our list
+            valid_gestures = [g.value for g in GestureType]
+            if gesture in valid_gestures:
+                return gesture
+
+            # Default to none if invalid
+            return "none"
+
+        except Exception as e:
+            print(f"Error selecting gesture: {e}")
+            return "none"
 
     def clear_history(self, user_id: str):
         """Clear conversation history for a user"""

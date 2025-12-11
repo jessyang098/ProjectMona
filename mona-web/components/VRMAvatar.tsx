@@ -362,11 +362,18 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       expressionManager.setValue(expressionName, intensity);
     }
 
-    // Update gesture manager with current emotion
+    // Update gesture manager with current emotion and play gesture if specified
     if (gestureManagerRef.current && emotion) {
       const emotionType = emotion.emotion as EmotionType;
       gestureManagerRef.current.setEmotion(emotionType);
       console.log("🎭 Updated gesture emotion:", emotionType);
+
+      // Play specific gesture if one was specified by the backend
+      if (emotion.gesture && emotion.gesture !== "none") {
+        const gestureName = emotion.gesture as GestureName;
+        console.log("🎬 Playing LLM-specified gesture:", gestureName);
+        gestureManagerRef.current.playGesture(gestureName, 0.5);
+      }
     }
   }, [emotion, vrm]);
 

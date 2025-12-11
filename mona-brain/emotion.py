@@ -4,6 +4,7 @@ Emotion Engine for Mona
 Tracks and manages Mona's emotional state based on conversation context.
 """
 
+import random
 from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field
@@ -40,6 +41,55 @@ class EmotionIntensity(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+class GestureType(str, Enum):
+    """Available gesture animations"""
+    # Greetings
+    WAVE = "wave"
+    GOODBYE = "goodbye"
+
+    # Happy/Excited
+    CLAPPING = "clapping"
+    EXCITED_JUMP = "excited_jump"
+
+    # Thinking/Curious
+    THINKING = "thinking"
+    LOOKING_AROUND = "looking_around"
+
+    # Emotional
+    BLUSH = "blush"
+    SAD = "sad"
+    ANGRY = "angry"
+    SURPRISED = "surprised"
+
+    # Idle/Neutral
+    RELAX = "relax"
+    SLEEPY = "sleepy"
+
+    # No gesture
+    NONE = "none"
+
+
+# Map emotions to appropriate gestures (for automatic selection)
+EMOTION_TO_GESTURE = {
+    EmotionType.HAPPY: [GestureType.CLAPPING, GestureType.NONE],
+    EmotionType.EXCITED: [GestureType.EXCITED_JUMP, GestureType.CLAPPING],
+    EmotionType.CONTENT: [GestureType.RELAX, GestureType.NONE],
+    EmotionType.CURIOUS: [GestureType.THINKING, GestureType.LOOKING_AROUND],
+    EmotionType.AFFECTIONATE: [GestureType.BLUSH, GestureType.NONE],
+    EmotionType.PLAYFUL: [GestureType.WAVE, GestureType.NONE],
+    EmotionType.SURPRISED: [GestureType.SURPRISED],
+    EmotionType.EMBARRASSED: [GestureType.BLUSH],
+    EmotionType.CONFUSED: [GestureType.THINKING, GestureType.LOOKING_AROUND],
+    EmotionType.BORED: [GestureType.SLEEPY, GestureType.NONE],
+    EmotionType.NEUTRAL: [GestureType.NONE, GestureType.RELAX],
+    EmotionType.CONCERNED: [GestureType.SAD, GestureType.NONE],
+    EmotionType.SAD: [GestureType.SAD],
+    EmotionType.ANNOYED: [GestureType.ANGRY, GestureType.NONE],
+    EmotionType.ANGRY: [GestureType.ANGRY],
+    EmotionType.FRUSTRATED: [GestureType.ANGRY, GestureType.SAD],
+}
 
 
 class EmotionState(BaseModel):
@@ -174,13 +224,27 @@ class EmotionEngine:
 
     def get_emotion_for_expression(self) -> dict:
         """
-        Get emotion data formatted for 3D avatar facial expressions.
-        This will be used in Week 4 when we add the 3D avatar.
+        Get emotion data formatted for 3D avatar facial expressions and gestures.
+        Includes a gesture recommendation based on current emotion.
         """
+        # Select an appropriate gesture based on emotion
+        emotion = self.current_state.primary_emotion
+        possible_gestures = EMOTION_TO_GESTURE.get(emotion, [GestureType.NONE])
+
+        # For high intensity emotions, always use a gesture (skip NONE)
+        if self.current_state.intensity == EmotionIntensity.HIGH:
+            non_none_gestures = [g for g in possible_gestures if g != GestureType.NONE]
+            if non_none_gestures:
+                possible_gestures = non_none_gestures
+
+        # Randomly select from possible gestures
+        selected_gesture = random.choice(possible_gestures)
+
         return {
-            "emotion": self.current_state.primary_emotion.value,
+            "emotion": emotion.value,
             "intensity": self.current_state.intensity.value,
             "timestamp": self.current_state.timestamp.isoformat(),
+            "gesture": selected_gesture.value,
         }
 
     def reset(self):
