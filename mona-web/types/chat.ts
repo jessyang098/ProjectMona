@@ -2,6 +2,7 @@ export interface EmotionData {
   emotion: string;
   intensity: string;
   timestamp: string;
+  gesture?: string;  // Optional gesture animation to play (e.g., "wave", "clapping", "thinking")
 }
 
 // Lip sync cue from Rhubarb - timing data for mouth shapes
