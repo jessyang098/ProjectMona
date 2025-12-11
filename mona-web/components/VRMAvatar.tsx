@@ -228,8 +228,8 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     });
 
     // If bones not found, try alternative bone names
-    if (!hipsRef.current) {
-      console.warn("Hips bone not found via getNormalizedBoneNode, searching scene...");
+    if (!hipsRef.current || !leftUpperArmRef.current || !rightUpperArmRef.current) {
+      console.warn("Some bones not found via getNormalizedBoneNode, searching scene...");
       vrm.scene.traverse((obj) => {
         const name = obj.name.toLowerCase();
         if (!hipsRef.current && (name.includes("hips") || name.includes("pelvis"))) {
@@ -244,8 +244,22 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
           headRef.current = obj;
           console.log("Found head via traverse:", obj.name);
         }
+        if (!leftUpperArmRef.current && (name.includes("leftupperarm") || name.includes("left_upper_arm") || name.includes("l_upperarm") || (name.includes("arm") && name.includes("left") && name.includes("upper")))) {
+          leftUpperArmRef.current = obj;
+          console.log("Found leftUpperArm via traverse:", obj.name);
+        }
+        if (!rightUpperArmRef.current && (name.includes("rightupperarm") || name.includes("right_upper_arm") || name.includes("r_upperarm") || (name.includes("arm") && name.includes("right") && name.includes("upper")))) {
+          rightUpperArmRef.current = obj;
+          console.log("Found rightUpperArm via traverse:", obj.name);
+        }
       });
     }
+
+    // Log final arm bone status
+    console.log("🦾 Arm bones after setup:", {
+      leftUpperArm: leftUpperArmRef.current?.name || "NOT FOUND",
+      rightUpperArm: rightUpperArmRef.current?.name || "NOT FOUND",
+    });
 
     // Store base rotations
     if (hipsRef.current) baseRotations.current.hips.copy(hipsRef.current.rotation);
@@ -253,13 +267,20 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     if (headRef.current) baseRotations.current.head.copy(headRef.current.rotation);
 
     // Fix T-pose by rotating arms to resting position
+    // For rotated models (like Moe with 180 deg Y rotation), invert the arm rotations
+    const isRotated = Math.abs(avatarConfig.rotateY) > 0.1;
+    const leftArmZ = isRotated ? -ANIMATION_CONFIG.arms.leftRotationZ : ANIMATION_CONFIG.arms.leftRotationZ;
+    const rightArmZ = isRotated ? -ANIMATION_CONFIG.arms.rightRotationZ : ANIMATION_CONFIG.arms.rightRotationZ;
+
     if (leftUpperArmRef.current) {
       baseRotations.current.leftUpperArm.copy(leftUpperArmRef.current.rotation);
-      leftUpperArmRef.current.rotation.z = ANIMATION_CONFIG.arms.leftRotationZ;
+      leftUpperArmRef.current.rotation.z = leftArmZ;
+      console.log(`🦾 Left arm initial Z rotation: ${leftArmZ.toFixed(2)} (rotated: ${isRotated})`);
     }
     if (rightUpperArmRef.current) {
       baseRotations.current.rightUpperArm.copy(rightUpperArmRef.current.rotation);
-      rightUpperArmRef.current.rotation.z = ANIMATION_CONFIG.arms.rightRotationZ;
+      rightUpperArmRef.current.rotation.z = rightArmZ;
+      console.log(`🦾 Right arm initial Z rotation: ${rightArmZ.toFixed(2)} (rotated: ${isRotated})`);
     }
 
     // Initialize gesture manager
@@ -470,18 +491,30 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     }
 
     // Force arms towards resting position (fixes Y-pose/T-pose from animations)
-    const armLerpSpeed = 0.1; // How fast arms return to rest (0-1, higher = faster)
+    // Must run AFTER gesture manager update to override animation poses
+    const armLerpSpeed = 0.2; // How fast arms return to rest (0-1, higher = faster)
+
+    // Get avatar config to check if model is rotated (affects arm rotation direction)
+    const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
+    const isRotated = Math.abs(avatarConfig.rotateY) > 0.1; // Model rotated 180 degrees
+
+    // For rotated models (like Moe), the arm Z rotations need to be inverted
+    const leftRestZ = isRotated ? -cfg.arms.leftRotationZ : cfg.arms.leftRotationZ;
+    const rightRestZ = isRotated ? -cfg.arms.rightRotationZ : cfg.arms.rightRotationZ;
+
     if (leftUpperArmRef.current) {
       const currentZ = leftUpperArmRef.current.rotation.z;
-      const restZ = cfg.arms.leftRotationZ;
       // Smoothly interpolate towards rest position
-      leftUpperArmRef.current.rotation.z = currentZ + (restZ - currentZ) * armLerpSpeed;
+      leftUpperArmRef.current.rotation.z = currentZ + (leftRestZ - currentZ) * armLerpSpeed;
+      // Dampen X rotation for more natural pose
+      leftUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
     }
     if (rightUpperArmRef.current) {
       const currentZ = rightUpperArmRef.current.rotation.z;
-      const restZ = cfg.arms.rightRotationZ;
       // Smoothly interpolate towards rest position
-      rightUpperArmRef.current.rotation.z = currentZ + (restZ - currentZ) * armLerpSpeed;
+      rightUpperArmRef.current.rotation.z = currentZ + (rightRestZ - currentZ) * armLerpSpeed;
+      // Dampen X rotation for more natural pose
+      rightUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
     }
 
     // Procedural head movement for natural idle behavior
