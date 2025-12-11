@@ -39,7 +39,7 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
 // Available avatar options
 export const AVATAR_OPTIONS = [
   { id: "moe", label: "Moe", url: "/avatars/Moe.vrm" },
-  { id: "mona1", label: "Mona", url: "/avatars/mona1.vrm" },
+  { id: "mona1", label: "Mona", url: "/avatars/Mona1.vrm" },
 ] as const;
 
 export type AvatarId = typeof AVATAR_OPTIONS[number]["id"];
@@ -170,7 +170,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.6} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.9} color="#f3f4ff" />
         <Suspense fallback={null}>
-          <VRMAvatar url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
+          <VRMAvatar key={vrmUrl} url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
         </Suspense>
         <CameraController viewMode={viewMode} />
       </Canvas>
