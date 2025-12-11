@@ -19,12 +19,12 @@ export interface LipSyncConfig {
 }
 
 const DEFAULT_CONFIG: LipSyncConfig = {
-  smoothingFactor: 0.25, // Smoother transitions between mouth shapes
-  amplitudeThreshold: 0.01, // Higher threshold to avoid twitching on quiet sounds
-  amplitudeScale: 4.0, // Reduced for more natural mouth opening (was 15.0)
+  smoothingFactor: 0.2, // Match Riko's smoothing
+  amplitudeThreshold: 0.005, // Match Riko's threshold
+  amplitudeScale: 1.0, // Match Riko's scale (was 4.0)
   centroidThresholds: {
-    wide: 0.65,
-    ih: 0.45,
+    wide: 0.75, // Match Riko's thresholds
+    ih: 0.5,
     oh: 0.25,
   },
 };
@@ -390,26 +390,20 @@ export class LipSyncManager {
     const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
 
     if (amplitude > amplitudeThreshold) {
-      const intensity = Math.min(1, (amplitude - amplitudeThreshold) * amplitudeScale);
+      const level = Math.min(1, (amplitude - amplitudeThreshold) * amplitudeScale);
 
-      // Classify by spectral brightness with natural blending
-      // Keep values moderate (0.3-0.6 range) for realistic mouth movement
+      // Match Riko's simpler approach: aa always gets the level
+      phonemes.aa = level;
+
+      // Classify vowel shape by spectral brightness
       if (centroid > centroidThresholds.wide) {
-        // Bright, wide vowel (ee) - like "see", "tree"
-        phonemes.ee = intensity * 0.5;
-        phonemes.aa = intensity * 0.2; // Small mouth opening
+        phonemes.ee = level; // Bright vowel (ee)
       } else if (centroid > centroidThresholds.ih) {
-        // Mid-range vowel (ih) - like "sit", "bit"
-        phonemes.ih = intensity * 0.45;
-        phonemes.aa = intensity * 0.35; // Medium mouth opening
+        phonemes.ih = level; // Mid vowel (ih)
       } else if (centroid > centroidThresholds.oh) {
-        // Darker vowel (oh) - like "go", "no"
-        phonemes.oh = intensity * 0.5;
-        phonemes.aa = intensity * 0.4; // Wider mouth opening
+        phonemes.oh = level; // Dark vowel (oh)
       } else {
-        // Darkest vowel (ou) - like "you", "blue"
-        phonemes.ou = intensity * 0.55;
-        phonemes.aa = intensity * 0.25; // Rounded mouth
+        phonemes.ou = level; // Darkest vowel (ou)
       }
     }
 
