@@ -39,8 +39,8 @@ interface GestureConfig {
 const GESTURE_CONFIGS: GestureConfig[] = [
   // === VRMA (VRM-native) Animations ===
 
-  // Wave/Greeting - manual trigger only
-  { name: "wave", path: "/animations/wave.fbx", triggerEmotions: [], priority: 10 },
+  // Wave/Greeting - manual trigger only (using VRMA goodbye animation)
+  { name: "wave", path: "/animations/Goodbye.vrma", triggerEmotions: [], priority: 10 },
   { name: "goodbye", path: "/animations/Goodbye.vrma", triggerEmotions: [], priority: 10 },
 
   // Happy/Excited gestures

@@ -31,20 +31,20 @@ const ANIMATION_CONFIG = {
     talkFrequency: 0.8,
     talkSmoothing: 0.04,
   },
-  // Torso movement for breathing effect (idle vs talking)
+  // Torso movement for subtle breathing effect (idle vs talking)
   torso: {
-    swayRange: 0.1,
-    // Idle: slow, subtle sway
-    idleFrequency: 2.8,
-    idleSmoothing: 0.01,
-    // Talking: more animated body language
-    talkFrequency: 1.8,
-    talkSmoothing: 0.02,
+    swayRange: 0.02, // Very subtle - ~1 degree max
+    // Idle: slow, gentle breathing
+    idleFrequency: 3.5,
+    idleSmoothing: 0.005,
+    // Talking: slightly more animated
+    talkFrequency: 2.5,
+    talkSmoothing: 0.01,
   },
-  // Arm positions to fix T-pose
+  // Arm positions - gentle rest pose (not too rigid)
   arms: {
-    leftRotationZ: -1.2,
-    rightRotationZ: 1.2,
+    leftRotationZ: -0.4,  // ~23 degrees - relaxed, not pressed against body
+    rightRotationZ: 0.4,
   },
 } as const;
 
@@ -504,11 +504,11 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       expressionManager.setValue('neutral', 1.0);
     }
 
-    // Force arms towards resting position (fixes Y-pose/T-pose)
-    // BUT skip this when a gesture is actively playing - let the animation control the arms
+    // Gently guide arms towards resting position (fixes Y-pose/T-pose)
+    // Skip entirely when a gesture is playing - let the animation have full control
     const currentGesture = gestureManagerRef.current?.getCurrentGesture();
     if (!currentGesture) {
-      const armLerpSpeed = 0.2; // How fast arms return to rest (0-1, higher = faster)
+      const armLerpSpeed = 0.05; // Slow, gentle correction - doesn't fight animations
 
       // Get avatar config to check if model is rotated (affects arm rotation direction)
       const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
@@ -520,17 +520,13 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
       if (leftUpperArmRef.current) {
         const currentZ = leftUpperArmRef.current.rotation.z;
-        // Smoothly interpolate towards rest position
+        // Gently guide towards rest position
         leftUpperArmRef.current.rotation.z = currentZ + (leftRestZ - currentZ) * armLerpSpeed;
-        // Dampen X rotation for more natural pose
-        leftUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
       }
       if (rightUpperArmRef.current) {
         const currentZ = rightUpperArmRef.current.rotation.z;
-        // Smoothly interpolate towards rest position
+        // Gently guide towards rest position
         rightUpperArmRef.current.rotation.z = currentZ + (rightRestZ - currentZ) * armLerpSpeed;
-        // Dampen X rotation for more natural pose
-        rightUpperArmRef.current.rotation.x *= (1 - armLerpSpeed * 0.3);
       }
     }
 
