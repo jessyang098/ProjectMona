@@ -10,13 +10,6 @@ import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
 import { onPoseCommand, type PoseCommand } from "@/lib/poseCommands";
 
-// Outline configuration for anime-style edge rendering
-const OUTLINE_CONFIG = {
-  color: 0x1a1a2e, // Dark blue-black outline
-  thickness: 0.003, // Outline thickness (in world units)
-  enabled: true,
-};
-
 // Procedural animation configuration
 const ANIMATION_CONFIG = {
   // Blinking behavior
@@ -173,10 +166,8 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     vrm.scene.scale.setScalar(avatarConfig.scale);
     vrm.scene.position.set(...avatarConfig.position);
     console.log("🎭 Applied avatar config for:", url, avatarConfig);
-    // Log all meshes and create outline meshes for anime-style rendering
+    // Log all meshes
     const meshNames: string[] = [];
-    const outlineMeshes: THREE.Mesh[] = [];
-
     vrm.scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         const mesh = obj as THREE.Mesh;
@@ -186,31 +177,9 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         if (mesh.material && "toneMapped" in mesh.material) {
           (mesh.material as THREE.Material & { toneMapped?: boolean }).toneMapped = true;
         }
-
-        // Create outline mesh (inverted hull technique)
-        if (OUTLINE_CONFIG.enabled && mesh.geometry) {
-          const outlineMaterial = new THREE.MeshBasicMaterial({
-            color: OUTLINE_CONFIG.color,
-            side: THREE.BackSide, // Render back faces only
-          });
-          const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterial);
-          outlineMesh.name = `${mesh.name}_outline`;
-          // Scale slightly larger for outline effect
-          outlineMesh.scale.multiplyScalar(1 + OUTLINE_CONFIG.thickness);
-          // Copy transforms
-          outlineMesh.position.copy(mesh.position);
-          outlineMesh.rotation.copy(mesh.rotation);
-          outlineMesh.quaternion.copy(mesh.quaternion);
-          // Parent to the same parent as the original mesh
-          if (mesh.parent) {
-            mesh.parent.add(outlineMesh);
-            outlineMeshes.push(outlineMesh);
-          }
-        }
       }
     });
     console.log("🎭 VRM Meshes found:", meshNames);
-    console.log("✏️ Created", outlineMeshes.length, "outline meshes");
 
     // Log all blend shapes/expressions
     if (vrm.expressionManager) {
@@ -297,12 +266,6 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     return () => {
       group.remove(vrm.scene);
-      // Cleanup outline meshes
-      outlineMeshes.forEach((outlineMesh) => {
-        outlineMesh.parent?.remove(outlineMesh);
-        outlineMesh.geometry.dispose();
-        (outlineMesh.material as THREE.Material).dispose();
-      });
       // Cleanup gesture manager
       if (gestureManagerRef.current) {
         gestureManagerRef.current.dispose();
