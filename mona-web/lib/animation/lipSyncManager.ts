@@ -19,11 +19,11 @@ export interface LipSyncConfig {
 }
 
 const DEFAULT_CONFIG: LipSyncConfig = {
-  smoothingFactor: 0.15, // Faster response to changes
-  amplitudeThreshold: 0.001, // Lowered to trigger on quieter sounds
-  amplitudeScale: 15.0, // Significantly increased for more visible mouth movement
+  smoothingFactor: 0.25, // Smoother transitions between mouth shapes
+  amplitudeThreshold: 0.01, // Higher threshold to avoid twitching on quiet sounds
+  amplitudeScale: 4.0, // Reduced for more natural mouth opening (was 15.0)
   centroidThresholds: {
-    wide: 0.65, // Adjusted for better vowel detection
+    wide: 0.65,
     ih: 0.45,
     oh: 0.25,
   },
@@ -392,23 +392,24 @@ export class LipSyncManager {
     if (amplitude > amplitudeThreshold) {
       const intensity = Math.min(1, (amplitude - amplitudeThreshold) * amplitudeScale);
 
-      // Classify by spectral brightness with more nuanced blending
+      // Classify by spectral brightness with natural blending
+      // Keep values moderate (0.3-0.6 range) for realistic mouth movement
       if (centroid > centroidThresholds.wide) {
         // Bright, wide vowel (ee) - like "see", "tree"
-        phonemes.ee = intensity * 0.8;
-        phonemes.aa = intensity * 0.3; // Small mouth opening
+        phonemes.ee = intensity * 0.5;
+        phonemes.aa = intensity * 0.2; // Small mouth opening
       } else if (centroid > centroidThresholds.ih) {
         // Mid-range vowel (ih) - like "sit", "bit"
-        phonemes.ih = intensity * 0.7;
-        phonemes.aa = intensity * 0.5; // Medium mouth opening
+        phonemes.ih = intensity * 0.45;
+        phonemes.aa = intensity * 0.35; // Medium mouth opening
       } else if (centroid > centroidThresholds.oh) {
         // Darker vowel (oh) - like "go", "no"
-        phonemes.oh = intensity * 0.8;
-        phonemes.aa = intensity * 0.6; // Wider mouth opening
+        phonemes.oh = intensity * 0.5;
+        phonemes.aa = intensity * 0.4; // Wider mouth opening
       } else {
         // Darkest vowel (ou) - like "you", "blue"
-        phonemes.ou = intensity * 0.9;
-        phonemes.aa = intensity * 0.4; // Rounded mouth
+        phonemes.ou = intensity * 0.55;
+        phonemes.aa = intensity * 0.25; // Rounded mouth
       }
     }
 
