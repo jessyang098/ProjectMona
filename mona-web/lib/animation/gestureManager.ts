@@ -118,6 +118,8 @@ export class GestureManager {
     try {
       let clip: THREE.AnimationClip | null = null;
 
+      console.log(`🎭 Loading gesture: ${gesture.name} from ${gesture.path}`);
+
       if (isVRMAFile(gesture.path)) {
         // Load VRM-native animation
         clip = await loadVRMAAnimation(gesture.path, this.vrm);
@@ -128,10 +130,12 @@ export class GestureManager {
 
       if (clip) {
         this.loadedGestures.set(gesture.name, clip);
-        console.log(`✓ Loaded gesture: ${gesture.name} (${isVRMAFile(gesture.path) ? 'VRMA' : 'Mixamo'})`);
+        console.log(`✓ Loaded gesture: ${gesture.name} (${isVRMAFile(gesture.path) ? 'VRMA' : 'Mixamo'}) - duration: ${clip.duration.toFixed(2)}s`);
+      } else {
+        console.warn(`⚠️ Gesture ${gesture.name} returned null clip`);
       }
     } catch (error) {
-      console.warn(`Failed to load gesture ${gesture.name}:`, error);
+      console.error(`❌ Failed to load gesture ${gesture.name}:`, error);
     }
   }
 
@@ -158,9 +162,12 @@ export class GestureManager {
    * @param fadeInDuration Duration of fade-in transition (longer = smoother)
    */
   playGesture(gestureName: GestureName, fadeInDuration: number = 0.5): boolean {
+    console.log(`🎬 playGesture called: ${gestureName}`);
+    console.log(`🎬 Available gestures: ${Array.from(this.loadedGestures.keys()).join(', ')}`);
+
     const clip = this.loadedGestures.get(gestureName);
     if (!clip) {
-      console.warn(`Gesture ${gestureName} not loaded`);
+      console.warn(`⚠️ Gesture ${gestureName} not loaded - available: ${Array.from(this.loadedGestures.keys()).join(', ')}`);
       return false;
     }
 
