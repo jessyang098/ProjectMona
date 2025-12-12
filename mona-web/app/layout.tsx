@@ -20,16 +20,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Eruda mobile debugging console - only loads when ?debug=true or localStorage has mona_debug */}
+        {/* Eruda mobile debugging console - loads when ?debug=true, /debug path, or localStorage has mona_debug */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 var params = new URLSearchParams(window.location.search);
-                var debugEnabled = params.get('debug') === 'true' || localStorage.getItem('mona_debug') === 'true';
+                var path = window.location.pathname;
+
+                // Check multiple debug triggers:
+                // 1. ?debug=true query param
+                // 2. /debug path
+                // 3. localStorage mona_debug
+                var debugFromQuery = params.get('debug') === 'true';
+                var debugFromPath = path === '/debug' || path.startsWith('/debug');
+                var debugFromStorage = localStorage.getItem('mona_debug') === 'true';
+                var debugEnabled = debugFromQuery || debugFromPath || debugFromStorage;
 
                 // Save debug mode to localStorage if enabled via URL
-                if (params.get('debug') === 'true') {
+                if (debugFromQuery || debugFromPath) {
                   localStorage.setItem('mona_debug', 'true');
                 }
 
