@@ -65,16 +65,32 @@ const VIEW_PRESETS = {
     target: new THREE.Vector3(0, 0.75, 0),
     fov: 42, // Default wider FOV
   },
+  // Mobile preset - zoomed out to show more of avatar
+  mobile: {
+    position: new THREE.Vector3(0, 0.794, 2.432),
+    target: new THREE.Vector3(0, 0.659, 0),
+    fov: 42,
+  },
+};
+
+// Detect if on mobile device
+const isMobile = () => {
+  if (typeof window === "undefined") return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || window.innerWidth < 768;
 };
 
 // Component to handle camera transitions
-function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
+function CameraController({ viewMode }: { viewMode: "portrait" | "full" | "mobile" }) {
   const { camera } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastLogTime = useRef(0);
 
+  // Use mobile preset if on mobile device, otherwise use the specified viewMode
+  const effectiveViewMode = isMobile() ? "mobile" : viewMode;
+
   useEffect(() => {
-    const preset = VIEW_PRESETS[viewMode];
+    const preset = VIEW_PRESETS[effectiveViewMode];
 
     // Animate camera position and FOV
     const startPos = camera.position.clone();
@@ -108,7 +124,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
     };
 
     animate();
-  }, [viewMode, camera]);
+  }, [effectiveViewMode, camera]);
 
   // Log camera position on change (throttled to avoid spam)
   const handleCameraChange = () => {
@@ -140,7 +156,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
       enablePan={true}
       enableZoom={true}
       enableRotate={true}
-      target={VIEW_PRESETS[viewMode].target.toArray() as [number, number, number]}
+      target={VIEW_PRESETS[effectiveViewMode].target.toArray() as [number, number, number]}
       minDistance={0.8}
       maxDistance={5}
       minPolarAngle={Math.PI / 4}
@@ -181,13 +197,16 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
 
   // Use provided avatarUrl, then env var, then default to Moe
   const vrmUrl = avatarUrl || process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
-  const initialPreset = VIEW_PRESETS[viewMode];
+
+  // Use mobile preset on mobile devices
+  const initialViewMode = typeof window !== "undefined" && isMobile() ? "mobile" : viewMode;
+  const initialPreset = VIEW_PRESETS[initialViewMode];
 
   return (
     <div className="h-full w-full">
       <Canvas
         shadows
-        camera={{ position: initialPreset.position.toArray() as [number, number, number], fov: 42 }}
+        camera={{ position: initialPreset.position.toArray() as [number, number, number], fov: initialPreset.fov }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.9 }}
       >
         <color attach="background" args={["#fffdf8"]} />
