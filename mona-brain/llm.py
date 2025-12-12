@@ -187,14 +187,20 @@ class MonaLLM:
             conversation.append(ConversationMessage(role="assistant", content=assistant_message))
             emotion_data = emotion_engine.get_emotion_for_expression()
 
-            # Use LLM to select the most appropriate gesture based on context
-            selected_gesture = await self._select_gesture(
-                assistant_message,
-                user_message,
-                emotion_data.get("emotion", "neutral")
-            )
-            emotion_data["gesture"] = selected_gesture
-            print(f"🎬 LLM selected gesture: {selected_gesture}")
+            # Check for direct gesture test command (test:wave, test:clapping, etc.)
+            forced_gesture = self._check_gesture_test_command(user_message)
+            if forced_gesture:
+                emotion_data["gesture"] = forced_gesture
+                print(f"🎬 TEST: Forced gesture: {forced_gesture}")
+            else:
+                # Use LLM to select the most appropriate gesture based on context
+                selected_gesture = await self._select_gesture(
+                    assistant_message,
+                    user_message,
+                    emotion_data.get("emotion", "neutral")
+                )
+                emotion_data["gesture"] = selected_gesture
+                print(f"🎬 LLM selected gesture: {selected_gesture}")
 
             yield {
                 "event": "complete",
@@ -268,6 +274,25 @@ Respond with ONLY the gesture name, nothing else."""
         except Exception as e:
             print(f"Error selecting gesture: {e}")
             return "none"
+
+    def _check_gesture_test_command(self, user_message: str) -> Optional[str]:
+        """
+        Check if message is a gesture test command (test:wave, test:clapping, etc.)
+        Returns the gesture name if it's a valid test command, None otherwise.
+        """
+        message_lower = user_message.lower().strip()
+        if not message_lower.startswith("test:"):
+            return None
+
+        gesture_name = message_lower.replace("test:", "").strip()
+
+        # All valid gestures (matching GestureType enum values)
+        valid_gestures = [g.value for g in GestureType]
+
+        if gesture_name in valid_gestures:
+            return gesture_name
+
+        return None
 
     def clear_history(self, user_id: str):
         """Clear conversation history for a user"""
