@@ -55,6 +55,7 @@ interface AvatarStageProps {
 
 // Camera presets for different view modes
 const VIEW_PRESETS = {
+  // Desktop presets
   portrait: {
     position: new THREE.Vector3(0, 0.9, 1.8),
     target: new THREE.Vector3(0, 1.0, 0),
@@ -65,8 +66,13 @@ const VIEW_PRESETS = {
     target: new THREE.Vector3(0, 0.75, 0),
     fov: 42, // Default wider FOV
   },
-  // Mobile preset - zoomed out to show more of avatar
-  mobile: {
+  // Mobile presets - adjusted for smaller screens
+  mobilePortrait: {
+    position: new THREE.Vector3(0, 1.0, 2.0),
+    target: new THREE.Vector3(0, 1.0, 0),
+    fov: 28, // Slightly wider than desktop portrait for mobile
+  },
+  mobileFull: {
     position: new THREE.Vector3(0, 0.794, 2.432),
     target: new THREE.Vector3(0, 0.659, 0),
     fov: 42,
@@ -80,17 +86,25 @@ const isMobile = () => {
     || window.innerWidth < 768;
 };
 
+// Get the effective preset key based on device and view mode
+const getPresetKey = (viewMode: "portrait" | "full"): keyof typeof VIEW_PRESETS => {
+  if (isMobile()) {
+    return viewMode === "portrait" ? "mobilePortrait" : "mobileFull";
+  }
+  return viewMode;
+};
+
 // Component to handle camera transitions
-function CameraController({ viewMode }: { viewMode: "portrait" | "full" | "mobile" }) {
+function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
   const { camera } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastLogTime = useRef(0);
 
-  // Use mobile preset if on mobile device, otherwise use the specified viewMode
-  const effectiveViewMode = isMobile() ? "mobile" : viewMode;
+  // Get the appropriate preset based on device and view mode
+  const presetKey = getPresetKey(viewMode);
 
   useEffect(() => {
-    const preset = VIEW_PRESETS[effectiveViewMode];
+    const preset = VIEW_PRESETS[presetKey];
 
     // Animate camera position and FOV
     const startPos = camera.position.clone();
@@ -124,7 +138,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" | "mobil
     };
 
     animate();
-  }, [effectiveViewMode, camera]);
+  }, [presetKey, camera]);
 
   // Log camera position on change (throttled to avoid spam)
   const handleCameraChange = () => {
@@ -156,7 +170,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" | "mobil
       enablePan={true}
       enableZoom={true}
       enableRotate={true}
-      target={VIEW_PRESETS[effectiveViewMode].target.toArray() as [number, number, number]}
+      target={VIEW_PRESETS[presetKey].target.toArray() as [number, number, number]}
       minDistance={0.8}
       maxDistance={5}
       minPolarAngle={Math.PI / 4}
@@ -198,9 +212,9 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
   // Use provided avatarUrl, then env var, then default to Moe
   const vrmUrl = avatarUrl || process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
 
-  // Use mobile preset on mobile devices
-  const initialViewMode = typeof window !== "undefined" && isMobile() ? "mobile" : viewMode;
-  const initialPreset = VIEW_PRESETS[initialViewMode];
+  // Get the initial preset based on device and view mode
+  const initialPresetKey = typeof window !== "undefined" ? getPresetKey(viewMode) : viewMode;
+  const initialPreset = VIEW_PRESETS[initialPresetKey];
 
   return (
     <div className="h-full w-full">

@@ -69,6 +69,9 @@ export class LipSyncManager {
   private lipSyncCues: LipSyncCue[] | null = null;
   private useTimedLipSync: boolean = false;
 
+  // Track if we're supposed to be playing (even if blocked by autoplay)
+  private shouldBePlaying: boolean = false;
+
   constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
     this.vrm = vrm;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -110,64 +113,103 @@ export class LipSyncManager {
 
   /**
    * Initialize audio analysis for the given audio URL.
-   * MOBILE FIX: Creates audio element synchronously to preserve user interaction context.
-   * Audio loading happens asynchronously in the background.
+   * MOBILE FIX: Reuses the pre-unlocked audio element from useAudioContext
+   * to bypass autoplay restrictions.
    */
   setupAudio(audioUrl: string): void {
     console.log("🎵 LipSyncManager.setupAudio called with:", audioUrl);
     console.log("🎵 Full audio URL that will be loaded:", new URL(audioUrl, window.location.href).href);
+    console.log("📱 isMobile:", this.isMobile);
 
-    // CRITICAL: Clean up old audio element and source before creating new ones
-    if (this.audioElement) {
-      console.log("🧹 Cleaning up previous audio element");
-      const oldAudio = this.audioElement;
-      oldAudio.pause();
-      oldAudio.currentTime = 0; // Reset playback position
-      oldAudio.src = ""; // Release the old audio
-      oldAudio.load(); // Force browser to release resources
-      this.audioElement = null; // Clear reference immediately
-    }
+    // Reset mobile animation timer and play state for fresh lip sync
+    this.mobileAnimationTimer = 0;
+    this.shouldBePlaying = false;
 
-    if (this.source) {
-      console.log("🧹 Disconnecting previous audio source");
-      this.source.disconnect();
-      this.source = null;
-    }
+    // MOBILE FIX: Reuse the pre-unlocked audio element if available
+    // This element was "unlocked" during user interaction in useAudioContext
+    const unlockedAudio = (window as any).__monaUnlockedAudio as HTMLAudioElement | undefined;
 
-    // CRITICAL: Create Audio element synchronously to preserve user interaction context
-    this.audioElement = new Audio();
+    if (this.isMobile && unlockedAudio) {
+      console.log("📱 Using pre-unlocked audio element for mobile");
 
-    // Mobile Chrome fix: Only use crossOrigin if NOT on mobile
-    // crossOrigin="anonymous" can cause issues on some mobile browsers
-    if (!this.isMobile) {
-      this.audioElement.crossOrigin = "anonymous";
-    }
+      // Stop any current playback on the unlocked element
+      unlockedAudio.pause();
+      unlockedAudio.currentTime = 0;
 
-    // Set source after crossOrigin configuration
-    this.audioElement.src = audioUrl;
+      // Set the new source
+      unlockedAudio.src = audioUrl;
 
-    console.log("🎵 Audio element src set to:", this.audioElement.src);
-    console.log("🎵 crossOrigin:", this.audioElement.crossOrigin || "not set (mobile)");
+      // Ensure volume is at max
+      unlockedAudio.volume = 1.0;
 
-    // Mobile-specific attributes for better compatibility
-    if (this.isMobile) {
-      this.audioElement.setAttribute("playsinline", "true");
-      this.audioElement.setAttribute("webkit-playsinline", "true");
-      // Use metadata preload for mobile to reduce data usage and avoid issues
-      this.audioElement.preload = "metadata";
-      console.log("📱 Mobile audio attributes applied");
+      // Store reference
+      this.audioElement = unlockedAudio;
+
+      console.log("📱 Pre-unlocked audio element configured with new source");
+      console.log("🎵 Audio element src set to:", this.audioElement.src);
     } else {
-      this.audioElement.preload = "auto";
+      // DESKTOP or fallback: Create new audio element
+      // CRITICAL: Clean up old audio element and source before creating new ones
+      if (this.audioElement && this.audioElement !== unlockedAudio) {
+        console.log("🧹 Cleaning up previous audio element");
+        const oldAudio = this.audioElement;
+        oldAudio.pause();
+        oldAudio.currentTime = 0; // Reset playback position
+        oldAudio.src = ""; // Release the old audio
+        oldAudio.load(); // Force browser to release resources
+        this.audioElement = null; // Clear reference immediately
+      }
+
+      if (this.source) {
+        console.log("🧹 Disconnecting previous audio source");
+        this.source.disconnect();
+        this.source = null;
+      }
+
+      // CRITICAL: Create Audio element synchronously to preserve user interaction context
+      this.audioElement = new Audio();
+
+      // Mobile Chrome fix: Only use crossOrigin if NOT on mobile
+      // crossOrigin="anonymous" can cause issues on some mobile browsers
+      if (!this.isMobile) {
+        this.audioElement.crossOrigin = "anonymous";
+      }
+
+      // Set source after crossOrigin configuration
+      this.audioElement.src = audioUrl;
+
+      console.log("🎵 Audio element src set to:", this.audioElement.src);
+      console.log("🎵 crossOrigin:", this.audioElement.crossOrigin || "not set (mobile)");
+
+      // Mobile-specific attributes for better compatibility (fallback path)
+      if (this.isMobile) {
+        this.audioElement.setAttribute("playsinline", "true");
+        this.audioElement.setAttribute("webkit-playsinline", "true");
+        // Use auto preload for mobile to ensure audio is ready faster
+        this.audioElement.preload = "auto";
+        // Ensure volume is at max
+        this.audioElement.volume = 1.0;
+        console.log("📱 Mobile audio attributes applied (preload: auto, volume: 1.0)");
+      } else {
+        this.audioElement.preload = "auto";
+      }
     }
 
     console.log("🎵 Audio element created");
 
     // Setup event listeners (these fire asynchronously but don't block play())
     this.audioElement.oncanplaythrough = () => {
-      console.log("✅ Audio can play through");
+      console.log("✅ Audio can play through - ready for playback");
     };
 
-    this.audioElement.onerror = (error) => {
+    this.audioElement.onloadedmetadata = () => {
+      console.log("📊 Audio metadata loaded:", {
+        duration: this.audioElement?.duration,
+        readyState: this.audioElement?.readyState,
+      });
+    };
+
+    this.audioElement.onerror = () => {
       // Network state 2 (NETWORK_IDLE) with no error often happens when browser aborts loading
       // This can be normal during rapid audio switching - only log if there's an actual error
       if (this.audioElement?.error) {
@@ -175,11 +217,13 @@ export class LipSyncManager {
         console.error("❌ Audio loading failed - MediaError code:", mediaError.code);
         console.error("   Message:", mediaError.message);
         console.error("   Codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED");
+        console.error("   Audio src:", this.audioElement.src);
       } else if (this.audioElement?.networkState !== 2) {
         // Only log if it's not the common NETWORK_IDLE state
         console.warn("⚠️ Audio error (no MediaError):", {
           networkState: this.audioElement?.networkState,
           readyState: this.audioElement?.readyState,
+          src: this.audioElement?.src,
         });
       }
     };
@@ -190,9 +234,10 @@ export class LipSyncManager {
 
     // MOBILE: Skip Web Audio API setup - just use HTMLAudioElement for playback
     // Web Audio API requires crossOrigin which breaks CORS on some mobile browsers
-    // We use pre-computed lip sync data from the server instead
+    // We use pre-computed lip sync data from the server OR fallback animation
     if (this.isMobile) {
-      console.log("📱 Mobile mode: Skipping Web Audio API (using server lip sync data)");
+      console.log("📱 Mobile mode: Skipping Web Audio API setup");
+      console.log("📱 Will use server lip sync cues if available, otherwise fallback animation");
       return;
     }
 
@@ -217,23 +262,32 @@ export class LipSyncManager {
     try {
       // Create new MediaElementSource for this audio element
       // Note: Each audio element needs its own source
+      console.log("🎵 Creating MediaElementSource...");
       this.source = this.audioContext.createMediaElementSource(this.audioElement);
+      console.log("🎵 MediaElementSource created");
 
       // Create analyser if we don't have one, or reuse existing
       if (!this.analyser) {
+        console.log("🎵 Creating new AnalyserNode...");
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 2048;
         this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
         this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
+      } else {
+        console.log("🎵 Reusing existing AnalyserNode");
       }
 
+      // Connect the audio routing: source -> analyser -> speakers
+      console.log("🎵 Connecting audio routing: source -> analyser -> destination");
       this.source.connect(this.analyser);
       this.analyser.connect(this.audioContext.destination);
 
       console.log("✅ Web Audio API setup complete");
+      console.log("🎵 Audio routing: audioElement -> MediaElementSource -> AnalyserNode -> AudioDestination (speakers)");
     } catch (error) {
       console.error("❌ Failed to set up Web Audio API:", error);
       console.error("   This usually happens on mobile when AudioContext wasn't initialized from user interaction");
+      console.error("   Error details:", error);
       // On desktop, this is a real error. On mobile, we already returned above.
       throw error;
     }
@@ -297,16 +351,24 @@ export class LipSyncManager {
       return;
     }
 
+    // Mark that we intend to play (for mobile fallback lip sync)
+    this.shouldBePlaying = true;
+
     // Log detailed audio element state
     console.log("📊 Audio element state:", {
       src: this.audioElement.src,
       readyState: this.audioElement.readyState,
+      readyStateDesc: ["HAVE_NOTHING", "HAVE_METADATA", "HAVE_CURRENT_DATA", "HAVE_FUTURE_DATA", "HAVE_ENOUGH_DATA"][this.audioElement.readyState],
       paused: this.audioElement.paused,
       currentTime: this.audioElement.currentTime,
       duration: this.audioElement.duration,
       volume: this.audioElement.volume,
       muted: this.audioElement.muted,
+      networkState: this.audioElement.networkState,
+      networkStateDesc: ["NETWORK_EMPTY", "NETWORK_IDLE", "NETWORK_LOADING", "NETWORK_NO_SOURCE"][this.audioElement.networkState],
       isMobile: this.isMobile,
+      hasLipSyncCues: this.useTimedLipSync,
+      lipSyncCueCount: this.lipSyncCues?.length ?? 0,
     });
 
     // Resume AudioContext if needed (desktop only - mobile skips Web Audio API)
@@ -317,20 +379,67 @@ export class LipSyncManager {
       });
     }
 
+    // Add event listeners to track playback state on mobile
+    if (this.isMobile) {
+      this.audioElement.onplay = () => console.log("📱 [Mobile] Audio play event fired");
+      this.audioElement.onplaying = () => console.log("📱 [Mobile] Audio playing event fired - AUDIO IS NOW PLAYING");
+      this.audioElement.onpause = () => console.log("📱 [Mobile] Audio pause event fired");
+      this.audioElement.onended = () => {
+        console.log("📱 [Mobile] Audio ended event fired");
+        this.shouldBePlaying = false; // Audio finished, stop lip sync
+      };
+      this.audioElement.onstalled = () => console.log("📱 [Mobile] Audio stalled event - network issue");
+      this.audioElement.onwaiting = () => console.log("📱 [Mobile] Audio waiting event - buffering");
+      this.audioElement.ontimeupdate = () => {
+        // Log every 0.5 seconds of playback
+        if (Math.floor(this.audioElement!.currentTime * 2) !== Math.floor((this.audioElement!.currentTime - 0.1) * 2)) {
+          console.log(`📱 [Mobile] Audio time: ${this.audioElement!.currentTime.toFixed(2)}s / ${this.audioElement!.duration.toFixed(2)}s`);
+        }
+      };
+    }
+
     // CRITICAL: Call play() synchronously to preserve user interaction context
     console.log("▶️ Calling audioElement.play() synchronously...");
+
+    // Add event listeners to track playback on desktop too
+    if (!this.isMobile) {
+      this.audioElement.onplay = () => console.log("🖥️ [Desktop] Audio play event fired");
+      this.audioElement.onplaying = () => console.log("🖥️ [Desktop] Audio playing event - AUDIO IS NOW PLAYING");
+      this.audioElement.onpause = () => console.log("🖥️ [Desktop] Audio pause event fired");
+      this.audioElement.onended = () => {
+        console.log("🖥️ [Desktop] Audio ended event fired");
+        this.shouldBePlaying = false;
+      };
+      this.audioElement.onerror = () => {
+        if (this.audioElement?.error) {
+          console.error("🖥️ [Desktop] Audio error:", this.audioElement.error.code, this.audioElement.error.message);
+        }
+      };
+      this.audioElement.onvolumechange = () => {
+        console.log("🖥️ [Desktop] Volume changed:", this.audioElement?.volume, "muted:", this.audioElement?.muted);
+      };
+    }
+
     const playPromise = this.audioElement.play();
 
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
           console.log("✅ Audio playback started successfully");
+          console.log("📊 Post-play state:", {
+            paused: this.audioElement?.paused,
+            currentTime: this.audioElement?.currentTime,
+            duration: this.audioElement?.duration,
+            volume: this.audioElement?.volume,
+            muted: this.audioElement?.muted,
+          });
         })
         .catch((error) => {
           // NotAllowedError is expected on mobile for first audio (before user interaction)
-          // Silently skip it - subsequent audio after user interaction will work
           if ((error as Error).name === "NotAllowedError") {
-            console.log("ℹ️ Audio blocked by browser (expected on first load before user interaction)");
+            console.log("⚠️ Audio blocked by browser autoplay policy");
+            console.log("   This is expected on mobile before user interaction");
+            console.log("   Audio will play after user taps/interacts with the page");
           } else {
             // Log other errors for debugging
             console.error("❌ Audio playback failed:", error);
@@ -351,12 +460,16 @@ export class LipSyncManager {
   /**
    * Stop and reset the current audio playback.
    * Used when user sends a new message to prioritize the new response.
+   * Note: Does not dispose the shared unlocked audio element on mobile.
    */
   stop(): void {
+    this.shouldBePlaying = false; // Clear play intent
     if (this.audioElement) {
       this.audioElement.pause();
       this.audioElement.currentTime = 0;
+      // Don't clear src on mobile's shared element - just stop playback
     }
+    this.mobileAnimationTimer = 0; // Reset mobile fallback animation
     this.resetMouth();
   }
 
@@ -401,26 +514,93 @@ export class LipSyncManager {
       return;
     }
 
-    // Fallback to real-time audio analysis
-    if (!this.analyser || !this.timeDomainBuffer || !this.frequencyBuffer) {
+    // Fallback to real-time audio analysis (desktop with Web Audio API)
+    if (this.analyser && this.timeDomainBuffer && this.frequencyBuffer) {
+      // Get audio analysis data
+      this.analyser.getByteTimeDomainData(this.timeDomainBuffer);
+      this.analyser.getByteFrequencyData(this.frequencyBuffer);
+
+      // Calculate RMS amplitude
+      const amplitude = this.calculateRMSAmplitude(this.timeDomainBuffer);
+
+      // Calculate spectral centroid (brightness of sound)
+      const centroid = this.calculateSpectralCentroid(this.frequencyBuffer);
+
+      // Map to phoneme shapes
+      const phonemeValues = this.estimatePhonemes(amplitude, centroid);
+
+      // Apply smoothing and update VRM expressions
+      this.applySmoothedPhonemes(phonemeValues, expressionManager);
       return;
     }
 
-    // Get audio analysis data
-    this.analyser.getByteTimeDomainData(this.timeDomainBuffer);
-    this.analyser.getByteFrequencyData(this.frequencyBuffer);
+    // MOBILE FALLBACK: Simple amplitude simulation based on audio playback state
+    // Since Web Audio API is not available on mobile, we create a simple
+    // mouth movement pattern when audio is playing OR when we intend to play
+    // (shouldBePlaying covers the case where autoplay is blocked but we want lip sync)
+    const isActuallyPlaying = this.audioElement && !this.audioElement.paused && !this.audioElement.ended;
+    const shouldAnimateMouth = this.isMobile && this.audioElement && (isActuallyPlaying || this.shouldBePlaying);
 
-    // Calculate RMS amplitude
-    const amplitude = this.calculateRMSAmplitude(this.timeDomainBuffer);
+    if (shouldAnimateMouth) {
+      this.updateMobileFallbackLipSync(expressionManager);
+      return;
+    }
 
-    // Calculate spectral centroid (brightness of sound)
-    const centroid = this.calculateSpectralCentroid(this.frequencyBuffer);
+    // No audio playing - close mouth
+    if (!this.shouldBePlaying && this.audioElement && (this.audioElement.paused || this.audioElement.ended)) {
+      this.applySmoothedPhonemes({ aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 }, expressionManager);
+    }
+  }
 
-    // Map to phoneme shapes
-    const phonemeValues = this.estimatePhonemes(amplitude, centroid);
+  /**
+   * Mobile fallback lip sync - creates simple mouth movement when audio plays.
+   * Uses a sine wave pattern to open/close mouth since we can't analyze audio.
+   */
+  private mobileAnimationTimer = 0;
+  private lastMobileLipSyncLog = 0;
+  private updateMobileFallbackLipSync(
+    expressionManager: NonNullable<VRM["expressionManager"]>
+  ): void {
+    // Increment timer based on frame rate (~60fps assumed)
+    this.mobileAnimationTimer += 0.016;
 
-    // Apply smoothing and update VRM expressions
-    this.applySmoothedPhonemes(phonemeValues, expressionManager);
+    // Log periodically to confirm lip sync is running (every 2 seconds)
+    const now = Date.now();
+    if (now - this.lastMobileLipSyncLog > 2000) {
+      this.lastMobileLipSyncLog = now;
+      console.log("👄 [Mobile] Fallback lip sync active, timer:", this.mobileAnimationTimer.toFixed(2));
+    }
+
+    // Safety timeout: Stop lip sync after 30 seconds max (in case audio never ends)
+    // This prevents infinite mouth animation if something goes wrong
+    if (this.mobileAnimationTimer > 30) {
+      console.log("⏱️ [Mobile] Lip sync timeout reached, stopping");
+      this.shouldBePlaying = false;
+      return;
+    }
+
+    // Create a varying mouth movement pattern
+    // Use multiple sine waves at different frequencies for more natural movement
+    const wave1 = Math.sin(this.mobileAnimationTimer * 8) * 0.5 + 0.5; // Fast variation
+    const wave2 = Math.sin(this.mobileAnimationTimer * 3) * 0.3 + 0.5; // Slower variation
+    const combined = (wave1 * 0.6 + wave2 * 0.4);
+
+    // Cap at MAX_MOUTH_OPEN for natural appearance
+    const mouthOpen = Math.min(MAX_MOUTH_OPEN, combined * 0.5);
+
+    // Alternate between different mouth shapes for variety
+    const shapePhase = Math.floor(this.mobileAnimationTimer * 4) % 4;
+    const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
+
+    phonemes.aa = mouthOpen; // Base jaw open
+    switch (shapePhase) {
+      case 0: phonemes.ee = mouthOpen * 0.5; break;
+      case 1: phonemes.oh = mouthOpen * 0.7; break;
+      case 2: phonemes.ih = mouthOpen * 0.6; break;
+      case 3: phonemes.ou = mouthOpen * 0.4; break;
+    }
+
+    this.applySmoothedPhonemes(phonemes, expressionManager);
   }
 
   /**
@@ -539,8 +719,17 @@ export class LipSyncManager {
    * Cleanup resources
    */
   dispose(): void {
-    this.audioElement?.pause();
-    this.audioElement = null;
+    // Don't dispose the shared unlocked audio element - just pause it
+    const unlockedAudio = (window as any).__monaUnlockedAudio as HTMLAudioElement | undefined;
+
+    if (this.audioElement) {
+      this.audioElement.pause();
+
+      // Only null out if it's NOT the shared unlocked audio element
+      if (this.audioElement !== unlockedAudio) {
+        this.audioElement = null;
+      }
+    }
 
     // Disconnect source if it exists
     if (this.source) {
