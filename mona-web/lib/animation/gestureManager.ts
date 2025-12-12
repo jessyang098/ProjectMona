@@ -25,6 +25,7 @@ export type GestureName =
   | "surprised"
   | "crouch"
   | "lay"
+  | "stand"
   | "stand1";
 
 interface GestureConfig {
@@ -70,6 +71,7 @@ const GESTURE_CONFIGS: GestureConfig[] = [
   // === Mixamo FBX Animations (hold poses) ===
   { name: "crouch", path: "/animations/crouch.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
   { name: "lay", path: "/animations/lay.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
+  { name: "stand", path: "/animations/stand.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
   { name: "stand1", path: "/animations/stand1.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
 ];
 
