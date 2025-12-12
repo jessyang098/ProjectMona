@@ -19,10 +19,17 @@ export async function loadMixamoAnimation(
   const animationAsset = await fbxLoader.loadAsync(url);
 
   // Extract the animation clip from the loaded FBX
-  const sourceClip = THREE.AnimationClip.findByName(
+  // Try "mixamo.com" first (standard Mixamo export), then fall back to first animation
+  let sourceClip = THREE.AnimationClip.findByName(
     animationAsset.animations,
     "mixamo.com"
   );
+
+  if (!sourceClip && animationAsset.animations.length > 0) {
+    // Use first animation if "mixamo.com" not found
+    sourceClip = animationAsset.animations[0];
+    console.log(`ℹ️ Using animation "${sourceClip.name}" from ${url} (no "mixamo.com" clip found)`);
+  }
 
   if (!sourceClip) {
     throw new Error(`No animation found in ${url}`);
