@@ -136,6 +136,13 @@ export class LipSyncManager {
       unlockedAudio.pause();
       unlockedAudio.currentTime = 0;
 
+      // Set crossOrigin BEFORE setting src (required for Web Audio API)
+      // This enables real-time lip sync analysis on mobile
+      if (!unlockedAudio.crossOrigin) {
+        unlockedAudio.crossOrigin = "anonymous";
+        console.log("📱 Set crossOrigin=anonymous for Web Audio API");
+      }
+
       // Set the new source
       unlockedAudio.src = audioUrl;
 
@@ -232,16 +239,8 @@ export class LipSyncManager {
     console.log("🎵 Loading audio...");
     this.audioElement.load();
 
-    // MOBILE: Skip Web Audio API setup - just use HTMLAudioElement for playback
-    // Web Audio API requires crossOrigin which breaks CORS on some mobile browsers
-    // We use pre-computed lip sync data from the server OR fallback animation
-    if (this.isMobile) {
-      console.log("📱 Mobile mode: Skipping Web Audio API setup");
-      console.log("📱 Will use server lip sync cues if available, otherwise fallback animation");
-      return;
-    }
-
-    // DESKTOP: Setup Web Audio API analysis chain for real-time lip sync fallback
+    // Setup Web Audio API analysis chain for real-time lip sync
+    // This enables the same natural lip sync on both mobile and desktop
     console.log("🎵 Setting up Web Audio API...");
 
     // Use global AudioContext if available (initialized from user interaction)
@@ -250,21 +249,46 @@ export class LipSyncManager {
       if (this.audioContext) {
         console.log("✅ Using pre-initialized global AudioContext");
       } else {
-        console.warn("⚠️ No global AudioContext found! This may fail on mobile.");
-        // Create it anyway, but this might fail on mobile
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log("⚠️ AudioContext created without user interaction (may fail on mobile)");
+        console.warn("⚠️ No global AudioContext found!");
+        // Create it anyway
+        try {
+          this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          console.log("⚠️ AudioContext created without user interaction");
+        } catch (e) {
+          console.error("❌ Failed to create AudioContext:", e);
+          console.log("📱 Will use fallback lip sync animation");
+          return;
+        }
       }
     }
 
     console.log("🎵 AudioContext state:", this.audioContext.state);
 
     try {
+      // For Web Audio API to work, we need crossOrigin on the audio element
+      // On mobile with the pre-unlocked element, we need to set this carefully
+      if (!this.audioElement.crossOrigin) {
+        // Only set crossOrigin if not already set - setting it clears the src
+        console.log("🎵 Setting crossOrigin for Web Audio API...");
+        const currentSrc = this.audioElement.src;
+        this.audioElement.crossOrigin = "anonymous";
+        // Restore src after setting crossOrigin (setting crossOrigin clears it)
+        if (currentSrc && !this.audioElement.src) {
+          this.audioElement.src = currentSrc;
+          this.audioElement.load();
+        }
+      }
+
       // Create new MediaElementSource for this audio element
-      // Note: Each audio element needs its own source
-      console.log("🎵 Creating MediaElementSource...");
-      this.source = this.audioContext.createMediaElementSource(this.audioElement);
-      console.log("🎵 MediaElementSource created");
+      // Note: Each audio element can only have ONE MediaElementSource
+      // If we've already created one for this element, reuse it
+      if (!this.source) {
+        console.log("🎵 Creating MediaElementSource...");
+        this.source = this.audioContext.createMediaElementSource(this.audioElement);
+        console.log("🎵 MediaElementSource created");
+      } else {
+        console.log("🎵 Reusing existing MediaElementSource");
+      }
 
       // Create analyser if we don't have one, or reuse existing
       if (!this.analyser) {
@@ -278,18 +302,25 @@ export class LipSyncManager {
       }
 
       // Connect the audio routing: source -> analyser -> speakers
+      // Only connect if not already connected
       console.log("🎵 Connecting audio routing: source -> analyser -> destination");
-      this.source.connect(this.analyser);
-      this.analyser.connect(this.audioContext.destination);
+      try {
+        this.source.connect(this.analyser);
+        this.analyser.connect(this.audioContext.destination);
+      } catch (connectError) {
+        // May already be connected - that's OK
+        console.log("🎵 Audio routing may already be connected");
+      }
 
       console.log("✅ Web Audio API setup complete");
       console.log("🎵 Audio routing: audioElement -> MediaElementSource -> AnalyserNode -> AudioDestination (speakers)");
     } catch (error) {
       console.error("❌ Failed to set up Web Audio API:", error);
-      console.error("   This usually happens on mobile when AudioContext wasn't initialized from user interaction");
-      console.error("   Error details:", error);
-      // On desktop, this is a real error. On mobile, we already returned above.
-      throw error;
+      console.log("📱 Will use fallback lip sync animation instead");
+      // Don't throw - allow fallback to work
+      // Clear source so we don't try to use it
+      this.source = null;
+      this.analyser = null;
     }
   }
 
