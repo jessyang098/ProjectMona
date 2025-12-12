@@ -323,11 +323,11 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         });
         await gestureManagerRef.current.loadAllGestures();
 
-        // Play greeting wave animation on startup
-        console.log("👋 Playing startup greeting wave");
+        // Set default standing pose on startup
+        console.log("🧍 Setting default stand pose");
         setTimeout(() => {
-          gestureManagerRef.current?.playGesture("wave", 0.5);
-        }, 500); // Small delay to let VRM fully load
+          gestureManagerRef.current?.playGesture("stand", 0.5);
+        }, 300); // Small delay to let VRM fully load
       }
     };
     initGestures();
