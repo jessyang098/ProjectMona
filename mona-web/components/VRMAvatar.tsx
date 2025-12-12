@@ -321,13 +321,22 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
           maxGestureInterval: 20,
           autoRandomGestures: true,
         });
+
+        console.log("🎭 Loading all gestures...");
         await gestureManagerRef.current.loadAllGestures();
+        console.log("🎭 All gestures loaded, attempting to play stand pose");
 
         // Set default standing pose on startup
-        console.log("🧍 Setting default stand pose");
+        // Increased delay to ensure everything is ready
         setTimeout(() => {
-          gestureManagerRef.current?.playGesture("stand", 0.5);
-        }, 300); // Small delay to let VRM fully load
+          if (gestureManagerRef.current) {
+            console.log("🧍 Playing default stand pose now");
+            const success = gestureManagerRef.current.playGesture("stand", 0.5);
+            console.log("🧍 Stand pose play result:", success);
+          } else {
+            console.warn("🧍 GestureManager was disposed before stand pose could play");
+          }
+        }, 500); // Increased delay
       }
     };
     initGestures();
