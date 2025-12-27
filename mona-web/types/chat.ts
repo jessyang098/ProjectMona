@@ -31,7 +31,7 @@ export interface Message {
 }
 
 export interface WebSocketMessage {
-  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready";
+  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "auth_status" | "chat_history" | "guest_limit_reached";
   content?: string;
   sender?: "user" | "mona";
   timestamp?: string;
@@ -41,4 +41,17 @@ export interface WebSocketMessage {
   audioUrl?: string;
   imageUrl?: string;  // For displaying uploaded images
   lipSync?: LipSyncCue[];  // Lip sync timing data
+  // Auth-related fields
+  isAuthenticated?: boolean;
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+    avatarUrl?: string;
+  } | null;
+  guestMessagesRemaining?: number | null;
+  guestMessageLimit?: number | null;
+  messages?: Array<{ content: string; sender: string; timestamp: string; emotion?: EmotionData }>;
+  messagesUsed?: number;
+  messageLimit?: number;
 }
