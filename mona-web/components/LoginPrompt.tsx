@@ -64,7 +64,7 @@ export default function LoginPrompt({
           <p className="mb-6 text-slate-600">
             {messagesUsed !== undefined && messageLimit !== undefined ? (
               <>
-                You've enjoyed <span className="font-semibold">{messageLimit}</span> messages with Mona!
+                You&apos;ve enjoyed <span className="font-semibold">{messageLimit}</span> messages with Mona!
                 Sign in so she can <span className="font-semibold text-pink-500">remember you</span> and
                 your conversations — pick up right where you left off, anytime.
               </>
