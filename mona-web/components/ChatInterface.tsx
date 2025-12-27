@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAudioContext } from "@/hooks/useAudioContext";
+import { useAuth } from "@/contexts/AuthContext";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./AvatarStage";
+import LoginPrompt from "./LoginPrompt";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest } from "@/lib/poseCommands";
@@ -22,6 +24,8 @@ export default function ChatInterface() {
   const [viewMode, setViewMode] = useState<"portrait" | "full">("full");
   const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
   const [showOutfitMenu, setShowOutfitMenu] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
     shirt: true,
     skirt: true,
@@ -37,7 +41,25 @@ export default function ChatInterface() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, sendMessage} = useWebSocket(WEBSOCKET_URL);
+  const { isAuthenticated, updateGuestStatus, setGuestLimitReached } = useAuth();
+
+  // WebSocket callbacks
+  const handleGuestLimitReached = useCallback((messagesUsed: number, messageLimit: number) => {
+    setGuestLimitInfo({ messagesUsed, messageLimit });
+    setShowLoginPrompt(true);
+    setGuestLimitReached(true);
+  }, [setGuestLimitReached]);
+
+  const handleAuthStatus = useCallback((status: { guestMessagesRemaining: number | null }) => {
+    if (status.guestMessagesRemaining !== null) {
+      updateGuestStatus(status.guestMessagesRemaining);
+    }
+  }, [updateGuestStatus]);
+
+  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, sendMessage } = useWebSocket(WEBSOCKET_URL, {
+    onGuestLimitReached: handleGuestLimitReached,
+    onAuthStatus: handleAuthStatus,
+  });
   const { initAudioContext } = useAudioContext();
 
   // Get the latest audio URL and lip sync data from Mona's messages
@@ -214,6 +236,14 @@ export default function ChatInterface() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-white text-slate-900">
+      {/* Login prompt modal */}
+      <LoginPrompt
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        messagesUsed={guestLimitInfo?.messagesUsed}
+        messageLimit={guestLimitInfo?.messageLimit}
+      />
+
       {/* Audio enablement overlay - shown until user clicks */}
       {!audioEnabled && (
         <div
@@ -237,7 +267,7 @@ export default function ChatInterface() {
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
         {/* Status */}
-        <header className="px-6 pt-4 sm:px-10">
+        <header className="px-6 pt-4 sm:px-10 flex items-center justify-between">
           <div className="inline-flex items-center gap-3 rounded-full border border-black/60 bg-black/80 px-4 py-2 text-white shadow-2xl pointer-events-auto">
             <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 text-center text-lg font-semibold leading-[40px]">
               M
@@ -259,6 +289,19 @@ export default function ChatInterface() {
               </p>
             </div>
           </div>
+
+          {/* Guest message counter / Sign in button */}
+          {!isAuthenticated && guestMessagesRemaining !== null && (
+            <button
+              onClick={() => setShowLoginPrompt(true)}
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+            >
+              <span className={guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/80"}>
+                {guestMessagesRemaining} messages left
+              </span>
+              <span className="text-purple-300">Sign in</span>
+            </button>
+          )}
         </header>
 
         {/* Chat panel - extends up from the chat button */}

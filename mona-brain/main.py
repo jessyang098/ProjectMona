@@ -5,11 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles as BaseStaticFiles
 from starlette.responses import Response
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
 try:
@@ -19,6 +21,9 @@ except ImportError:
     pass  # dotenv is optional
 
 from llm import MonaLLM
+from database import init_db, get_db, User, ChatMessage, GuestSession, async_session
+from auth import router as auth_router, verify_token
+from config import GUEST_MESSAGE_LIMIT
 from personality_loader import load_personality_from_yaml
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
@@ -34,8 +39,11 @@ openai_client: Optional[OpenAI] = None
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Initialize LLM and TTS on startup"""
+    """Initialize LLM, TTS, and database on startup"""
     global mona_llm, mona_tts, mona_tts_sovits, openai_client
+
+    # Initialize database
+    await init_db()
 
     # Download NLTK data if not present (needed for GPT-SoVITS English support)
     try:
@@ -100,6 +108,9 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Mona Brain API", lifespan=lifespan)
+
+# Include auth router
+app.include_router(auth_router)
 
 # CORS configuration for Next.js frontend
 # Allow all origins for mobile compatibility (audio playback requires permissive CORS)
@@ -215,7 +226,7 @@ async def health():
 
 
 @app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
+async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Optional[str] = None):
     await manager.connect(websocket, client_id)
 
     # Detect mobile device from User-Agent header
@@ -226,7 +237,82 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     )
     print(f"📱 Client {client_id} - Mobile: {is_mobile}, User-Agent: {user_agent[:100]}...")
 
+    # Check authentication
+    user: Optional[User] = None
+    is_guest = True
+    guest_session_id = client_id  # Use client_id as guest session ID
+
+    if token:
+        payload = verify_token(token)
+        if payload:
+            user_id = payload.get("sub")
+            async with async_session() as db:
+                result = await db.execute(select(User).where(User.id == user_id))
+                user = result.scalar_one_or_none()
+                if user:
+                    is_guest = False
+                    print(f"🔐 Authenticated user: {user.email}")
+
+    # Track guest session
+    if is_guest:
+        async with async_session() as db:
+            result = await db.execute(select(GuestSession).where(GuestSession.session_id == guest_session_id))
+            guest_session = result.scalar_one_or_none()
+            if not guest_session:
+                guest_session = GuestSession(session_id=guest_session_id, message_count=0)
+                db.add(guest_session)
+                await db.commit()
+            print(f"👤 Guest session: {guest_session_id}, messages: {guest_session.message_count if guest_session else 0}")
+
     try:
+        # Send auth status to client
+        async with async_session() as db:
+            guest_messages_remaining = GUEST_MESSAGE_LIMIT
+            if is_guest:
+                result = await db.execute(select(GuestSession).where(GuestSession.session_id == guest_session_id))
+                guest_session = result.scalar_one_or_none()
+                if guest_session:
+                    guest_messages_remaining = max(0, GUEST_MESSAGE_LIMIT - guest_session.message_count)
+
+            auth_status = {
+                "type": "auth_status",
+                "isAuthenticated": not is_guest,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.name,
+                    "avatarUrl": user.avatar_url,
+                } if user else None,
+                "guestMessagesRemaining": guest_messages_remaining if is_guest else None,
+                "guestMessageLimit": GUEST_MESSAGE_LIMIT if is_guest else None,
+            }
+            await manager.send_message(auth_status, client_id)
+
+            # Load chat history for authenticated users
+            if user:
+                result = await db.execute(
+                    select(ChatMessage)
+                    .where(ChatMessage.user_id == user.id)
+                    .order_by(ChatMessage.created_at.asc())
+                    .limit(50)  # Load last 50 messages
+                )
+                history = result.scalars().all()
+                if history:
+                    history_message = {
+                        "type": "chat_history",
+                        "messages": [
+                            {
+                                "content": msg.content,
+                                "sender": "mona" if msg.role == "assistant" else "user",
+                                "timestamp": msg.created_at.isoformat(),
+                                "emotion": {"emotion": msg.emotion} if msg.emotion else None,
+                            }
+                            for msg in history
+                        ],
+                    }
+                    await manager.send_message(history_message, client_id)
+                    print(f"📜 Sent {len(history)} messages from history to {user.email}")
+
         # Send welcome message
         if mona_llm:
             # Get initial emotion state
@@ -318,6 +404,29 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             user_content = message_data.get("content", "") or ""
             print(f"Received from {client_id}: {user_content[:100]}... (has_image: {has_image})")
 
+            # Check guest message limit
+            if is_guest:
+                async with async_session() as db:
+                    result = await db.execute(select(GuestSession).where(GuestSession.session_id == guest_session_id))
+                    guest_session = result.scalar_one_or_none()
+                    if guest_session and guest_session.message_count >= GUEST_MESSAGE_LIMIT:
+                        limit_message = {
+                            "type": "guest_limit_reached",
+                            "message": "You've reached the free message limit. Please sign in to continue chatting!",
+                            "messagesUsed": guest_session.message_count,
+                            "messageLimit": GUEST_MESSAGE_LIMIT,
+                        }
+                        await manager.send_message(limit_message, client_id)
+                        continue  # Skip processing this message
+
+                    # Increment guest message count
+                    if guest_session:
+                        guest_session.message_count += 1
+                        guest_session.last_active = datetime.now()
+                        await db.commit()
+                        remaining = max(0, GUEST_MESSAGE_LIMIT - guest_session.message_count)
+                        print(f"👤 Guest {guest_session_id}: {guest_session.message_count}/{GUEST_MESSAGE_LIMIT} messages used, {remaining} remaining")
+
             # Echo user message back (for confirmation)
             user_message = {
                 "type": "message",
@@ -327,6 +436,17 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 "hasImage": has_image,
             }
             await manager.send_message(user_message, client_id)
+
+            # Save user message to database (for authenticated users)
+            if user:
+                async with async_session() as db:
+                    chat_msg = ChatMessage(
+                        user_id=user.id,
+                        role="user",
+                        content=user_content,
+                    )
+                    db.add(chat_msg)
+                    await db.commit()
 
             # Send typing indicator
             typing_indicator = {
@@ -355,12 +475,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                 await manager.send_message(typing_indicator, client_id)
                         elif event["event"] in {"complete", "error"}:
                             # Send text message immediately (without audio)
+                            mona_content = event.get("content", "")
+                            emotion_info = event.get("emotion", {})
                             response_message = {
                                 "type": "message",
-                                "content": event.get("content", ""),
+                                "content": mona_content,
                                 "sender": "mona",
                                 "timestamp": datetime.now().isoformat(),
-                                "emotion": event.get("emotion", {}),
+                                "emotion": emotion_info,
                                 "audioUrl": None,  # Will update later
                             }
                             # Stop typing indicator before final payload
@@ -368,6 +490,18 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
                             await manager.send_message(response_message, client_id)
+
+                            # Save Mona's response to database (for authenticated users)
+                            if user and mona_content:
+                                async with async_session() as db:
+                                    chat_msg = ChatMessage(
+                                        user_id=user.id,
+                                        role="assistant",
+                                        content=mona_content,
+                                        emotion=emotion_info.get("emotion") if emotion_info else None,
+                                    )
+                                    db.add(chat_msg)
+                                    await db.commit()
 
                             # Generate TTS audio in background (non-blocking)
                             if event.get("content"):
