@@ -160,10 +160,10 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           setGuestMessagesRemaining(data.guestMessagesRemaining ?? null);
           if (options?.onAuthStatus) {
             options.onAuthStatus({
-              isAuthenticated: data.isAuthenticated,
-              user: data.user,
-              guestMessagesRemaining: data.guestMessagesRemaining,
-              guestMessageLimit: data.guestMessageLimit,
+              isAuthenticated: data.isAuthenticated ?? false,
+              user: data.user ?? null,
+              guestMessagesRemaining: data.guestMessagesRemaining ?? null,
+              guestMessageLimit: data.guestMessageLimit ?? null,
             });
           }
         } else if (data.type === "chat_history") {
