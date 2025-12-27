@@ -16,7 +16,14 @@ export async function loadMixamoAnimation(
 ): Promise<THREE.AnimationClip> {
   const fbxLoader = new FBXLoader();
 
+  console.log(`📦 Loading FBX: ${url}`);
   const animationAsset = await fbxLoader.loadAsync(url);
+  console.log(`📦 FBX loaded: ${url}, animations count: ${animationAsset.animations.length}`);
+
+  // Log all available animations for debugging
+  if (animationAsset.animations.length > 0) {
+    console.log(`📦 Available animations in ${url}:`, animationAsset.animations.map(a => `"${a.name}" (${a.duration.toFixed(2)}s)`).join(', '));
+  }
 
   // Extract the animation clip from the loaded FBX
   // Try "mixamo.com" first (standard Mixamo export), then fall back to first animation
@@ -32,14 +39,22 @@ export async function loadMixamoAnimation(
   }
 
   if (!sourceClip) {
+    console.error(`❌ No animation found in ${url}`);
     throw new Error(`No animation found in ${url}`);
   }
 
   // Calculate height scale factor between Mixamo rig and VRM avatar
   const mixamoHipsNode = animationAsset.getObjectByName("mixamorigHips");
   if (!mixamoHipsNode) {
+    // Log available bones for debugging
+    const bones: string[] = [];
+    animationAsset.traverse((obj) => {
+      if (obj.type === 'Bone') bones.push(obj.name);
+    });
+    console.error(`❌ Mixamo rig not found in ${url}. Available bones:`, bones.slice(0, 20).join(', '));
     throw new Error("Mixamo rig not found - missing 'mixamorigHips' node");
   }
+  console.log(`📦 Mixamo hips found at height: ${mixamoHipsNode.position.y}`)
 
   const mixamoHipsHeight = mixamoHipsNode.position.y;
   const vrmHipsPosition = vrm.humanoid.normalizedRestPose.hips?.position;

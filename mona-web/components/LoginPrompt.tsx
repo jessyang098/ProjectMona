@@ -46,17 +46,17 @@ export default function LoginPrompt({
 
         {/* Content */}
         <div className="text-center">
-          {/* Icon */}
+          {/* Icon - Heart with sparkles */}
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100">
-            <svg className="h-8 w-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <svg className="h-8 w-8 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
           </div>
 
           {/* Title */}
           <h2 className="mb-2 text-xl font-bold text-slate-900">
             {messagesUsed !== undefined && messageLimit !== undefined
-              ? "Free Messages Used Up!"
+              ? "Want to keep chatting?"
               : "Sign In to Continue"}
           </h2>
 
@@ -64,13 +64,30 @@ export default function LoginPrompt({
           <p className="mb-6 text-slate-600">
             {messagesUsed !== undefined && messageLimit !== undefined ? (
               <>
-                You've used all <span className="font-semibold">{messageLimit}</span> free messages.
-                Sign in to unlock unlimited chatting with Mona and save your conversation history!
+                You've enjoyed <span className="font-semibold">{messageLimit}</span> messages with Mona!
+                Sign in so she can <span className="font-semibold text-pink-500">remember you</span> and
+                your conversations — pick up right where you left off, anytime.
               </>
             ) : (
-              "Sign in to save your chat history and continue your conversation with Mona anytime!"
+              "Sign in so Mona can remember you and your conversations — pick up right where you left off, anytime!"
             )}
           </p>
+
+          {/* Benefits */}
+          <div className="mb-6 flex justify-center gap-4 text-xs text-slate-500">
+            <div className="flex items-center gap-1">
+              <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Unlimited messages</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>She remembers you</span>
+            </div>
+          </div>
 
           {/* Google Sign In Button */}
           <button
