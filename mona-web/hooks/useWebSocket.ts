@@ -184,7 +184,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           console.log("⚠️ Guest limit reached:", data);
           setGuestMessagesRemaining(0);
           if (options?.onGuestLimitReached) {
-            options.onGuestLimitReached(data.messagesUsed, data.messageLimit);
+            options.onGuestLimitReached(data.messagesUsed ?? 0, data.messageLimit ?? 10);
           }
         }
       } catch (error) {
