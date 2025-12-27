@@ -3,6 +3,49 @@ import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 import { MIXAMO_TO_VRM_BONE_MAP } from "./mixamoRigMap";
 
+// Bones that need X-axis flip correction for avatars with inverted arm orientations
+const ARM_BONES: VRMHumanBoneName[] = [
+  "leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand",
+  "rightShoulder", "rightUpperArm", "rightLowerArm", "rightHand",
+  "leftThumbMetacarpal", "leftThumbProximal", "leftThumbDistal",
+  "leftIndexProximal", "leftIndexIntermediate", "leftIndexDistal",
+  "leftMiddleProximal", "leftMiddleIntermediate", "leftMiddleDistal",
+  "leftRingProximal", "leftRingIntermediate", "leftRingDistal",
+  "leftLittleProximal", "leftLittleIntermediate", "leftLittleDistal",
+  "rightThumbMetacarpal", "rightThumbProximal", "rightThumbDistal",
+  "rightIndexProximal", "rightIndexIntermediate", "rightIndexDistal",
+  "rightMiddleProximal", "rightMiddleIntermediate", "rightMiddleDistal",
+  "rightRingProximal", "rightRingIntermediate", "rightRingDistal",
+  "rightLittleProximal", "rightLittleIntermediate", "rightLittleDistal",
+] as VRMHumanBoneName[];
+
+/**
+ * Detects if a VRM avatar has inverted arm orientations (pointing -X instead of +X)
+ * This is common in some non-VRoid avatars exported with incorrect bone orientations
+ */
+function detectInvertedArms(vrm: VRM): boolean {
+  const leftUpperArm = vrm.humanoid?.getRawBoneNode("leftUpperArm");
+  if (!leftUpperArm) return false;
+
+  // Check if the left arm points in -X direction (inverted)
+  // Normal VRM: left arm should have positive X translation from shoulder
+  const worldPos = new THREE.Vector3();
+  leftUpperArm.getWorldPosition(worldPos);
+
+  const shoulder = vrm.humanoid?.getRawBoneNode("leftShoulder");
+  if (shoulder) {
+    const shoulderPos = new THREE.Vector3();
+    shoulder.getWorldPosition(shoulderPos);
+    // If arm is to the right of shoulder (in world space), it's inverted
+    // In VRM, left arm should be at negative X from center
+    const armDirection = worldPos.x - shoulderPos.x;
+    // Inverted if left arm is in positive X direction from shoulder
+    return armDirection > 0;
+  }
+
+  return false;
+}
+
 /**
  * Loads a Mixamo animation file (FBX format) and retargets it for use with VRM avatars.
  *
@@ -68,6 +111,12 @@ export async function loadMixamoAnimation(
   const vrmHipsHeight = vrmHipsPosition[1];
   const heightScale = vrmHipsHeight / mixamoHipsHeight;
 
+  // Detect if this avatar has inverted arm orientations
+  const hasInvertedArms = detectInvertedArms(vrm);
+  if (hasInvertedArms) {
+    console.log(`⚠️ Detected inverted arm orientations in VRM, applying corrections`);
+  }
+
   // Convert tracks to VRM bone space
   const vrmTracks: THREE.KeyframeTrack[] = [];
 
@@ -103,6 +152,9 @@ export async function loadMixamoAnimation(
       // Retarget rotation keyframes
       const retargetedValues = new Float32Array(track.values.length);
 
+      // Check if this is an arm bone that needs correction
+      const isArmBone = hasInvertedArms && ARM_BONES.includes(vrmBoneName);
+
       for (let i = 0; i < track.values.length; i += 4) {
         workQuaternion.fromArray(track.values, i);
 
@@ -110,6 +162,14 @@ export async function loadMixamoAnimation(
         workQuaternion
           .premultiply(parentRestWorldRotation)
           .multiply(restRotationInverse);
+
+        // Apply arm correction for inverted avatars
+        // Flip the rotation around the X axis for arm bones
+        if (isArmBone) {
+          // Invert Y and Z components to mirror the rotation
+          workQuaternion.y = -workQuaternion.y;
+          workQuaternion.z = -workQuaternion.z;
+        }
 
         workQuaternion.toArray(retargetedValues, i);
       }
