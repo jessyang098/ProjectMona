@@ -60,14 +60,18 @@ export function parseTestCommand(input: string): { command: PoseCommand | null; 
     const command = trimmed.slice(5).trim();
 
     switch (command) {
-      case "default":
+      case "standing_idle":
+      case "standing-idle":
       case "idle":
+        return { command: { type: "play", pose: "standing_idle" }, remainingText: null };
+      case "default":
         return { command: { type: "play", pose: "default" }, remainingText: null };
       case "crouch":
         return { command: { type: "play", pose: "crouch" }, remainingText: null };
       case "lay":
         return { command: { type: "play", pose: "lay" }, remainingText: null };
       case "stand":
+        return { command: { type: "play", pose: "stand" }, remainingText: null };
       case "stand1":
         return { command: { type: "play", pose: "stand1" }, remainingText: null };
       case "wave":

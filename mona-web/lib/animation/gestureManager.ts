@@ -27,7 +27,8 @@ export type GestureName =
   | "lay"
   | "stand"
   | "stand1"
-  | "default";
+  | "default"
+  | "standing_idle";
 
 interface GestureConfig {
   name: GestureName;
@@ -36,6 +37,7 @@ interface GestureConfig {
   priority: number; // Higher = more likely to play
   duration?: number; // Optional override
   isHoldPose?: boolean; // If true, holds the pose until manually stopped
+  isLoopingIdle?: boolean; // If true, loops continuously (for idle animations)
 }
 
 const GESTURE_CONFIGS: GestureConfig[] = [
@@ -70,6 +72,7 @@ const GESTURE_CONFIGS: GestureConfig[] = [
   { name: "sleepy", path: "/animations/Sleepy.vrma", triggerEmotions: ["neutral"], priority: 4 },
 
   // === Mixamo FBX Animations (hold poses) ===
+  { name: "standing_idle", path: "/animations/standing-idle.fbx", triggerEmotions: [], priority: 0, isLoopingIdle: true },
   { name: "default", path: "/animations/default.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
   { name: "crouch", path: "/animations/crouch.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
   { name: "lay", path: "/animations/lay.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
@@ -132,12 +135,16 @@ export class GestureManager {
 
       if (clip) {
         this.loadedGestures.set(gesture.name, clip);
-        console.log(`✓ Loaded gesture: ${gesture.name} (${isVRMAFile(gesture.path) ? 'VRMA' : 'Mixamo'}) - duration: ${clip.duration.toFixed(2)}s`);
+        console.log(`✓ Loaded gesture: ${gesture.name} (${isVRMAFile(gesture.path) ? 'VRMA' : 'Mixamo'}) - duration: ${clip.duration.toFixed(2)}s, tracks: ${clip.tracks.length}`);
       } else {
         console.warn(`⚠️ Gesture ${gesture.name} returned null clip`);
       }
     } catch (error) {
       console.error(`❌ Failed to load gesture ${gesture.name}:`, error);
+      // Log the full error stack for better debugging
+      if (error instanceof Error) {
+        console.error(`   Stack: ${error.stack}`);
+      }
     }
   }
 
@@ -176,6 +183,7 @@ export class GestureManager {
     // Find config for this gesture
     const config = GESTURE_CONFIGS.find(c => c.name === gestureName);
     const isHoldPose = config?.isHoldPose ?? false;
+    const isLoopingIdle = config?.isLoopingIdle ?? false;
 
     // Stop current gesture with smooth crossfade
     if (this.currentAction) {
@@ -186,8 +194,12 @@ export class GestureManager {
     const action = this.mixer.clipAction(clip);
     action.reset();
 
-    if (isHoldPose) {
-      // Hold poses: loop and clamp at end for static pose
+    if (isLoopingIdle) {
+      // Looping idle: plays continuously forever
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.clampWhenFinished = false;
+    } else if (isHoldPose) {
+      // Hold poses: play once and clamp at end for static pose
       action.setLoop(THREE.LoopOnce, 1);
       action.clampWhenFinished = true; // Hold the final pose
     } else {
@@ -205,33 +217,35 @@ export class GestureManager {
     this.lastGestureTime = Date.now();
     this.scheduleNextGesture();
 
-    // Only auto fade-out for non-hold poses
-    if (!isHoldPose) {
+    // Only auto fade-out for non-hold, non-looping poses
+    if (!isHoldPose && !isLoopingIdle) {
       const fadeOutDuration = 0.5;
       const gestureEndTime = clip.duration * 1000 - fadeOutDuration * 1000;
       setTimeout(() => {
         if (this.currentAction === action) {
-          action.fadeOut(fadeOutDuration);
-          this.currentAction = null;
-          this.currentGestureName = null;
+          // Return to standing idle instead of T-posing
+          this.returnToIdle(fadeOutDuration);
         }
       }, Math.max(0, gestureEndTime));
     }
 
-    console.log(`▶ Playing gesture: ${gestureName}${isHoldPose ? ' (holding)' : ''}`);
+    console.log(`▶ Playing gesture: ${gestureName}${isLoopingIdle ? ' (looping)' : isHoldPose ? ' (holding)' : ''}`);
     return true;
   }
 
   /**
-   * Return to rest pose from a hold pose
+   * Return to standing idle animation
+   */
+  returnToIdle(fadeInDuration: number = 0.5): void {
+    console.log(`↩ Returning to standing idle from: ${this.currentGestureName}`);
+    this.playGesture("standing_idle", fadeInDuration);
+  }
+
+  /**
+   * Return to rest pose from a hold pose (legacy - now returns to idle)
    */
   returnToRest(fadeOutDuration: number = 0.8): void {
-    if (this.currentAction) {
-      console.log(`↩ Returning to rest pose from: ${this.currentGestureName}`);
-      this.currentAction.fadeOut(fadeOutDuration);
-      this.currentAction = null;
-      this.currentGestureName = null;
-    }
+    this.returnToIdle(fadeOutDuration);
   }
 
   /**
