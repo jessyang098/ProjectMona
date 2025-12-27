@@ -326,15 +326,15 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         await gestureManagerRef.current.loadAllGestures();
         console.log("🎭 All gestures loaded, attempting to play stand pose");
 
-        // Set default standing pose on startup
+        // Set default idle pose on startup
         // Increased delay to ensure everything is ready
         setTimeout(() => {
           if (gestureManagerRef.current) {
-            console.log("🧍 Playing default stand pose now");
-            const success = gestureManagerRef.current.playGesture("stand", 0.5);
-            console.log("🧍 Stand pose play result:", success);
+            console.log("🧍 Playing default idle pose now");
+            const success = gestureManagerRef.current.playGesture("default", 0.5);
+            console.log("🧍 Default pose play result:", success);
           } else {
-            console.warn("🧍 GestureManager was disposed before stand pose could play");
+            console.warn("🧍 GestureManager was disposed before default pose could play");
           }
         }, 500); // Increased delay
       }

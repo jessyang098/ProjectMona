@@ -5,18 +5,41 @@ import { EmotionData, Message, WebSocketMessage } from "@/types/chat";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-export function useWebSocket(url: string) {
+interface AuthStatus {
+  isAuthenticated: boolean;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    avatarUrl?: string;
+  } | null;
+  guestMessagesRemaining: number | null;
+  guestMessageLimit: number | null;
+}
+
+interface UseWebSocketOptions {
+  onAuthStatus?: (status: AuthStatus) => void;
+  onGuestLimitReached?: (messagesUsed: number, messageLimit: number) => void;
+  onChatHistory?: (messages: Message[]) => void;
+}
+
+export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [latestEmotion, setLatestEmotion] = useState<EmotionData | null>(null);
+  const [guestMessagesRemaining, setGuestMessagesRemaining] = useState<number | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
 
   useEffect(() => {
-    // Generate a unique client ID
-    const clientId = `client-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    // Get client ID from localStorage for guest persistence, or generate new one
+    let clientId = localStorage.getItem("mona_guest_session_id");
+    if (!clientId) {
+      clientId = `client-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      localStorage.setItem("mona_guest_session_id", clientId);
+    }
     const wsUrl = `${url}/${clientId}`;
 
     console.log("Connecting to WebSocket:", wsUrl);
@@ -131,6 +154,38 @@ export function useWebSocket(url: string) {
 
             return prev;
           });
+        } else if (data.type === "auth_status") {
+          // Handle auth status from server
+          console.log("🔐 Auth status:", data);
+          setGuestMessagesRemaining(data.guestMessagesRemaining ?? null);
+          if (options?.onAuthStatus) {
+            options.onAuthStatus({
+              isAuthenticated: data.isAuthenticated,
+              user: data.user,
+              guestMessagesRemaining: data.guestMessagesRemaining,
+              guestMessageLimit: data.guestMessageLimit,
+            });
+          }
+        } else if (data.type === "chat_history") {
+          // Handle chat history from server (for authenticated users)
+          console.log("📜 Chat history received:", data.messages?.length, "messages");
+          if (data.messages && options?.onChatHistory) {
+            const historyMessages: Message[] = data.messages.map((msg: { content: string; sender: string; timestamp: string; emotion?: EmotionData }) => ({
+              content: msg.content,
+              sender: msg.sender as "user" | "mona",
+              timestamp: msg.timestamp,
+              emotion: msg.emotion,
+            }));
+            options.onChatHistory(historyMessages);
+            setMessages(historyMessages);
+          }
+        } else if (data.type === "guest_limit_reached") {
+          // Handle guest limit reached
+          console.log("⚠️ Guest limit reached:", data);
+          setGuestMessagesRemaining(0);
+          if (options?.onGuestLimitReached) {
+            options.onGuestLimitReached(data.messagesUsed, data.messageLimit);
+          }
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
@@ -180,6 +235,7 @@ export function useWebSocket(url: string) {
     isTyping,
     isGeneratingAudio,
     latestEmotion,
+    guestMessagesRemaining,
     sendMessage,
   };
 }
