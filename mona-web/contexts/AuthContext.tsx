@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         updateGuestStatus,
-        setGuestLimitReached,
+        setGuestLimitReached: setIsGuestLimitReached,
       }}
     >
       {children}
