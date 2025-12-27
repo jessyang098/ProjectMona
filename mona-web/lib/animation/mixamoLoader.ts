@@ -44,7 +44,11 @@ export async function loadMixamoAnimation(
   }
 
   // Calculate height scale factor between Mixamo rig and VRM avatar
-  const mixamoHipsNode = animationAsset.getObjectByName("mixamorigHips");
+  // Try both naming conventions: "mixamorigHips" and "mixamorig:Hips"
+  let mixamoHipsNode = animationAsset.getObjectByName("mixamorigHips");
+  if (!mixamoHipsNode) {
+    mixamoHipsNode = animationAsset.getObjectByName("mixamorig:Hips");
+  }
   if (!mixamoHipsNode) {
     // Log available bones for debugging
     const bones: string[] = [];
@@ -74,14 +78,21 @@ export async function loadMixamoAnimation(
   for (const track of sourceClip.tracks) {
     const [mixamoBoneName, propertyName] = track.name.split(".");
 
+    // Normalize bone name: convert "mixamorig:Hips" to "mixamorigHips"
+    const normalizedBoneName = mixamoBoneName.replace("mixamorig:", "mixamorig");
+
     // Map Mixamo bone to VRM bone
-    const vrmBoneName = MIXAMO_TO_VRM_BONE_MAP[mixamoBoneName] as VRMHumanBoneName | undefined;
+    const vrmBoneName = MIXAMO_TO_VRM_BONE_MAP[normalizedBoneName] as VRMHumanBoneName | undefined;
     if (!vrmBoneName) continue;
 
     const vrmBoneNode = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName);
     if (!vrmBoneNode) continue;
 
-    const mixamoBoneNode = animationAsset.getObjectByName(mixamoBoneName);
+    // Try both naming conventions for bone lookup
+    let mixamoBoneNode = animationAsset.getObjectByName(mixamoBoneName);
+    if (!mixamoBoneNode) {
+      mixamoBoneNode = animationAsset.getObjectByName(normalizedBoneName);
+    }
     if (!mixamoBoneNode) continue;
 
     // Store rest pose rotations for retargeting
