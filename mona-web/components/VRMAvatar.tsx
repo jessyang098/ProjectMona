@@ -293,10 +293,10 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       if (!gestureManagerRef.current) {
         console.log("🎭 Creating GestureManager");
         gestureManagerRef.current = new GestureManager(vrm, {
-          gestureChance: 0.4,
+          gestureChance: 0,
           minGestureInterval: 10,
           maxGestureInterval: 20,
-          autoRandomGestures: true,
+          autoRandomGestures: false,
         });
 
         console.log("🎭 Loading all gestures...");

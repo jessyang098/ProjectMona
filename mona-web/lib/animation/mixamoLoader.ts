@@ -68,6 +68,13 @@ export async function loadMixamoAnimation(
   const vrmHipsHeight = vrmHipsPosition[1];
   const heightScale = vrmHipsHeight / mixamoHipsHeight;
 
+  // Detect VRM version for coordinate system handling
+  // VRM 0.x uses a different coordinate system than VRM 1.0
+  // VRoid Studio exports VRM 0.x by default, so we assume 0.x if version is undefined
+  const vrmMetaVersion = (vrm.meta as { metaVersion?: string })?.metaVersion;
+  const isVRM0 = vrmMetaVersion === '0' || vrmMetaVersion === undefined;
+  console.log(`📦 VRM meta version: ${vrmMetaVersion ?? 'undefined'}, treating as VRM0: ${isVRM0}`);
+
   // Convert tracks to VRM bone space
   const vrmTracks: THREE.KeyframeTrack[] = [];
 
@@ -114,9 +121,11 @@ export async function loadMixamoAnimation(
         workQuaternion.toArray(retargetedValues, i);
       }
 
-      // Note: VRM 0.x coordinate system flip was previously applied here,
-      // but the retargeting math above already handles the coordinate transform correctly
-      const finalValues = retargetedValues;
+      // VRM 0.x coordinate system flip: negate x and z components (indices 0, 2 in each quaternion)
+      // This is needed because VRM 0.x uses a different coordinate system than Mixamo
+      const finalValues = isVRM0
+        ? retargetedValues.map((v, i) => (i % 2 === 0 ? -v : v))
+        : retargetedValues;
 
       vrmTracks.push(
         new THREE.QuaternionKeyframeTrack(
@@ -130,11 +139,16 @@ export async function loadMixamoAnimation(
       // Apply height scaling to match VRM avatar proportions
       const scaledValues = track.values.map((value) => value * heightScale);
 
+      // VRM 0.x coordinate system flip: negate x and z components (indices 0, 2 in each vec3)
+      const finalVectorValues = isVRM0
+        ? scaledValues.map((v, i) => (i % 3 !== 1 ? -v : v))
+        : scaledValues;
+
       vrmTracks.push(
         new THREE.VectorKeyframeTrack(
           `${vrmBoneNode.name}.${propertyName}`,
           track.times,
-          scaledValues
+          finalVectorValues
         )
       );
     }
