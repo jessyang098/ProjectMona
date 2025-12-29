@@ -43,11 +43,6 @@ const ANIMATION_CONFIG = {
     talkFrequency: 1.8,
     talkSmoothing: 0.02,
   },
-  // Arm offset to prevent clipping with body/clothing
-  // Positive values push arms outward (away from body)
-  arms: {
-    spreadOffset: 0.15, // Radians to rotate arms outward on Z-axis
-  },
 } as const;
 
 // Per-avatar configuration for different VRM models
@@ -568,15 +563,6 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     if (spineRef.current) {
       spineRef.current.rotation.x = anim.torso.currentRotation.x;
-    }
-
-    // Apply arm spread offset to prevent clipping with body/clothing
-    // This adds a small outward rotation on top of the animation
-    if (leftUpperArmRef.current) {
-      leftUpperArmRef.current.rotation.z += cfg.arms.spreadOffset;
-    }
-    if (rightUpperArmRef.current) {
-      rightUpperArmRef.current.rotation.z -= cfg.arms.spreadOffset;
     }
   });
 
