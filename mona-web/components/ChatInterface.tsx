@@ -11,6 +11,7 @@ import LoginPrompt from "./LoginPrompt";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest } from "@/lib/poseCommands";
+import { useAnimationState } from "@/hooks/useAnimationState";
 
 const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -61,6 +62,7 @@ export default function ChatInterface() {
     onAuthStatus: handleAuthStatus,
   });
   const { initAudioContext } = useAudioContext();
+  const { currentAnimation } = useAnimationState();
 
   // Get the latest audio URL and lip sync data from Mona's messages
   const latestMonaMessageWithAudio = messages
@@ -278,7 +280,7 @@ export default function ChatInterface() {
                 {isConnected ? (
                   <span className="inline-flex items-center gap-1 text-emerald-300">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                    Linked · {emotionLabel}
+                    Linked · {emotionLabel}{currentAnimation ? ` · ${formatAnimationName(currentAnimation)}` : ""}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-red-300">
@@ -566,4 +568,12 @@ function getEmotionLabel(emotion: EmotionData | null): string {
   }
   const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
   return `${toTitle(emotion.emotion)} · ${toTitle(emotion.intensity)}`;
+}
+
+function formatAnimationName(name: string): string {
+  // Convert snake_case to Title Case (e.g., "standing_idle" -> "Standing Idle")
+  return name
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }

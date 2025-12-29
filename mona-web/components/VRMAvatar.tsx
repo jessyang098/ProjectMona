@@ -10,6 +10,7 @@ import { VRMLookAtQuaternionProxy } from "@pixiv/three-vrm-animation";
 import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
 import { onPoseCommand, type PoseCommand } from "@/lib/poseCommands";
+import { setAnimationState } from "@/lib/animationState";
 
 // Procedural animation configuration
 const ANIMATION_CONFIG = {
@@ -41,11 +42,6 @@ const ANIMATION_CONFIG = {
     // Talking: slightly more animated
     talkFrequency: 1.8,
     talkSmoothing: 0.02,
-  },
-  // Arm positions - natural rest pose at sides
-  arms: {
-    leftRotationZ: -1.0,  // ~57 degrees - arms naturally at sides (Riko uses 1.2)
-    rightRotationZ: 1.0,
   },
 } as const;
 
@@ -127,6 +123,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   const lipSyncRef = useRef<LipSyncManager | null>(null);
   const gestureManagerRef = useRef<GestureManager | null>(null);
   const currentAudioRef = useRef<string | null>(null);
+  const lastPublishedGestureRef = useRef<string | null>(null);
 
   const baseRotations = useRef({
     hips: new THREE.Euler(),
@@ -154,11 +151,6 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       timer: 0,
       nextBlink: 0,
       blinkAmount: 0,
-    },
-    // Track when a gesture ends to apply faster arm correction
-    gestureTransition: {
-      wasGesturePlaying: false,
-      transitionTimer: 0,
     },
   });
   const gltf = useLoader(
@@ -289,27 +281,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       rightUpperArm: rightUpperArmRef.current?.name || "NOT FOUND",
     });
 
-    // Store base rotations
+    // Store base rotations for reference
     if (hipsRef.current) baseRotations.current.hips.copy(hipsRef.current.rotation);
     if (chestRef.current) baseRotations.current.chest.copy(chestRef.current.rotation);
     if (headRef.current) baseRotations.current.head.copy(headRef.current.rotation);
-
-    // Fix T-pose by rotating arms to resting position
-    // For rotated models (like Moe with 180 deg Y rotation), invert the arm rotations
-    const isRotated = Math.abs(avatarConfig.rotateY) > 0.1;
-    const leftArmZ = isRotated ? -ANIMATION_CONFIG.arms.leftRotationZ : ANIMATION_CONFIG.arms.leftRotationZ;
-    const rightArmZ = isRotated ? -ANIMATION_CONFIG.arms.rightRotationZ : ANIMATION_CONFIG.arms.rightRotationZ;
-
-    if (leftUpperArmRef.current) {
-      baseRotations.current.leftUpperArm.copy(leftUpperArmRef.current.rotation);
-      leftUpperArmRef.current.rotation.z = leftArmZ;
-      console.log(`🦾 Left arm initial Z rotation: ${leftArmZ.toFixed(2)} (rotated: ${isRotated})`);
-    }
-    if (rightUpperArmRef.current) {
-      baseRotations.current.rightUpperArm.copy(rightUpperArmRef.current.rotation);
-      rightUpperArmRef.current.rotation.z = rightArmZ;
-      console.log(`🦾 Right arm initial Z rotation: ${rightArmZ.toFixed(2)} (rotated: ${isRotated})`);
-    }
+    if (leftUpperArmRef.current) baseRotations.current.leftUpperArm.copy(leftUpperArmRef.current.rotation);
+    if (rightUpperArmRef.current) baseRotations.current.rightUpperArm.copy(rightUpperArmRef.current.rotation);
 
     // Initialize gesture manager
     const initGestures = async () => {
@@ -534,52 +511,14 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       expressionManager.setValue('neutral', 1.0);
     }
 
-    // Always guide arms towards resting position (fixes T-pose)
-    // This runs continuously to counteract animation mixer resetting to T-pose
+    // Track current gesture for animation state publishing
     const currentGesture = gestureManagerRef.current?.getCurrentGesture();
-    const gestureTransition = anim.gestureTransition;
 
-    // Detect when a gesture just ended and start transition
-    if (gestureTransition.wasGesturePlaying && !currentGesture) {
-      gestureTransition.transitionTimer = 1.0; // 1 second transition period with faster lerp
-    }
-    gestureTransition.wasGesturePlaying = !!currentGesture;
-
-    // Decrease transition timer
-    if (gestureTransition.transitionTimer > 0) {
-      gestureTransition.transitionTimer -= delta;
-    }
-
-    // Get avatar config to check if model is rotated (affects arm rotation direction)
-    const avatarConfig = AVATAR_CONFIGS[url] || DEFAULT_AVATAR_CONFIG;
-    const isRotated = Math.abs(avatarConfig.rotateY) > 0.1; // Model rotated 180 degrees
-
-    // For rotated models (like Moe), the arm Z rotations need to be inverted
-    const leftRestZ = isRotated ? -cfg.arms.leftRotationZ : cfg.arms.leftRotationZ;
-    const rightRestZ = isRotated ? -cfg.arms.rightRotationZ : cfg.arms.rightRotationZ;
-
-    // Determine arm correction speed based on state:
-    // - During gesture: skip (let animation control)
-    // - During transition (after gesture ends): fast correction to override fadeOut
-    // - Normal idle: gentle correction
-    let armLerpSpeed = 0;
-    if (currentGesture) {
-      armLerpSpeed = 0; // Let gesture animation have full control
-    } else if (gestureTransition.transitionTimer > 0) {
-      armLerpSpeed = 0.25; // Fast correction during post-gesture transition
-    } else {
-      armLerpSpeed = 0.08; // Normal gentle correction
-    }
-
-    if (armLerpSpeed > 0) {
-      if (leftUpperArmRef.current) {
-        const currentZ = leftUpperArmRef.current.rotation.z;
-        leftUpperArmRef.current.rotation.z = currentZ + (leftRestZ - currentZ) * armLerpSpeed;
-      }
-      if (rightUpperArmRef.current) {
-        const currentZ = rightUpperArmRef.current.rotation.z;
-        rightUpperArmRef.current.rotation.z = currentZ + (rightRestZ - currentZ) * armLerpSpeed;
-      }
+    // Publish animation state changes to global state
+    const gestureToPublish = currentGesture ?? null;
+    if (gestureToPublish !== lastPublishedGestureRef.current) {
+      lastPublishedGestureRef.current = gestureToPublish;
+      setAnimationState(gestureToPublish, !!gestureToPublish);
     }
 
     // Check if avatar is currently talking (audio playing)
