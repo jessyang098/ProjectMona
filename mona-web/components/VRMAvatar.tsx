@@ -58,41 +58,43 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
 // Default config for unknown avatars
 const DEFAULT_AVATAR_CONFIG = { scale: 0.95, position: [0, 0.10, 0] as [number, number, number], rotateY: 0 };
 
-// Map backend emotions to VRM 0.x expression names (LOWERCASE!)
-// VRM 0.x preset expressions: neutral, a, i, u, e, o, blink, blink_l, blink_r,
-// joy, angry, sorrow, fun, lookup, lookdown, lookleft, lookright
-// Custom expressions in Moe.vrm may include: special, cheekpuff, etc.
+// Map backend emotions to Moe.vrm expression names
+// Moe.vrm expressions: neutral, happy, angry, sad, relaxed,
+// aa, ih, ou, ee, oh (visemes), blink, blinkLeft, blinkRight,
+// lookUp, lookDown, lookLeft, lookRight,
+// ChangeColor, Lencerie, Mouth#1-5, Special, CheekPuff
 const emotionToExpression: Record<string, string> = {
   // Positive emotions
-  happy: "joy",
-  excited: "fun",
-  content: "joy",
-  affectionate: "joy",
-  playful: "fun",
+  happy: "happy",
+  excited: "happy",
+  content: "relaxed",
+  affectionate: "happy",
+  playful: "happy",
 
   // Neutral/Mixed emotions
   curious: "neutral",
-  surprised: "fun",      // No dedicated surprised, fun works
-  embarrassed: "neutral", // Fall back to neutral (special may not exist)
+  surprised: "happy",     // No dedicated surprised
+  embarrassed: "Special", // Special expression for embarrassed/blush
   confused: "neutral",
-  bored: "neutral",
+  bored: "relaxed",
   neutral: "neutral",
 
   // Negative emotions
-  concerned: "sorrow",
-  sad: "sorrow",
-  annoyed: "angry",  // Use angry for annoyed
+  concerned: "sad",
+  sad: "sad",
+  annoyed: "angry",
   angry: "angry",
   frustrated: "angry",
 };
 
-// All available VRM 0.x expressions for testing (LOWERCASE!)
-// Use with test:expr:<name> in chat (e.g., "test:expr:joy", "test:expr:sorrow")
+// All available Moe.vrm expressions for testing
+// Use with test:expr:<name> in chat (e.g., "test:expr:happy", "test:expr:sad")
 export const ALL_EXPRESSIONS = [
-  "neutral", "joy", "angry", "sorrow", "fun",
-  "blink", "blink_l", "blink_r",
-  "lookup", "lookdown", "lookleft", "lookright",
-  "a", "i", "u", "e", "o",
+  "neutral", "happy", "angry", "sad", "relaxed",
+  "blink", "blinkLeft", "blinkRight",
+  "lookUp", "lookDown", "lookLeft", "lookRight",
+  "aa", "ih", "ou", "ee", "oh",
+  "Special", "CheekPuff",
 ] as const;
 
 // Outfit visibility configuration

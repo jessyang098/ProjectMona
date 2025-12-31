@@ -19,14 +19,26 @@ export type ExpressionCommand = {
 const POSE_EVENT = "mona:pose";
 const EXPRESSION_EVENT = "mona:expression";
 
-// All available VRM expressions
+// All available Moe.vrm expressions (case-sensitive!)
 const VALID_EXPRESSIONS = [
-  "neutral", "joy", "angry", "sorrow", "fun",
-  "blink", "blink_l", "blink_r",
+  "neutral", "happy", "angry", "sad", "relaxed",
+  "blink", "blinkleft", "blinkright",  // lowercase for user input
   "lookup", "lookdown", "lookleft", "lookright",
-  "a", "i", "u", "e", "o",
+  "aa", "ih", "ou", "ee", "oh",
   "special", "cheekpuff",
 ];
+
+// Map user input (lowercase) to actual VRM expression names (case-sensitive)
+const EXPRESSION_NAME_MAP: Record<string, string> = {
+  "blinkleft": "blinkLeft",
+  "blinkright": "blinkRight",
+  "lookup": "lookUp",
+  "lookdown": "lookDown",
+  "lookleft": "lookLeft",
+  "lookright": "lookRight",
+  "special": "Special",
+  "cheekpuff": "CheekPuff",
+};
 
 /**
  * Trigger a pose animation
@@ -128,8 +140,9 @@ export function parseTestCommand(input: string): {
       }
 
       if (VALID_EXPRESSIONS.includes(exprName)) {
-        // VRM 0.x expressions are lowercase - just use the name directly
-        return { command: null, expressionCommand: { type: "set", expression: exprName, weight: 1.0 }, remainingText: null };
+        // Map to actual VRM expression name (some are case-sensitive)
+        const actualName = EXPRESSION_NAME_MAP[exprName] ?? exprName;
+        return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, remainingText: null };
       }
 
       console.warn(`Unknown expression: ${exprName}. Valid: ${VALID_EXPRESSIONS.join(", ")}`);
