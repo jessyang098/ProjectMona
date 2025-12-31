@@ -58,42 +58,41 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
 // Default config for unknown avatars
 const DEFAULT_AVATAR_CONFIG = { scale: 0.95, position: [0, 0.10, 0] as [number, number, number], rotateY: 0 };
 
-// Map backend emotions to VRM 0.x expression names
-// Moe.vrm expressions: Neutral, A, I, U, E, O, Blink, Blink_L, Blink_R,
-// Joy, Angry, Sorrow, Fun, LookUp, LookDown, LookLeft, LookRight,
-// ChangeColor, Lencerie, Mouth#1-5, Special, CheekPuff
+// Map backend emotions to VRM 0.x expression names (LOWERCASE!)
+// VRM 0.x preset expressions: neutral, a, i, u, e, o, blink, blink_l, blink_r,
+// joy, angry, sorrow, fun, lookup, lookdown, lookleft, lookright
+// Custom expressions in Moe.vrm may include: special, cheekpuff, etc.
 const emotionToExpression: Record<string, string> = {
   // Positive emotions
-  happy: "Joy",
-  excited: "Fun",
-  content: "Joy",
-  affectionate: "Joy",
-  playful: "Fun",
+  happy: "joy",
+  excited: "fun",
+  content: "joy",
+  affectionate: "joy",
+  playful: "fun",
 
   // Neutral/Mixed emotions
-  curious: "Neutral",
-  surprised: "Fun",      // No dedicated surprised, Fun works
-  embarrassed: "Special", // Special expression (likely blush)
-  confused: "Neutral",
-  bored: "Neutral",
-  neutral: "Neutral",
+  curious: "neutral",
+  surprised: "fun",      // No dedicated surprised, fun works
+  embarrassed: "neutral", // Fall back to neutral (special may not exist)
+  confused: "neutral",
+  bored: "neutral",
+  neutral: "neutral",
 
   // Negative emotions
-  concerned: "Sorrow",
-  sad: "Sorrow",
-  annoyed: "CheekPuff",  // Puffed cheeks for pouty/annoyed
-  angry: "Angry",
-  frustrated: "Angry",
+  concerned: "sorrow",
+  sad: "sorrow",
+  annoyed: "angry",  // Use angry for annoyed
+  angry: "angry",
+  frustrated: "angry",
 };
 
-// All available VRM expressions for testing
-// Use with test:expr:<name> in chat (e.g., "test:expr:Joy", "test:expr:CheekPuff")
+// All available VRM 0.x expressions for testing (LOWERCASE!)
+// Use with test:expr:<name> in chat (e.g., "test:expr:joy", "test:expr:sorrow")
 export const ALL_EXPRESSIONS = [
-  "Neutral", "Joy", "Angry", "Sorrow", "Fun",
-  "Blink", "Blink_L", "Blink_R",
-  "LookUp", "LookDown", "LookLeft", "LookRight",
-  "A", "I", "U", "E", "O",
-  "Special", "CheekPuff",
+  "neutral", "joy", "angry", "sorrow", "fun",
+  "blink", "blink_l", "blink_r",
+  "lookup", "lookdown", "lookleft", "lookright",
+  "a", "i", "u", "e", "o",
 ] as const;
 
 // Outfit visibility configuration
@@ -369,12 +368,18 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     const expressionManager = (vrm as VRM & { expressionManager?: { setValue: (name: string, weight: number) => void } })
       .expressionManager;
     if (expressionManager) {
+      // Debug: Log all available expressions from the VRM
+      const exprMgr = expressionManager as unknown as { expressionMap?: Record<string, unknown> };
+      if (exprMgr.expressionMap) {
+        console.log("📋 Available VRM expressions:", Object.keys(exprMgr.expressionMap));
+      }
+
       const names = Array.from(new Set(Object.values(emotionToExpression)));
       names.forEach((name) => expressionManager.setValue(name, 0));
-      const expressionName = emotionToExpression[emotion.emotion] ?? "Neutral";
+      const expressionName = emotionToExpression[emotion.emotion] ?? "neutral";
+      console.log(`😊 Setting expression: "${expressionName}" (mapped from "${emotion.emotion}") with intensity ${intensity}`);
       expressionManager.setValue(expressionName, intensity);
       emotionExpressionRef.current = expressionName; // Track for useFrame
-      console.log(`😊 Emotion expression: ${emotion.emotion} → ${expressionName} (intensity: ${intensity})`);
     }
 
     // Update gesture manager with current emotion and play gesture if specified
@@ -465,9 +470,10 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         console.log(`😊 Set expression: ${command.expression} = ${command.weight ?? 1.0}`);
       } else if (command.type === "clear") {
         ALL_EXPRESSIONS.forEach((expr) => expressionManager.setValue(expr, 0));
-        expressionManager.setValue("Neutral", 1.0);
+        expressionManager.setValue("neutral", 1.0);
         testExpressionRef.current = null; // Clear test expression
-        console.log("😊 Cleared all expressions, set Neutral");
+        emotionExpressionRef.current = null; // Also clear emotion expression
+        console.log("😊 Cleared all expressions, set neutral");
       }
     });
 
@@ -564,16 +570,16 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     anim.eyes.blinkAmount = Math.max(0, Math.min(1, anim.eyes.blinkAmount));
 
     if (expressionManager) {
-      expressionManager.setValue('Blink', anim.eyes.blinkAmount);
+      expressionManager.setValue('blink', anim.eyes.blinkAmount);
       // Apply expression priority: test > emotion > neutral
       if (testExpressionRef.current) {
         expressionManager.setValue(testExpressionRef.current, 1.0);
-      } else if (emotionExpressionRef.current && emotionExpressionRef.current !== 'Neutral') {
-        // Keep emotion expression active (already set by useEffect, just maintain it)
+      } else if (emotionExpressionRef.current) {
+        // Keep emotion expression active
         expressionManager.setValue(emotionExpressionRef.current, 1.0);
-      } else {
-        expressionManager.setValue('Neutral', 1.0);
       }
+      // Note: Don't set neutral fallback - let the emotion expression persist
+      // The VRM will naturally show neutral if no expression is set
     }
 
     // Track current gesture for animation state publishing
