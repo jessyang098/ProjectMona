@@ -138,6 +138,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   const gestureManagerRef = useRef<GestureManager | null>(null);
   const currentAudioRef = useRef<string | null>(null);
   const lastPublishedGestureRef = useRef<string | null>(null);
+  const testExpressionRef = useRef<string | null>(null); // Track active test expression
 
   const baseRotations = useRef({
     hips: new THREE.Euler(),
@@ -446,10 +447,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
         // Clear other expressions first, then set the new one
         ALL_EXPRESSIONS.forEach((expr) => expressionManager.setValue(expr, 0));
         expressionManager.setValue(command.expression, command.weight ?? 1.0);
+        testExpressionRef.current = command.expression; // Track active test expression
         console.log(`😊 Set expression: ${command.expression} = ${command.weight ?? 1.0}`);
       } else if (command.type === "clear") {
         ALL_EXPRESSIONS.forEach((expr) => expressionManager.setValue(expr, 0));
         expressionManager.setValue("Neutral", 1.0);
+        testExpressionRef.current = null; // Clear test expression
         console.log("😊 Cleared all expressions, set Neutral");
       }
     });
@@ -548,7 +551,10 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     if (expressionManager) {
       expressionManager.setValue('Blink', anim.eyes.blinkAmount);
-      expressionManager.setValue('Neutral', 1.0);
+      // Only set Neutral if no test expression is active
+      if (!testExpressionRef.current) {
+        expressionManager.setValue('Neutral', 1.0);
+      }
     }
 
     // Track current gesture for animation state publishing
