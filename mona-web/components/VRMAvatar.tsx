@@ -346,6 +346,18 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   // Update emotion and trigger gestures
   useEffect(() => {
     if (!vrm) return;
+
+    // Skip emotion-based expression if a test expression is active
+    if (testExpressionRef.current) {
+      console.log("⏭️ Skipping emotion expression - test expression active:", testExpressionRef.current);
+      // Still update gesture manager for emotion-triggered animations
+      if (gestureManagerRef.current && emotion) {
+        const emotionType = emotion.emotion as EmotionType;
+        gestureManagerRef.current.setEmotion(emotionType);
+      }
+      return;
+    }
+
     const intensity = emotion
       ? emotion.intensity === "high"
         ? 1
@@ -551,8 +563,10 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     if (expressionManager) {
       expressionManager.setValue('Blink', anim.eyes.blinkAmount);
-      // Only set Neutral if no test expression is active
-      if (!testExpressionRef.current) {
+      // Apply test expression if active, otherwise set Neutral
+      if (testExpressionRef.current) {
+        expressionManager.setValue(testExpressionRef.current, 1.0);
+      } else {
         expressionManager.setValue('Neutral', 1.0);
       }
     }
