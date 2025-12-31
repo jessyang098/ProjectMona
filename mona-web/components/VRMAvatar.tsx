@@ -139,6 +139,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   const currentAudioRef = useRef<string | null>(null);
   const lastPublishedGestureRef = useRef<string | null>(null);
   const testExpressionRef = useRef<string | null>(null); // Track active test expression
+  const emotionExpressionRef = useRef<string | null>(null); // Track emotion-based expression
 
   const baseRotations = useRef({
     hips: new THREE.Euler(),
@@ -344,39 +345,40 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   }, [vrm, url, gltf]);
 
   // Update emotion and trigger gestures
+  // Only update when we have a new emotion - don't clear on null/undefined
   useEffect(() => {
-    if (!vrm) return;
+    if (!vrm || !emotion) return; // Don't reset on null emotion - keep last expression
 
     // Skip emotion-based expression if a test expression is active
     if (testExpressionRef.current) {
       console.log("⏭️ Skipping emotion expression - test expression active:", testExpressionRef.current);
       // Still update gesture manager for emotion-triggered animations
-      if (gestureManagerRef.current && emotion) {
+      if (gestureManagerRef.current) {
         const emotionType = emotion.emotion as EmotionType;
         gestureManagerRef.current.setEmotion(emotionType);
       }
       return;
     }
 
-    const intensity = emotion
-      ? emotion.intensity === "high"
-        ? 1
-        : emotion.intensity === "medium"
-        ? 0.6
-        : 0.3
-      : 0;
+    const intensity = emotion.intensity === "high"
+      ? 1
+      : emotion.intensity === "medium"
+      ? 0.6
+      : 0.3;
 
     const expressionManager = (vrm as VRM & { expressionManager?: { setValue: (name: string, weight: number) => void } })
       .expressionManager;
     if (expressionManager) {
       const names = Array.from(new Set(Object.values(emotionToExpression)));
       names.forEach((name) => expressionManager.setValue(name, 0));
-      const expressionName = emotion ? emotionToExpression[emotion.emotion] ?? "neutral" : "neutral";
+      const expressionName = emotionToExpression[emotion.emotion] ?? "Neutral";
       expressionManager.setValue(expressionName, intensity);
+      emotionExpressionRef.current = expressionName; // Track for useFrame
+      console.log(`😊 Emotion expression: ${emotion.emotion} → ${expressionName} (intensity: ${intensity})`);
     }
 
     // Update gesture manager with current emotion and play gesture if specified
-    if (gestureManagerRef.current && emotion) {
+    if (gestureManagerRef.current) {
       const emotionType = emotion.emotion as EmotionType;
       gestureManagerRef.current.setEmotion(emotionType);
       console.log("🎭 Updated gesture emotion:", emotionType);
@@ -563,9 +565,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     if (expressionManager) {
       expressionManager.setValue('Blink', anim.eyes.blinkAmount);
-      // Apply test expression if active, otherwise set Neutral
+      // Apply expression priority: test > emotion > neutral
       if (testExpressionRef.current) {
         expressionManager.setValue(testExpressionRef.current, 1.0);
+      } else if (emotionExpressionRef.current && emotionExpressionRef.current !== 'Neutral') {
+        // Keep emotion expression active (already set by useEffect, just maintain it)
+        expressionManager.setValue(emotionExpressionRef.current, 1.0);
       } else {
         expressionManager.setValue('Neutral', 1.0);
       }
