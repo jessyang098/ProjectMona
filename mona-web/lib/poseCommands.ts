@@ -128,18 +128,8 @@ export function parseTestCommand(input: string): {
       }
 
       if (VALID_EXPRESSIONS.includes(exprName)) {
-        // Convert to proper VRM 0.x casing
-        const properName = exprName.charAt(0).toUpperCase() + exprName.slice(1);
-        // Handle special cases
-        const expressionName = properName === "Cheekpuff" ? "CheekPuff"
-          : properName === "Blink_l" ? "Blink_L"
-          : properName === "Blink_r" ? "Blink_R"
-          : properName === "Lookup" ? "LookUp"
-          : properName === "Lookdown" ? "LookDown"
-          : properName === "Lookleft" ? "LookLeft"
-          : properName === "Lookright" ? "LookRight"
-          : properName;
-        return { command: null, expressionCommand: { type: "set", expression: expressionName, weight: 1.0 }, remainingText: null };
+        // VRM 0.x expressions are lowercase - just use the name directly
+        return { command: null, expressionCommand: { type: "set", expression: exprName, weight: 1.0 }, remainingText: null };
       }
 
       console.warn(`Unknown expression: ${exprName}. Valid: ${VALID_EXPRESSIONS.join(", ")}`);
