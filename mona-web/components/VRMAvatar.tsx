@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { VRMLookAtQuaternionProxy } from "@pixiv/three-vrm-animation";
 import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
-import { onPoseCommand, type PoseCommand } from "@/lib/poseCommands";
+import { onPoseCommand, onExpressionCommand, type PoseCommand, type ExpressionCommand } from "@/lib/poseCommands";
 import { setAnimationState } from "@/lib/animationState";
 
 // Procedural animation configuration
@@ -58,29 +58,43 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
 // Default config for unknown avatars
 const DEFAULT_AVATAR_CONFIG = { scale: 0.95, position: [0, 0.10, 0] as [number, number, number], rotateY: 0 };
 
+// Map backend emotions to VRM 0.x expression names
+// Moe.vrm expressions: Neutral, A, I, U, E, O, Blink, Blink_L, Blink_R,
+// Joy, Angry, Sorrow, Fun, LookUp, LookDown, LookLeft, LookRight,
+// ChangeColor, Lencerie, Mouth#1-5, Special, CheekPuff
 const emotionToExpression: Record<string, string> = {
   // Positive emotions
-  happy: "happy",
-  excited: "happy",
-  content: "relaxed",
-  affectionate: "relaxed",
-  playful: "happy",
+  happy: "Joy",
+  excited: "Fun",
+  content: "Joy",
+  affectionate: "Joy",
+  playful: "Fun",
 
   // Neutral/Mixed emotions
-  curious: "surprised",
-  surprised: "surprised",
-  embarrassed: "shy",
-  confused: "surprised",
-  bored: "neutral",
-  neutral: "neutral",
+  curious: "Neutral",
+  surprised: "Fun",      // No dedicated surprised, Fun works
+  embarrassed: "Special", // Special expression (likely blush)
+  confused: "Neutral",
+  bored: "Neutral",
+  neutral: "Neutral",
 
   // Negative emotions
-  concerned: "sad",
-  sad: "sad",
-  annoyed: "sad",      // VRM may not have 'angry', use 'sad' with furrowed brow
-  angry: "sad",        // VRM may not have 'angry', use 'sad' with furrowed brow
-  frustrated: "sad",
+  concerned: "Sorrow",
+  sad: "Sorrow",
+  annoyed: "CheekPuff",  // Puffed cheeks for pouty/annoyed
+  angry: "Angry",
+  frustrated: "Angry",
 };
+
+// All available VRM expressions for testing
+// Use with test:expr:<name> in chat (e.g., "test:expr:Joy", "test:expr:CheekPuff")
+export const ALL_EXPRESSIONS = [
+  "Neutral", "Joy", "Angry", "Sorrow", "Fun",
+  "Blink", "Blink_L", "Blink_R",
+  "LookUp", "LookDown", "LookLeft", "LookRight",
+  "A", "I", "U", "E", "O",
+  "Special", "CheekPuff",
+] as const;
 
 // Outfit visibility configuration
 export interface OutfitVisibility {
@@ -417,6 +431,32 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     return cleanup;
   }, []);
 
+  // Listen for expression test commands
+  useEffect(() => {
+    if (!vrm) return;
+
+    const cleanup = onExpressionCommand((command: ExpressionCommand) => {
+      const expressionManager = vrm.expressionManager;
+      if (!expressionManager) {
+        console.warn("ExpressionManager not ready for expression command");
+        return;
+      }
+
+      if (command.type === "set" && command.expression) {
+        // Clear other expressions first, then set the new one
+        ALL_EXPRESSIONS.forEach((expr) => expressionManager.setValue(expr, 0));
+        expressionManager.setValue(command.expression, command.weight ?? 1.0);
+        console.log(`😊 Set expression: ${command.expression} = ${command.weight ?? 1.0}`);
+      } else if (command.type === "clear") {
+        ALL_EXPRESSIONS.forEach((expr) => expressionManager.setValue(expr, 0));
+        expressionManager.setValue("Neutral", 1.0);
+        console.log("😊 Cleared all expressions, set Neutral");
+      }
+    });
+
+    return cleanup;
+  }, [vrm]);
+
   // Handle audio playback with lip sync
   useEffect(() => {
     if (!vrm || !audioUrl) {
@@ -507,8 +547,8 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     anim.eyes.blinkAmount = Math.max(0, Math.min(1, anim.eyes.blinkAmount));
 
     if (expressionManager) {
-      expressionManager.setValue('blink', anim.eyes.blinkAmount);
-      expressionManager.setValue('neutral', 1.0);
+      expressionManager.setValue('Blink', anim.eyes.blinkAmount);
+      expressionManager.setValue('Neutral', 1.0);
     }
 
     // Track current gesture for animation state publishing
