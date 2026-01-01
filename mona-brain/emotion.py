@@ -44,7 +44,7 @@ class EmotionIntensity(str, Enum):
 
 
 class GestureType(str, Enum):
-    """Available gesture animations"""
+    """Available gesture animations - synced with gestureManager.ts"""
     # Greetings
     WAVE = "wave"
     GOODBYE = "goodbye"
@@ -67,26 +67,35 @@ class GestureType(str, Enum):
     RELAX = "relax"
     SLEEPY = "sleepy"
 
+    # Poses (hold poses from Mixamo FBX)
+    CROUCH = "crouch"
+    LAY = "lay"
+    STAND = "stand"
+    STAND1 = "stand1"
+    DEFAULT = "default"
+    STANDING_IDLE = "standing_idle"
+
     # No gesture
     NONE = "none"
 
 
 # Map emotions to appropriate gestures (for automatic selection)
+# NONE means use standing_idle, the default looping animation
 EMOTION_TO_GESTURE = {
-    EmotionType.HAPPY: [GestureType.CLAPPING, GestureType.NONE],
+    EmotionType.HAPPY: [GestureType.CLAPPING, GestureType.STANDING_IDLE],
     EmotionType.EXCITED: [GestureType.EXCITED_JUMP, GestureType.CLAPPING],
-    EmotionType.CONTENT: [GestureType.RELAX, GestureType.NONE],
+    EmotionType.CONTENT: [GestureType.RELAX, GestureType.STANDING_IDLE],
     EmotionType.CURIOUS: [GestureType.THINKING, GestureType.LOOKING_AROUND],
-    EmotionType.AFFECTIONATE: [GestureType.BLUSH, GestureType.NONE],
-    EmotionType.PLAYFUL: [GestureType.WAVE, GestureType.NONE],
+    EmotionType.AFFECTIONATE: [GestureType.BLUSH, GestureType.STANDING_IDLE],
+    EmotionType.PLAYFUL: [GestureType.WAVE, GestureType.STANDING_IDLE],
     EmotionType.SURPRISED: [GestureType.SURPRISED],
     EmotionType.EMBARRASSED: [GestureType.BLUSH],
     EmotionType.CONFUSED: [GestureType.THINKING, GestureType.LOOKING_AROUND],
-    EmotionType.BORED: [GestureType.SLEEPY, GestureType.NONE],
-    EmotionType.NEUTRAL: [GestureType.NONE, GestureType.RELAX],
-    EmotionType.CONCERNED: [GestureType.SAD, GestureType.NONE],
+    EmotionType.BORED: [GestureType.SLEEPY, GestureType.STANDING_IDLE],
+    EmotionType.NEUTRAL: [GestureType.STANDING_IDLE, GestureType.RELAX],
+    EmotionType.CONCERNED: [GestureType.SAD, GestureType.STANDING_IDLE],
     EmotionType.SAD: [GestureType.SAD],
-    EmotionType.ANNOYED: [GestureType.ANGRY, GestureType.NONE],
+    EmotionType.ANNOYED: [GestureType.ANGRY, GestureType.STANDING_IDLE],
     EmotionType.ANGRY: [GestureType.ANGRY],
     EmotionType.FRUSTRATED: [GestureType.ANGRY, GestureType.SAD],
 }
@@ -253,27 +262,30 @@ class EmotionEngine:
         self.emotion_history = []
 
 
-# Emotion-to-expression mapping for future 3D avatar (Week 4)
+# Emotion-to-expression mapping for Moe.vrm avatar
+# Available Moe.vrm expressions: neutral, happy, angry, sad, relaxed,
+#   blink, blinkLeft, blinkRight, lookUp, lookDown, lookLeft, lookRight,
+#   aa, ih, ou, ee, oh (visemes), Special, CheekPuff
 EMOTION_TO_BLENDSHAPES = {
     # Positive emotions
-    EmotionType.HAPPY: {"Joy": 0.8, "Smile": 0.9},
-    EmotionType.EXCITED: {"Joy": 1.0, "Surprise": 0.6, "EyesWide": 0.5},
-    EmotionType.CONTENT: {"Smile": 0.5, "Relaxed": 0.7},
-    EmotionType.AFFECTIONATE: {"Joy": 0.7, "Smile": 0.8, "Blush": 0.3},
-    EmotionType.PLAYFUL: {"Smile": 0.9, "Joy": 0.6, "Wink": 0.7},
+    EmotionType.HAPPY: {"happy": 0.9},
+    EmotionType.EXCITED: {"happy": 1.0},
+    EmotionType.CONTENT: {"relaxed": 0.7},
+    EmotionType.AFFECTIONATE: {"happy": 0.8},
+    EmotionType.PLAYFUL: {"happy": 0.7},
 
     # Neutral/Mixed emotions
-    EmotionType.CURIOUS: {"Surprise": 0.4, "Focus": 0.8, "EyebrowRaise": 0.6},
-    EmotionType.SURPRISED: {"Surprise": 1.0, "EyesWide": 0.9, "MouthO": 0.8},
-    EmotionType.EMBARRASSED: {"Blush": 0.9, "LookAway": 0.6, "Smile": 0.4},
-    EmotionType.CONFUSED: {"Surprise": 0.3, "BrowFurrow": 0.6, "HeadTilt": 0.5},
-    EmotionType.BORED: {"Relaxed": 0.8, "LookAway": 0.7, "EyesHalfClosed": 0.6},
-    EmotionType.NEUTRAL: {"Neutral": 1.0},
+    EmotionType.CURIOUS: {"neutral": 1.0},
+    EmotionType.SURPRISED: {"happy": 0.6},  # No surprise expression, use happy
+    EmotionType.EMBARRASSED: {"Special": 1.0},  # Special blush expression
+    EmotionType.CONFUSED: {"neutral": 1.0},
+    EmotionType.BORED: {"relaxed": 0.8},
+    EmotionType.NEUTRAL: {"neutral": 1.0},
 
     # Negative emotions
-    EmotionType.CONCERNED: {"Sad": 0.5, "Worry": 0.7, "BrowFurrow": 0.5},
-    EmotionType.SAD: {"Sad": 0.8, "MouthFrown": 0.6, "EyesSad": 0.7},
-    EmotionType.ANNOYED: {"BrowFurrow": 0.7, "MouthFrown": 0.5, "LookAway": 0.4},
-    EmotionType.ANGRY: {"BrowFurrow": 1.0, "MouthFrown": 0.8, "EyesNarrow": 0.9},
-    EmotionType.FRUSTRATED: {"BrowFurrow": 0.8, "Sad": 0.4, "MouthFrown": 0.6},
+    EmotionType.CONCERNED: {"sad": 0.5},
+    EmotionType.SAD: {"sad": 0.9},
+    EmotionType.ANNOYED: {"angry": 0.6},
+    EmotionType.ANGRY: {"angry": 1.0},
+    EmotionType.FRUSTRATED: {"angry": 0.7, "sad": 0.3},
 }

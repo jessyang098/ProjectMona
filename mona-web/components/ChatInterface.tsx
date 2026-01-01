@@ -303,14 +303,16 @@ export default function ChatInterface() {
           </div>
 
           {/* Guest message counter / Sign in button */}
-          {!isAuthenticated && guestMessagesRemaining !== null && (
+          {!isAuthenticated && (
             <button
               onClick={() => setShowLoginPrompt(true)}
               className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
             >
-              <span className={guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/80"}>
-                {guestMessagesRemaining} messages left
-              </span>
+              {guestMessagesRemaining !== null && (
+                <span className={guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/80"}>
+                  {guestMessagesRemaining} left
+                </span>
+              )}
               <span className="text-purple-300">Sign in</span>
             </button>
           )}
