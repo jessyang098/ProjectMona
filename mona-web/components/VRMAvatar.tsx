@@ -53,6 +53,9 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Mona1.vrm - original avatar, no rotation needed
   "Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
   "/avatars/Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
+  // Torako - VRoid Hub model, likely needs 180 rotation like other VRoid exports
+  "torako.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/torako.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars
@@ -141,6 +144,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   const lastPublishedGestureRef = useRef<string | null>(null);
   const testExpressionRef = useRef<string | null>(null); // Track active test expression
   const emotionExpressionRef = useRef<string | null>(null); // Track emotion-based expression
+  const prevExpressionRef = useRef<string | null>(null); // Track previous expression for clearing
 
   const baseRotations = useRef({
     hips: new THREE.Euler(),
@@ -573,15 +577,20 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     if (expressionManager) {
       expressionManager.setValue('blink', anim.eyes.blinkAmount);
-      // Apply expression priority: test > emotion > neutral
-      if (testExpressionRef.current) {
-        expressionManager.setValue(testExpressionRef.current, 1.0);
-      } else if (emotionExpressionRef.current) {
-        // Keep emotion expression active
-        expressionManager.setValue(emotionExpressionRef.current, 1.0);
+
+      // Determine current active expression (test takes priority over emotion)
+      const activeExpression = testExpressionRef.current ?? emotionExpressionRef.current;
+
+      // Clear previous expression if it changed
+      if (prevExpressionRef.current && prevExpressionRef.current !== activeExpression) {
+        expressionManager.setValue(prevExpressionRef.current, 0);
       }
-      // Note: Don't set neutral fallback - let the emotion expression persist
-      // The VRM will naturally show neutral if no expression is set
+
+      // Apply active expression
+      if (activeExpression) {
+        expressionManager.setValue(activeExpression, 1.0);
+        prevExpressionRef.current = activeExpression;
+      }
     }
 
     // Track current gesture for animation state publishing
