@@ -7,15 +7,19 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:800
 interface LoginPromptProps {
   isOpen: boolean;
   onClose: () => void;
+  onTryForFree?: () => void;
   messagesUsed?: number;
   messageLimit?: number;
+  isInitialPrompt?: boolean;
 }
 
 export default function LoginPrompt({
   isOpen,
   onClose,
+  onTryForFree,
   messagesUsed,
   messageLimit,
+  isInitialPrompt = false,
 }: LoginPromptProps) {
   const { login } = useAuth();
 
@@ -25,24 +29,49 @@ export default function LoginPrompt({
 
   if (!isOpen) return null;
 
+  // Determine the title and description based on context
+  const getTitle = () => {
+    if (isInitialPrompt) return "Welcome to Mona!";
+    if (messagesUsed !== undefined && messageLimit !== undefined) return "Want to keep chatting?";
+    return "Sign In to Continue";
+  };
+
+  const getDescription = () => {
+    if (isInitialPrompt) {
+      return "Sign in so Mona can remember you forever — or try for free with limited messages!";
+    }
+    if (messagesUsed !== undefined && messageLimit !== undefined) {
+      return (
+        <>
+          You&apos;ve enjoyed <span className="font-semibold">{messageLimit}</span> messages with Mona!
+          Sign in so she can <span className="font-semibold text-pink-500">remember you</span> and
+          your conversations — pick up right where you left off, anytime.
+        </>
+      );
+    }
+    return "Sign in so Mona can remember you and your conversations — pick up right where you left off, anytime!";
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={isInitialPrompt ? undefined : onClose}
     >
       <div
         className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        {/* Close button - hidden on initial prompt */}
+        {!isInitialPrompt && (
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
 
         {/* Content */}
         <div className="text-center">
@@ -55,22 +84,12 @@ export default function LoginPrompt({
 
           {/* Title */}
           <h2 className="mb-2 text-xl font-bold text-slate-900">
-            {messagesUsed !== undefined && messageLimit !== undefined
-              ? "Want to keep chatting?"
-              : "Sign In to Continue"}
+            {getTitle()}
           </h2>
 
           {/* Description */}
           <p className="mb-6 text-slate-600">
-            {messagesUsed !== undefined && messageLimit !== undefined ? (
-              <>
-                You&apos;ve enjoyed <span className="font-semibold">{messageLimit}</span> messages with Mona!
-                Sign in so she can <span className="font-semibold text-pink-500">remember you</span> and
-                your conversations — pick up right where you left off, anytime.
-              </>
-            ) : (
-              "Sign in so Mona can remember you and your conversations — pick up right where you left off, anytime!"
-            )}
+            {getDescription()}
           </p>
 
           {/* Benefits */}
@@ -127,6 +146,24 @@ export default function LoginPrompt({
             </svg>
             Continue with Discord
           </button>
+
+          {/* Try for free button - only shown on initial prompt */}
+          {isInitialPrompt && onTryForFree && (
+            <>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs text-slate-400">or</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+              <button
+                onClick={onTryForFree}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                Try for free
+                <span className="ml-2 text-xs text-slate-400">(10 messages)</span>
+              </button>
+            </>
+          )}
 
           {/* Privacy note */}
           <p className="mt-4 text-xs text-slate-400">
