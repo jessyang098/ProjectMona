@@ -23,6 +23,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateGuestStatus: (remaining: number) => void;
   setGuestLimitReached: (reached: boolean) => void;
+  resetGuestSession: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -135,6 +136,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const resetGuestSession = useCallback(() => {
+    // Generate a new guest session ID (clears previous chat history)
+    const newSessionId = `guest-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    localStorage.setItem("mona_guest_session_id", newSessionId);
+    setGuestSessionId(newSessionId);
+    setGuestMessagesRemaining(10);
+    setIsGuestLimitReached(false);
+    return newSessionId;
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -149,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         updateGuestStatus,
         setGuestLimitReached: setIsGuestLimitReached,
+        resetGuestSession,
       }}
     >
       {children}

@@ -26,6 +26,7 @@ export default function ChatInterface() {
   const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
   const [showOutfitMenu, setShowOutfitMenu] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [isInitialPrompt, setIsInitialPrompt] = useState(false);
   const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
     shirt: true,
@@ -42,7 +43,7 @@ export default function ChatInterface() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const { isAuthenticated, updateGuestStatus, setGuestLimitReached } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, updateGuestStatus, setGuestLimitReached, resetGuestSession } = useAuth();
 
   // WebSocket callbacks
   const handleGuestLimitReached = useCallback((messagesUsed: number, messageLimit: number) => {
@@ -96,6 +97,14 @@ export default function ChatInterface() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  // Show login prompt on initial load for non-authenticated users (after auth check completes)
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      setShowLoginPrompt(true);
+      setIsInitialPrompt(true);
+    }
+  }, [isAuthLoading, isAuthenticated]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -251,13 +260,24 @@ export default function ChatInterface() {
       {/* Login prompt modal */}
       <LoginPrompt
         isOpen={showLoginPrompt}
-        onClose={() => setShowLoginPrompt(false)}
+        onClose={() => {
+          setShowLoginPrompt(false);
+          setIsInitialPrompt(false);
+        }}
+        onTryForFree={async () => {
+          // Reset guest session (start fresh) and enable audio
+          resetGuestSession();
+          await enableAudio();
+          setShowLoginPrompt(false);
+          setIsInitialPrompt(false);
+        }}
         messagesUsed={guestLimitInfo?.messagesUsed}
         messageLimit={guestLimitInfo?.messageLimit}
+        isInitialPrompt={isInitialPrompt}
       />
 
-      {/* Audio enablement overlay - shown until user clicks */}
-      {!audioEnabled && (
+      {/* Audio enablement overlay - shown for authenticated users who haven't enabled audio */}
+      {!audioEnabled && isAuthenticated && (
         <div
           className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
           onClick={enableAudio}

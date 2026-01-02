@@ -53,12 +53,12 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Mona1.vrm - original avatar, no rotation needed
   "Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
   "/avatars/Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
-  // Higanbana - VRoid Hub model
-  "Higanbana.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
-  "/avatars/Higanbana.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
-  // Toraka - VRoid Hub model
-  "Toraka.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
-  "/avatars/Toraka.vrm": { scale: 0.85, position: [0, 0.10, 0], rotateY: Math.PI },
+  // Higanbana - VRoid Hub model (taller, needs smaller scale and lower position)
+  "Higanbana.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
+  "/avatars/Higanbana.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
+  // Toraka - VRoid Hub model (taller, needs smaller scale and lower position)
+  "Toraka.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
+  "/avatars/Toraka.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars
