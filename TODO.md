@@ -109,7 +109,8 @@ FRONTEND_URL=http://localhost:3000
 
 | Avatar | Original Name | Creator | Source | License |
 |--------|---------------|---------|--------|---------|
-| Torako | Higanbana | [Creator Name] | [VRoid Hub](https://hub.vroid.com/) | Attribution required |
+| Hana | Higanbana | [Creator Name] | [VRoid Hub](https://hub.vroid.com/) | Attribution required |
+| Tora | Toraka | [Creator Name] | [VRoid Hub](https://hub.vroid.com/) | Attribution required |
 | Moe | Moe | [Creator Name] | [Source] | [License] |
 
 *Note: Update creator names and links with actual attribution info.*

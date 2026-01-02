@@ -40,8 +40,9 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
 export const AVATAR_OPTIONS = [
   { id: "moe", label: "Moe", url: "/avatars/Moe.vrm" },
   { id: "mona1", label: "Mona", url: "/avatars/Mona1.vrm" },
-  { id: "higanbana", label: "Higanbana", url: "/avatars/Higanbana.vrm" },
-  { id: "toraka", label: "Toraka", url: "/avatars/Toraka.vrm" },
+  { id: "hana", label: "Hana", url: "/avatars/Hana.vrm" },
+  { id: "tora", label: "Tora", url: "/avatars/Tora.vrm" },
+  { id: "sakura", label: "Sakura", url: "/avatars/sakura.vrm" },
 ] as const;
 
 export type AvatarId = typeof AVATAR_OPTIONS[number]["id"];
