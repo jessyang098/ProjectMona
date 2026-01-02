@@ -62,6 +62,9 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Sakura - VRoid Hub model (lowered position)
   "sakura.vrm": { scale: 0.70, position: [0, -0.10, 0], rotateY: Math.PI },
   "/avatars/sakura.vrm": { scale: 0.70, position: [0, -0.10, 0], rotateY: Math.PI },
+  // Lily - VRoid Hub model (lowered position)
+  "Lily.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
+  "/avatars/Lily.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars

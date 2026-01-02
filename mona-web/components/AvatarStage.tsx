@@ -43,6 +43,7 @@ export const AVATAR_OPTIONS = [
   { id: "hana", label: "Hana", url: "/avatars/Hana.vrm" },
   { id: "tora", label: "Tora", url: "/avatars/Tora.vrm" },
   { id: "sakura", label: "Sakura", url: "/avatars/sakura.vrm" },
+  { id: "lily", label: "Lily", url: "/avatars/Lily.vrm" },
 ] as const;
 
 export type AvatarId = typeof AVATAR_OPTIONS[number]["id"];
