@@ -53,12 +53,15 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Mona1.vrm - original avatar, no rotation needed
   "Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
   "/avatars/Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
-  // Higanbana - VRoid Hub model (taller, needs smaller scale and lower position)
-  "Higanbana.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
-  "/avatars/Higanbana.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
-  // Toraka - VRoid Hub model (taller, needs smaller scale and lower position)
-  "Toraka.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
-  "/avatars/Toraka.vrm": { scale: 0.70, position: [0, -0.15, 0], rotateY: Math.PI },
+  // Hana - VRoid Hub model (taller, needs smaller scale)
+  "Hana.vrm": { scale: 0.70, position: [0, -0.05, 0], rotateY: Math.PI },
+  "/avatars/Hana.vrm": { scale: 0.70, position: [0, -0.05, 0], rotateY: Math.PI },
+  // Tora - VRoid Hub model (taller, needs smaller scale)
+  "Tora.vrm": { scale: 0.70, position: [0, -0.05, 0], rotateY: Math.PI },
+  "/avatars/Tora.vrm": { scale: 0.70, position: [0, -0.05, 0], rotateY: Math.PI },
+  // Sakura - VRoid Hub model
+  "sakura.vrm": { scale: 0.70, position: [0, -0.05, 0], rotateY: Math.PI },
+  "/avatars/sakura.vrm": { scale: 0.70, position: [0, -0.05, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars
