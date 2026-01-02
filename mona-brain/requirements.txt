@@ -10,7 +10,6 @@ PyYAML>=6.0.2
 python-multipart>=0.0.9
 anyio>=4.2.0,<5.0.0
 starlette>=0.36.0,<0.46.0
-transformers>=4.36.0,<4.45.0
 
 # Database
 sqlalchemy>=2.0.23,<3.0.0
@@ -26,3 +25,9 @@ itsdangerous>=2.1.2
 torch==2.4.0
 torchaudio==2.4.0
 torchvision==0.19.0
+
+# ML dependencies (pinned for GPT-SoVITS compatibility)
+transformers==4.44.0
+peft==0.12.0
+numpy<2.0
+pillow<11.0
