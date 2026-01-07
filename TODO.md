@@ -4,15 +4,16 @@
 
 ### 1. Discord OAuth Setup (IN PROGRESS)
 - [x] Discord app created (Client ID: 1457044242256887900)
-- [x] Redirect URL added: `https://9s1a5iczgbjaem-8000.proxy.runpod.net/auth/discord/callback`
-- [ ] Create `.env` file on RunPod with:
+- [ ] Update Discord redirect URL to: `https://9s1a5iczgbjaem-8888.proxy.runpod.net/auth/discord/callback`
+- [ ] Update `.env` on RunPod (`/workspace/ProjectMona/mona-brain/.env`):
   ```
   DISCORD_CLIENT_ID=1457044242256887900
   DISCORD_CLIENT_SECRET=<your secret>
-  DISCORD_REDIRECT_URI=https://9s1a5iczgbjaem-8000.proxy.runpod.net/auth/discord/callback
+  DISCORD_REDIRECT_URI=https://9s1a5iczgbjaem-8888.proxy.runpod.net/auth/discord/callback
   FRONTEND_URL=https://project-mona-v1.vercel.app
   ```
-- [ ] Restart backend on RunPod
+- [ ] Start backend on port 8888: `uvicorn main:app --host 0.0.0.0 --port 8888`
+- [ ] Update Vercel env: `NEXT_PUBLIC_BACKEND_URL=https://9s1a5iczgbjaem-8888.proxy.runpod.net`
 - [ ] Test Discord login flow
 
 ### 2. Fix GPT-SoVITS Startup
