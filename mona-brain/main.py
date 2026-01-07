@@ -113,11 +113,17 @@ app = FastAPI(title="Mona Brain API", lifespan=lifespan)
 app.include_router(auth_router)
 
 # CORS configuration for Next.js frontend
-# Allow all origins for mobile compatibility (audio playback requires permissive CORS)
+# Need specific origins for OAuth (credentials require non-wildcard origins)
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://project-mona-v1.vercel.app",
+    os.getenv("FRONTEND_URL", "http://localhost:3000"),
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for mobile audio playback
-    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,  # Required for OAuth cookies
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],  # Expose all headers to client

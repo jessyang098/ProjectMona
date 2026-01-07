@@ -1,5 +1,32 @@
 # Project Mona - TODO
 
+## Critical Next Steps
+
+### 1. Discord OAuth Setup (IN PROGRESS)
+- [x] Discord app created (Client ID: 1457044242256887900)
+- [x] Redirect URL added: `https://9s1a5iczgbjaem-8000.proxy.runpod.net/auth/discord/callback`
+- [ ] Create `.env` file on RunPod with:
+  ```
+  DISCORD_CLIENT_ID=1457044242256887900
+  DISCORD_CLIENT_SECRET=<your secret>
+  DISCORD_REDIRECT_URI=https://9s1a5iczgbjaem-8000.proxy.runpod.net/auth/discord/callback
+  FRONTEND_URL=https://project-mona-v1.vercel.app
+  ```
+- [ ] Restart backend on RunPod
+- [ ] Test Discord login flow
+
+### 2. Fix GPT-SoVITS Startup
+- [ ] Run: `pip uninstall peft transformers -y && pip install --no-cache-dir peft==0.12.0 transformers==4.44.0`
+- [ ] Run: `python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng')"`
+- [ ] Restart GPT-SoVITS server
+
+### 3. Memory Persistence (After auth works)
+- [ ] Add `Memory` table to SQLite database
+- [ ] Persist extracted memories (name, preferences, events)
+- [ ] Load memories on user connect
+
+---
+
 ## Memory Persistence
 
 Currently, Mona's memory system has a gap:
