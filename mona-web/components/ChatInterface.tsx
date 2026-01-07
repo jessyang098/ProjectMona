@@ -8,6 +8,7 @@ import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./AvatarStage";
 import LoginPrompt from "./LoginPrompt";
+import UserMenu from "./UserMenu";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions } from "@/lib/poseCommands";
@@ -322,20 +323,8 @@ export default function ChatInterface() {
             </div>
           </div>
 
-          {/* Guest message counter / Sign in button */}
-          {!isAuthenticated && (
-            <button
-              onClick={() => setShowLoginPrompt(true)}
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
-            >
-              {guestMessagesRemaining !== null && (
-                <span className={guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/80"}>
-                  {guestMessagesRemaining} left
-                </span>
-              )}
-              <span className="text-purple-300">Sign in</span>
-            </button>
-          )}
+          {/* User menu / Sign in */}
+          <UserMenu onOpenLogin={() => setShowLoginPrompt(true)} />
         </header>
 
         {/* Chat panel - extends up from the chat button */}
