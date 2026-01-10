@@ -59,6 +59,7 @@ next-env.d.ts
 
 # Third-party code (not owned by this project)
 riko_project_patreon-main/
+riko_project_patreon-main-2/
 gpt-sovits/
 
 # Generated audio cache
