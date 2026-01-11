@@ -65,3 +65,12 @@ gpt-sovits/
 # Generated audio cache
 mona-brain/assets/audio_cache/*.mp3
 mona-brain/assets/audio_cache/*.wav
+
+# Local documentation (not tracked)
+DEPLOYMENT_GUIDE.md
+FIX_RUNPOD.md
+QUICKSTART.md
+REMINDERS.md
+RUNPOD_SETUP.md
+SETUP.md
+TODO.md
