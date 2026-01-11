@@ -46,7 +46,13 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: str
+    nickname: Optional[str] = None
     avatar_url: Optional[str] = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Request body for profile updates."""
+    nickname: Optional[str] = None
 
 
 class GuestStatusResponse(BaseModel):
@@ -352,6 +358,37 @@ async def get_me(user: User = Depends(get_current_user)):
         id=user.id,
         email=user.email,
         name=user.name,
+        nickname=user.nickname,
+        avatar_url=user.avatar_url,
+    )
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    profile: ProfileUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update user profile (nickname, etc.)."""
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    # Update nickname if provided
+    if profile.nickname is not None:
+        # Allow empty string to clear nickname, or set new value
+        user.nickname = profile.nickname if profile.nickname else None
+
+    await db.commit()
+    await db.refresh(user)
+
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        nickname=user.nickname,
         avatar_url=user.avatar_url,
     )
 

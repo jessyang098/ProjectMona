@@ -24,6 +24,7 @@ class User(Base):
     discord_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
+    nickname: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # What Mona calls the user
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
