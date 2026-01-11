@@ -8,6 +8,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  nickname?: string;
   avatarUrl?: string;
 }
 
@@ -21,6 +22,7 @@ interface AuthContextType {
   isGuestLimitReached: boolean;
   login: () => void;
   logout: () => Promise<void>;
+  updateUser: (user: User) => void;
   updateGuestStatus: (remaining: number) => void;
   setGuestLimitReached: (reached: boolean) => void;
   resetGuestSession: () => string;
@@ -129,6 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setGuestSessionId(sessionId);
   }, []);
 
+  const updateUser = useCallback((updatedUser: User) => {
+    setUser(updatedUser);
+  }, []);
+
   const updateGuestStatus = useCallback((remaining: number) => {
     setGuestMessagesRemaining(remaining);
     if (remaining <= 0) {
@@ -158,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isGuestLimitReached,
         login,
         logout,
+        updateUser,
         updateGuestStatus,
         setGuestLimitReached: setIsGuestLimitReached,
         resetGuestSession,

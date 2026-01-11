@@ -4,11 +4,15 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAudioContext } from "@/hooks/useAudioContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./AvatarStage";
 import LoginPrompt from "./LoginPrompt";
 import UserMenu from "./UserMenu";
+import ProfileModal from "./ProfileModal";
+import SettingsModal from "./SettingsModal";
+import ShopModal from "./ShopModal";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions } from "@/lib/poseCommands";
@@ -27,8 +31,12 @@ export default function ChatInterface() {
   const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
   const [showOutfitMenu, setShowOutfitMenu] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showShopModal, setShowShopModal] = useState(false);
   const [isInitialPrompt, setIsInitialPrompt] = useState(false);
   const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
+  const [volume, setVolume] = useState(1);
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
     shirt: true,
     skirt: true,
@@ -45,6 +53,7 @@ export default function ChatInterface() {
   const audioChunksRef = useRef<Blob[]>([]);
 
   const { isAuthenticated, isLoading: isAuthLoading, updateGuestStatus, setGuestLimitReached, resetGuestSession } = useAuth();
+  const { isDarkMode, setDarkMode } = useTheme();
 
   // WebSocket callbacks
   const handleGuestLimitReached = useCallback((messagesUsed: number, messageLimit: number) => {
@@ -277,6 +286,28 @@ export default function ChatInterface() {
         isInitialPrompt={isInitialPrompt}
       />
 
+      {/* Profile modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
+
+      {/* Settings modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        volume={volume}
+        onVolumeChange={setVolume}
+        isDarkMode={isDarkMode}
+        onDarkModeChange={setDarkMode}
+      />
+
+      {/* Shop modal */}
+      <ShopModal
+        isOpen={showShopModal}
+        onClose={() => setShowShopModal(false)}
+      />
+
       {/* Audio enablement overlay - shown for authenticated users who haven't enabled audio */}
       {!audioEnabled && isAuthenticated && (
         <div
@@ -324,7 +355,12 @@ export default function ChatInterface() {
           </div>
 
           {/* User menu / Sign in */}
-          <UserMenu onOpenLogin={() => setShowLoginPrompt(true)} />
+          <UserMenu
+            onOpenLogin={() => setShowLoginPrompt(true)}
+            onOpenProfile={() => setShowProfileModal(true)}
+            onOpenSettings={() => setShowSettingsModal(true)}
+            onOpenShop={() => setShowShopModal(true)}
+          />
         </header>
 
         {/* Chat panel - extends up from the chat button */}
