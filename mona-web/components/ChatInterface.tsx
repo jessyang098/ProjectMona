@@ -306,6 +306,11 @@ export default function ChatInterface() {
       <ShopModal
         isOpen={showShopModal}
         onClose={() => setShowShopModal(false)}
+        isAuthenticated={isAuthenticated}
+        onOpenLogin={() => {
+          setShowShopModal(false);
+          setShowLoginPrompt(true);
+        }}
       />
 
       {/* Audio enablement overlay - shown for authenticated users who haven't enabled audio */}

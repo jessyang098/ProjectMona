@@ -32,20 +32,35 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
     setIsOpen(false);
   };
 
-  // Not authenticated - show sign in button
+  // Not authenticated - show shop button and sign in button
   if (!isAuthenticated) {
     return (
-      <button
-        onClick={onOpenLogin}
-        className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
-      >
-        {guestMessagesRemaining !== null && (
-          <span className={`text-xs ${guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/60"}`}>
-            {guestMessagesRemaining} left
-          </span>
-        )}
-        <span className="font-medium">Sign in</span>
-      </button>
+      <div className="pointer-events-auto flex items-center gap-2">
+        {/* Shop button - always visible */}
+        <button
+          onClick={onOpenShop}
+          className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+          title="Shop"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          <span className="hidden sm:inline font-medium">Shop</span>
+        </button>
+
+        {/* Sign in button */}
+        <button
+          onClick={onOpenLogin}
+          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+        >
+          {guestMessagesRemaining !== null && (
+            <span className={`text-xs ${guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/60"}`}>
+              {guestMessagesRemaining} left
+            </span>
+          )}
+          <span className="font-medium">Sign in</span>
+        </button>
+      </div>
     );
   }
 

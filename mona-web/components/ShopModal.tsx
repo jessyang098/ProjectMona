@@ -7,6 +7,8 @@ type ShopTab = "characters" | "outfits" | "voices" | "premium";
 interface ShopModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isAuthenticated?: boolean;
+  onOpenLogin?: () => void;
 }
 
 // Placeholder data - will be replaced with real data from backend
@@ -123,10 +125,26 @@ const SUBSCRIPTION = {
   ],
 };
 
-export default function ShopModal({ isOpen, onClose }: ShopModalProps) {
+export default function ShopModal({ isOpen, onClose, isAuthenticated = false, onOpenLogin }: ShopModalProps) {
   const [activeTab, setActiveTab] = useState<ShopTab>("characters");
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   if (!isOpen) return null;
+
+  const handlePurchaseClick = () => {
+    if (!isAuthenticated) {
+      setShowLoginPrompt(true);
+    } else {
+      // TODO: Handle actual purchase
+      console.log("Purchase clicked");
+    }
+  };
+
+  const handleLoginFromShop = () => {
+    setShowLoginPrompt(false);
+    onClose();
+    onOpenLogin?.();
+  };
 
   const tabs: { id: ShopTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -219,17 +237,48 @@ export default function ShopModal({ isOpen, onClose }: ShopModalProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
-          {activeTab === "characters" && <CharactersTab />}
-          {activeTab === "outfits" && <OutfitsTab />}
-          {activeTab === "voices" && <VoicesTab />}
-          {activeTab === "premium" && <SubscriptionTab />}
+          {activeTab === "characters" && <CharactersTab onPurchase={handlePurchaseClick} />}
+          {activeTab === "outfits" && <OutfitsTab onPurchase={handlePurchaseClick} />}
+          {activeTab === "voices" && <VoicesTab onPurchase={handlePurchaseClick} />}
+          {activeTab === "premium" && <SubscriptionTab onPurchase={handlePurchaseClick} />}
         </div>
+
+        {/* Login Prompt Overlay */}
+        {showLoginPrompt && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-black/60 backdrop-blur-sm">
+            <div className="mx-4 max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100">
+                <svg className="h-8 w-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">Sign in to Purchase</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Create an account or sign in to purchase items and unlock premium features.
+              </p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setShowLoginPrompt(false)}
+                  className="flex-1 rounded-xl border-2 border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLoginFromShop}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 py-2.5 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg"
+                >
+                  Sign in
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function CharactersTab() {
+function CharactersTab({ onPurchase }: { onPurchase: () => void }) {
   return (
     <div className="space-y-4">
       {CHARACTERS.map((character) => (
@@ -287,7 +336,10 @@ function CharactersTab() {
                     Coming Soon
                   </button>
                 ) : (
-                  <button className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg hover:shadow-pink-500/30">
+                  <button
+                    onClick={onPurchase}
+                    className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg hover:shadow-pink-500/30"
+                  >
                     Get for ${character.price?.toFixed(2)}
                   </button>
                 )}
@@ -300,7 +352,7 @@ function CharactersTab() {
   );
 }
 
-function OutfitsTab() {
+function OutfitsTab({ onPurchase }: { onPurchase: () => void }) {
   return (
     <div className="grid grid-cols-2 gap-4">
       {OUTFITS.map((outfit) => (
@@ -355,7 +407,10 @@ function OutfitsTab() {
                   Coming Soon
                 </button>
               ) : (
-                <button className="w-full rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 py-2 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg">
+                <button
+                  onClick={onPurchase}
+                  className="w-full rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 py-2 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg"
+                >
                   ${outfit.price?.toFixed(2)}
                 </button>
               )}
@@ -367,7 +422,7 @@ function OutfitsTab() {
   );
 }
 
-function VoicesTab() {
+function VoicesTab({ onPurchase }: { onPurchase: () => void }) {
   return (
     <div className="space-y-3">
       {VOICES.map((voice) => (
@@ -437,7 +492,10 @@ function VoicesTab() {
                   Soon
                 </button>
               ) : (
-                <button className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg">
+                <button
+                  onClick={onPurchase}
+                  className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition hover:shadow-lg"
+                >
                   ${voice.price?.toFixed(2)}
                 </button>
               )}
@@ -449,7 +507,7 @@ function VoicesTab() {
   );
 }
 
-function SubscriptionTab() {
+function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
   return (
     <div className="flex flex-col items-center">
       {/* Premium Card */}
@@ -498,7 +556,10 @@ function SubscriptionTab() {
           </div>
 
           {/* Subscribe button */}
-          <button className="mt-6 w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-500 py-4 text-lg font-bold text-white shadow-xl shadow-pink-500/30 transition-all hover:shadow-2xl hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98]">
+          <button
+            onClick={onPurchase}
+            className="mt-6 w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-500 py-4 text-lg font-bold text-white shadow-xl shadow-pink-500/30 transition-all hover:shadow-2xl hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98]"
+          >
             Subscribe Now
           </button>
 
