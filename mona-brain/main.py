@@ -76,10 +76,6 @@ async def lifespan(_app: FastAPI):
         # Initialize with default settings (uses RunPod server or local if available)
         mona_tts_sovits = MonaTTSSoVITS()
         print(f"✓ Mona GPT-SoVITS initialized (using RunPod GPU server)")
-
-        # Pre-warm the model to avoid slow first request
-        import asyncio
-        asyncio.create_task(mona_tts_sovits.warmup())
     except Exception as e:
         print(f"⚠ Warning: Could not initialize GPT-SoVITS - {e}")
         print("⚠ Will fall back to OpenAI TTS.")
@@ -106,6 +102,42 @@ async def lifespan(_app: FastAPI):
     except Exception as e:
         print(f"⚠ Warning: Could not initialize Whisper - {e}")
         openai_client = None
+
+    # Pre-warm models in background to speed up first user experience
+    async def startup_warmup():
+        """Warm up GPT-SoVITS and pre-cache the welcome greeting."""
+        # 1. Warm up GPT-SoVITS model (loads into GPU)
+        if mona_tts_sovits:
+            await mona_tts_sovits.warmup()
+
+            # 2. Pre-cache the welcome greeting so first user gets instant voice
+            welcome_text = "Hi! I'm Mona! I'm so happy to meet you!"
+            print(f"🎤 Pre-caching welcome greeting...")
+            try:
+                audio_path, _ = await mona_tts_sovits.generate_speech(welcome_text)
+                if audio_path:
+                    print(f"✓ Welcome greeting cached: {audio_path}")
+                else:
+                    print(f"⚠ Welcome greeting cache failed")
+            except Exception as e:
+                print(f"⚠ Welcome greeting cache error: {e}")
+
+        # 3. Warm up OpenAI LLM connection (reduces first response latency)
+        if mona_llm:
+            print("🔥 Warming up OpenAI LLM connection...")
+            try:
+                # Send a minimal request to establish connection pool
+                await mona_llm.client.chat.completions.create(
+                    model=mona_llm.model,
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=1
+                )
+                print("✓ OpenAI LLM connection warmed up")
+            except Exception as e:
+                print(f"⚠ LLM warmup error: {e}")
+
+    import asyncio
+    asyncio.create_task(startup_warmup())
 
     yield
     # Cleanup on shutdown (if needed)
