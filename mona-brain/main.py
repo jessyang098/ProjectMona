@@ -76,6 +76,10 @@ async def lifespan(_app: FastAPI):
         # Initialize with default settings (uses RunPod server or local if available)
         mona_tts_sovits = MonaTTSSoVITS()
         print(f"✓ Mona GPT-SoVITS initialized (using RunPod GPU server)")
+
+        # Pre-warm the model to avoid slow first request
+        import asyncio
+        asyncio.create_task(mona_tts_sovits.warmup())
     except Exception as e:
         print(f"⚠ Warning: Could not initialize GPT-SoVITS - {e}")
         print("⚠ Will fall back to OpenAI TTS.")

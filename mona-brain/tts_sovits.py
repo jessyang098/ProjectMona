@@ -50,6 +50,61 @@ class MonaTTSSoVITS:
         self.audio_dir = Path(audio_dir)
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
+        # Track if warmup has been done
+        self._warmed_up = False
+
+    async def warmup(self) -> bool:
+        """
+        Pre-warm the GPT-SoVITS model by generating a short test phrase.
+        This loads models into GPU memory so first real request is faster.
+
+        Returns:
+            True if warmup succeeded, False otherwise
+        """
+        if self._warmed_up:
+            print("🔥 GPT-SoVITS already warmed up")
+            return True
+
+        print("🔥 Warming up GPT-SoVITS model...")
+        warmup_text = "Hi!"  # Very short text for quick warmup
+
+        try:
+            payload = {
+                "text": warmup_text,
+                "text_lang": self.text_lang,
+                "ref_audio_path": self.ref_audio_path,
+                "prompt_text": self.prompt_text,
+                "prompt_lang": self.prompt_lang,
+                "speed_factor": self.speed_factor,
+                "text_split_method": "cut0",
+                "streaming_mode": 1,
+            }
+
+            response = requests.post(
+                self.sovits_url,
+                json=payload,
+                timeout=60,  # Allow extra time for first load
+                stream=True
+            )
+
+            if response.status_code == 200:
+                # Just consume the response to trigger model loading
+                for _ in response.iter_content(chunk_size=1024):
+                    pass
+                self._warmed_up = True
+                print("✓ GPT-SoVITS model warmed up successfully!")
+                return True
+            else:
+                print(f"✗ GPT-SoVITS warmup failed: {response.status_code}")
+                return False
+
+        except requests.exceptions.Timeout:
+            print("✗ GPT-SoVITS warmup timed out (model may still be loading)")
+            return False
+        except Exception as e:
+            print(f"✗ GPT-SoVITS warmup error: {e}")
+            return False
+
     def _get_cache_path(self, text: str, format: str = "wav") -> Path:
         """Generate cache file path based on text hash and format."""
         text_hash = hashlib.md5(
