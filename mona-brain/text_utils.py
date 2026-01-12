@@ -19,10 +19,11 @@ def preprocess_tts_text(text: str) -> str:
     if not text:
         return text
 
-    # Replace standalone "tch" tsundere expression only
+    # Replace problematic expressions for TTS
     # Words containing "tch" (watch, catch, etc.) are fine - TTS handles them
     replacements = {
         r'\btch\b': 'tsk',
+        r'\baww+\b': 'awe',  # "aww", "awww" -> "awe" for speech (TTS struggles with double-w)
     }
 
     # Apply replacements (case-insensitive)
