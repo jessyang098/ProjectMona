@@ -33,9 +33,9 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   // Audio queue for pipelined TTS (only for user responses, not greeting)
   const [audioQueue, setAudioQueue] = useState<AudioChunk[]>([]);
   const [expectedChunks, setExpectedChunks] = useState(0);
+  const [hasUserSentMessage, setHasUserSentMessage] = useState(false);  // Track if user has sent a message (exposed to ChatInterface)
   const websocketRef = useRef<WebSocket | null>(null);
   const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
-  const hasUserSentMessageRef = useRef<boolean>(false);  // Track if user has sent a message
 
   useEffect(() => {
     // Get client ID from localStorage for guest persistence, or generate new one
@@ -135,12 +135,8 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         } else if (data.type === "typing") {
           setIsTyping(data.isTyping || false);
         } else if (data.type === "audio_chunk" && data.audioUrl) {
-          // Pipelined TTS: Add audio chunk to queue (only after user has sent a message)
-          // The greeting uses legacy audio_ready, not pipelined chunks
-          if (!hasUserSentMessageRef.current) {
-            console.log("⏭️ [PIPELINE] Ignoring audio chunk - user hasn't sent a message yet");
-            return;
-          }
+          // Pipelined TTS: Add audio chunk to queue
+          // Note: hasUserSentMessage state is used by ChatInterface to know not to play greeting
 
           const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
           const chunkIndex = data.chunkIndex ?? 0;
@@ -255,8 +251,8 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
 
   const sendMessage = useCallback((content: string, imageBase64?: string) => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
-      // Mark that user has sent a message - this enables pipelined audio queue
-      hasUserSentMessageRef.current = true;
+      // Mark that user has sent a message - this tells ChatInterface not to play greeting anymore
+      setHasUserSentMessage(true);
 
       // Store image for when we receive the echoed message back
       if (imageBase64) {
@@ -286,6 +282,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     guestMessagesRemaining,
     audioQueue,  // Expose audio queue for playback
     expectedChunks,
+    hasUserSentMessage,  // True after first user message - ChatInterface uses this to not replay greeting
     sendMessage,
   };
 }

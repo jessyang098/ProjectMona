@@ -68,7 +68,7 @@ export default function ChatInterface() {
     }
   }, [updateGuestStatus]);
 
-  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, audioQueue, sendMessage } = useWebSocket(WEBSOCKET_URL, {
+  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, audioQueue, hasUserSentMessage, sendMessage } = useWebSocket(WEBSOCKET_URL, {
     onGuestLimitReached: handleGuestLimitReached,
     onAuthStatus: handleAuthStatus,
   });
@@ -77,20 +77,20 @@ export default function ChatInterface() {
 
   // Get the latest audio URL and lip sync data from Mona's messages
   // Note: Only use this for legacy single-audio mode (welcome message)
-  // When audioQueue has items, pipelined mode is active and audioUrl should be ignored
+  // After user sends first message, pipelined mode takes over and audioUrl is ignored
   const latestMonaMessageWithAudio = messages
     .slice()
     .reverse()
     .find((msg) => msg.sender === "mona" && msg.audioUrl);
 
-  // Don't pass audioUrl when in pipelined mode (audioQueue has items)
-  // This prevents the greeting from replaying when a new response is being played via queue
-  const latestAudioUrl = audioQueue.length > 0 ? undefined : latestMonaMessageWithAudio?.audioUrl;
-  const latestLipSync = audioQueue.length > 0 ? undefined : latestMonaMessageWithAudio?.lipSync;
+  // Don't pass audioUrl after user has sent a message - pipelined mode handles responses
+  // This prevents the greeting from replaying when responses come in
+  const latestAudioUrl = hasUserSentMessage ? undefined : latestMonaMessageWithAudio?.audioUrl;
+  const latestLipSync = hasUserSentMessage ? undefined : latestMonaMessageWithAudio?.lipSync;
 
   useEffect(() => {
-    console.log("🎵 Latest audio URL updated:", latestAudioUrl, "(queue length:", audioQueue.length, ")");
-  }, [latestAudioUrl, audioQueue.length]);
+    console.log("🎵 Latest audio URL updated:", latestAudioUrl, "(hasUserSentMessage:", hasUserSentMessage, ")");
+  }, [latestAudioUrl, hasUserSentMessage]);
 
   // Enable audio on first user interaction
   const enableAudio = async () => {
