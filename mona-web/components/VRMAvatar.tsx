@@ -59,6 +59,9 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Sakura - VRoid Hub model
   "sakura.vrm": { scale: 0.70, position: [0, 0.10, 0], rotateY: Math.PI },
   "/avatars/sakura.vrm": { scale: 0.70, position: [0, 0.10, 0], rotateY: Math.PI },
+  // Cantarella - same settings as Mona
+  "Cantarella.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
+  "/avatars/Cantarella.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
 };
 
 // Default config for unknown avatars
