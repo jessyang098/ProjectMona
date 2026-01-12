@@ -15,7 +15,7 @@ import SettingsModal from "./SettingsModal";
 import ShopModal from "./ShopModal";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
-import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions } from "@/lib/poseCommands";
+import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions, triggerTestSpeak } from "@/lib/poseCommands";
 import { useAnimationState } from "@/hooks/useAnimationState";
 
 const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws";
@@ -158,8 +158,8 @@ export default function ChatInterface() {
     e.preventDefault();
     if (!audioEnabled) enableAudio(); // Enable audio on first interaction
 
-    // Check for test commands (test:crouch, test:lay, test:expr:joy, etc.)
-    const { command, expressionCommand, remainingText } = parseTestCommand(inputValue);
+    // Check for test commands (test:crouch, test:lay, test:expr:joy, test:speak, etc.)
+    const { command, expressionCommand, speakCommand, speakText, remainingText } = parseTestCommand(inputValue);
     if (command) {
       if (command.type === "play" && command.pose) {
         triggerPose(command.pose);
@@ -176,6 +176,12 @@ export default function ChatInterface() {
       } else if (expressionCommand.type === "clear") {
         clearExpressions();
       }
+      setInputValue("");
+      inputRef.current?.blur();
+      return;
+    }
+    if (speakCommand && speakText) {
+      triggerTestSpeak(speakText);
       setInputValue("");
       inputRef.current?.blur();
       return;

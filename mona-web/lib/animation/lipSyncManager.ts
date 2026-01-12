@@ -36,8 +36,9 @@ const DEFAULT_CONFIG: LipSyncConfig = {
   },
 };
 
-// Faster smoothing for closing mouth on silence (between words)
-const SILENCE_SMOOTHING_FACTOR = 0.4;
+// Much faster smoothing for closing mouth on silence (between words)
+// Higher value = faster closing for clearer word separation
+const SILENCE_SMOOTHING_FACTOR = 0.65;
 
 type PhonemeValues = {
   aa: number;
@@ -670,13 +671,15 @@ export class LipSyncManager {
 
     const currentTime = this.audioElement.currentTime;
 
-    // Find the current cue and next cue for interpolation
+    // Find the current cue, previous cue, and next cue for interpolation
+    let prevCue: LipSyncCue | null = null;
     let currentCue: LipSyncCue | null = null;
     let nextCue: LipSyncCue | null = null;
 
     for (let i = 0; i < this.lipSyncCues.length; i++) {
       const cue = this.lipSyncCues[i];
       if (currentTime >= cue.start && currentTime < cue.end) {
+        prevCue = this.lipSyncCues[i - 1] ?? null;
         currentCue = cue;
         nextCue = this.lipSyncCues[i + 1] ?? null;
         break;
@@ -703,15 +706,35 @@ export class LipSyncManager {
         ou: phonemes.ou ?? 0,
       };
 
-      // Interpolate towards next cue if we're near the end of current cue
-      // This creates smoother coarticulation between phonemes
-      if (nextCue && currentCue.end - currentTime < 0.05) {
-        const blendFactor = 1 - ((currentCue.end - currentTime) / 0.05);
+      const cueDuration = currentCue.end - currentCue.start;
+      const timeIntoCue = currentTime - currentCue.start;
+      const timeUntilEnd = currentCue.end - currentTime;
+
+      // Coarticulation: Blend from previous cue at the start (first 30% of cue)
+      // This makes transitions INTO phonemes smoother
+      const blendInWindow = Math.min(0.08, cueDuration * 0.3); // 80ms or 30% of cue
+      if (prevCue && timeIntoCue < blendInWindow) {
+        const blendFactor = timeIntoCue / blendInWindow; // 0 at start, 1 at end of window
+        const { _silence: prevSilence, ...prevPhonemes } = prevCue.phonemes as PhonemeValues & { _silence?: boolean };
+
+        for (const key of ['aa', 'ee', 'ih', 'oh', 'ou'] as const) {
+          const prevVal = prevPhonemes[key] ?? 0;
+          // Blend from previous value toward current
+          targetValues[key] = prevVal + (targetValues[key] - prevVal) * blendFactor;
+        }
+      }
+
+      // Coarticulation: Blend toward next cue at the end (last 30% of cue)
+      // This creates anticipation of the next phoneme
+      const blendOutWindow = Math.min(0.08, cueDuration * 0.3); // 80ms or 30% of cue
+      if (nextCue && timeUntilEnd < blendOutWindow) {
+        const blendFactor = 1 - (timeUntilEnd / blendOutWindow); // 0 at start, 1 at very end
         const { _silence: nextSilence, ...nextPhonemes } = nextCue.phonemes as PhonemeValues & { _silence?: boolean };
 
         for (const key of ['aa', 'ee', 'ih', 'oh', 'ou'] as const) {
           const nextVal = nextPhonemes[key] ?? 0;
-          targetValues[key] = targetValues[key] + (nextVal - targetValues[key]) * blendFactor * 0.5;
+          // Blend toward next value (use 0.6 factor so we don't fully reach next shape)
+          targetValues[key] = targetValues[key] + (nextVal - targetValues[key]) * blendFactor * 0.6;
         }
       }
     }

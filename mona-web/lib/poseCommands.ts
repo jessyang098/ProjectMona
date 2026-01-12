@@ -4,6 +4,7 @@
  */
 
 import type { GestureName } from "./animation/gestureManager";
+import type { LipSyncCue } from "@/types/chat";
 
 export type PoseCommand = {
   type: "play" | "stop";
@@ -16,8 +17,15 @@ export type ExpressionCommand = {
   weight?: number;
 };
 
+export type SpeakCommand = {
+  text: string;
+  lipSync: LipSyncCue[];
+  audioUrl?: string;  // Optional pre-recorded audio file
+};
+
 const POSE_EVENT = "mona:pose";
 const EXPRESSION_EVENT = "mona:expression";
+const SPEAK_EVENT = "mona:speak";
 
 // All available Moe.vrm expressions (case-sensitive!)
 const VALID_EXPRESSIONS = [
@@ -113,40 +121,165 @@ export function onExpressionCommand(callback: (command: ExpressionCommand) => vo
 }
 
 /**
+ * Generate fake lip sync cues based on text length
+ * This creates a pattern of mouth movements for testing
+ */
+function generateTestLipSync(text: string, durationSeconds: number): LipSyncCue[] {
+  const cues: LipSyncCue[] = [];
+  const words = text.split(/\s+/).filter(w => w.length > 0);
+  const wordDuration = durationSeconds / words.length;
+
+  let currentTime = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const syllables = Math.max(1, Math.ceil(word.length / 3)); // Rough syllable estimate
+    const syllableDuration = wordDuration / syllables;
+
+    for (let s = 0; s < syllables; s++) {
+      // Vary mouth shapes based on position
+      const shape = ["D", "C", "E", "F", "B"][s % 5];
+      const phonemes = SHAPE_TO_PHONEMES[shape];
+
+      cues.push({
+        start: currentTime,
+        end: currentTime + syllableDuration * 0.7, // Leave gap for closing
+        shape,
+        phonemes,
+      });
+
+      // Add brief silence between syllables
+      cues.push({
+        start: currentTime + syllableDuration * 0.7,
+        end: currentTime + syllableDuration,
+        shape: "X",
+        phonemes: { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 },
+      });
+
+      currentTime += syllableDuration;
+    }
+
+    // Add pause between words
+    if (i < words.length - 1) {
+      cues.push({
+        start: currentTime,
+        end: currentTime + 0.1,
+        shape: "X",
+        phonemes: { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 },
+      });
+      currentTime += 0.1;
+    }
+  }
+
+  return cues;
+}
+
+// Phoneme mappings matching backend lip_sync.py
+const SHAPE_TO_PHONEMES: Record<string, { aa: number; ee: number; ih: number; oh: number; ou: number }> = {
+  "A": { aa: 0.0, ee: 0.0, ih: 0.0, oh: 0.0, ou: 0.15 },
+  "B": { aa: 0.4, ee: 0.0, ih: 0.25, oh: 0.0, ou: 0.0 },
+  "C": { aa: 0.25, ee: 0.85, ih: 0.2, oh: 0.0, ou: 0.0 },
+  "D": { aa: 0.9, ee: 0.0, ih: 0.1, oh: 0.0, ou: 0.0 },
+  "E": { aa: 0.55, ee: 0.0, ih: 0.0, oh: 0.75, ou: 0.0 },
+  "F": { aa: 0.2, ee: 0.0, ih: 0.0, oh: 0.2, ou: 0.8 },
+  "X": { aa: 0.0, ee: 0.0, ih: 0.0, oh: 0.0, ou: 0.0 },
+};
+
+/**
+ * Trigger test speech - dispatches event for VRMAvatar to handle
+ * Uses pre-recorded test audio if available, otherwise falls back to Web Speech API
+ */
+export function triggerTestSpeak(text: string): void {
+  // Check for test audio file in public folder
+  const testAudioUrl = "/audio/test-greeting.mp3";
+
+  // Estimate duration based on text length
+  const wordsPerSecond = 2.5;
+  const wordCount = text.split(/\s+/).length;
+  const estimatedDuration = wordCount / wordsPerSecond;
+
+  // Generate lip sync cues
+  const lipSync = generateTestLipSync(text, estimatedDuration);
+
+  // Dispatch speak event for the avatar to handle
+  window.dispatchEvent(
+    new CustomEvent<SpeakCommand>(SPEAK_EVENT, {
+      detail: { text, lipSync, audioUrl: testAudioUrl },
+    })
+  );
+
+  console.log(`🎤 Test speak: "${text}" (~${estimatedDuration.toFixed(1)}s, ${lipSync.length} cues)`);
+  console.log(`🎵 Will try test audio: ${testAudioUrl}`);
+}
+
+/**
+ * Listen for speak commands
+ */
+export function onSpeakCommand(callback: (command: SpeakCommand) => void): () => void {
+  const handler = (e: Event) => {
+    const customEvent = e as CustomEvent<SpeakCommand>;
+    callback(customEvent.detail);
+  };
+  window.addEventListener(SPEAK_EVENT, handler);
+  return () => window.removeEventListener(SPEAK_EVENT, handler);
+}
+
+// Default test paragraph for lip sync testing
+const TEST_PARAGRAPH = "Hello! I'm Mona, your virtual companion. I love chatting with you and learning about your day. How are you feeling today? I hope you're having a wonderful time!";
+
+/**
  * Parse test commands from user input
  * Supports:
  *   - test:<pose> - Play a pose (e.g., "test:wave", "test:idle")
  *   - test:expr:<expression> - Set expression (e.g., "test:expr:joy", "test:expr:cheekpuff")
  *   - test:expr:clear - Clear all expressions
+ *   - test:speak - Speak a test paragraph (for lip sync testing without backend)
+ *   - test:speak:<custom text> - Speak custom text
  * Returns the remaining message (without command) or null if it was a command-only message
  */
 export function parseTestCommand(input: string): {
   command: PoseCommand | null;
   expressionCommand: ExpressionCommand | null;
+  speakCommand: boolean;
+  speakText: string | null;
   remainingText: string | null;
 } {
-  const trimmed = input.trim().toLowerCase();
+  const trimmed = input.trim();
+  const lowerTrimmed = trimmed.toLowerCase();
 
   // Check for test: prefix commands
-  if (trimmed.startsWith("test:")) {
-    const command = trimmed.slice(5).trim();
+  if (lowerTrimmed.startsWith("test:")) {
+    const command = lowerTrimmed.slice(5).trim();
+
+    // Check for speak commands: test:speak or test:speak:<text>
+    if (command === "speak" || command.startsWith("speak:")) {
+      const customText = command.startsWith("speak:") ? trimmed.slice(11).trim() : null;
+      const textToSpeak = customText || TEST_PARAGRAPH;
+      return {
+        command: null,
+        expressionCommand: null,
+        speakCommand: true,
+        speakText: textToSpeak,
+        remainingText: null,
+      };
+    }
 
     // Check for expression commands: test:expr:<name>
     if (command.startsWith("expr:")) {
       const exprName = command.slice(5).trim();
 
       if (exprName === "clear") {
-        return { command: null, expressionCommand: { type: "clear" }, remainingText: null };
+        return { command: null, expressionCommand: { type: "clear" }, speakCommand: false, speakText: null, remainingText: null };
       }
 
       if (VALID_EXPRESSIONS.includes(exprName)) {
         // Map to actual VRM expression name (some are case-sensitive)
         const actualName = EXPRESSION_NAME_MAP[exprName] ?? exprName;
-        return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, remainingText: null };
+        return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, speakCommand: false, speakText: null, remainingText: null };
       }
 
       console.warn(`Unknown expression: ${exprName}. Valid: ${VALID_EXPRESSIONS.join(", ")}`);
-      return { command: null, expressionCommand: null, remainingText: input };
+      return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
     }
 
     // Pose commands
@@ -154,27 +287,27 @@ export function parseTestCommand(input: string): {
       case "standing_idle":
       case "standing-idle":
       case "idle":
-        return { command: { type: "play", pose: "standing_idle" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "standing_idle" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "default":
-        return { command: { type: "play", pose: "default" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "default" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "crouch":
-        return { command: { type: "play", pose: "crouch" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "crouch" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "lay":
-        return { command: { type: "play", pose: "lay" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "lay" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "stand":
-        return { command: { type: "play", pose: "stand" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "stand" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "stand1":
-        return { command: { type: "play", pose: "stand1" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "stand1" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "wave":
-        return { command: { type: "play", pose: "wave" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "play", pose: "wave" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "rest":
       case "stop":
-        return { command: { type: "stop" }, expressionCommand: null, remainingText: null };
+        return { command: { type: "stop" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       default:
         console.warn(`Unknown test command: ${command}`);
-        return { command: null, expressionCommand: null, remainingText: input };
+        return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
     }
   }
 
-  return { command: null, expressionCommand: null, remainingText: input };
+  return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
 }

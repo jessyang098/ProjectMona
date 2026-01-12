@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { VRMLookAtQuaternionProxy } from "@pixiv/three-vrm-animation";
 import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
-import { onPoseCommand, onExpressionCommand, type PoseCommand, type ExpressionCommand } from "@/lib/poseCommands";
+import { onPoseCommand, onExpressionCommand, onSpeakCommand, type PoseCommand, type ExpressionCommand, type SpeakCommand } from "@/lib/poseCommands";
 import { setAnimationState } from "@/lib/animationState";
 
 // Procedural animation configuration
@@ -498,6 +498,51 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     return cleanup;
   }, [vrm]);
+
+  // Listen for test speak commands (for lip sync testing without backend)
+  useEffect(() => {
+    if (!vrm) return;
+
+    const cleanup = onSpeakCommand((command: SpeakCommand) => {
+      console.log("🎤 Received speak command:", command.text.substring(0, 50) + "...");
+
+      // Create or reuse LipSyncManager
+      if (!lipSyncRef.current) {
+        const maxMouthOpen = getMaxMouthOpen(url);
+        console.log("📦 Creating new LipSyncManager for test speak");
+        lipSyncRef.current = new LipSyncManager(vrm, {
+          smoothingFactor: 0.2,
+          amplitudeScale: 12.0,
+          amplitudeThreshold: 0.0005,
+          maxMouthOpen,
+        });
+      }
+
+      // Stop any current audio
+      lipSyncRef.current.stop();
+
+      // If we have a test audio URL, try to load and play it
+      if (command.audioUrl) {
+        console.log("🎵 Loading test audio:", command.audioUrl);
+        try {
+          lipSyncRef.current.setupAudio(command.audioUrl);
+          lipSyncRef.current.setLipSyncData(command.lipSync);
+          lipSyncRef.current.play();
+          console.log("✅ Test audio playing with", command.lipSync.length, "lip sync cues");
+        } catch (error) {
+          console.warn("⚠️ Test audio failed, falling back to lip sync only:", error);
+          // Even without audio, we can still animate the mouth using the lip sync data
+          lipSyncRef.current.setLipSyncData(command.lipSync);
+        }
+      } else {
+        // No audio, just animate mouth based on lip sync timing
+        lipSyncRef.current.setLipSyncData(command.lipSync);
+        console.log("👄 Lip sync only mode (no audio)");
+      }
+    });
+
+    return cleanup;
+  }, [vrm, url]);
 
   // Handle audio playback with lip sync
   useEffect(() => {

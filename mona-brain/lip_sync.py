@@ -14,18 +14,21 @@ from typing import Optional, List, Dict, Any
 # Rhubarb outputs: A, B, C, D, E, F, G, H, X
 # VRM uses: aa (jaw open), ee (wide smile), ih (slight smile), oh (round), ou (pucker)
 #
-# Increased intensity values for more visible/accurate lip sync.
-# Real speech requires larger mouth movements to look natural on avatars.
+# Key improvements for natural lip sync:
+# 1. "A" shape (closed mouth M/B/P) now uses ou for lip compression
+# 2. Blend shapes are combined more naturally (real speech uses multiple shapes)
+# 3. Distinct shapes for each phoneme category to improve enunciation
+# 4. "X" (silence) closes mouth completely for clear word boundaries
 RHUBARB_TO_VRM = {
-    "A": {"aa": 0.1, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # Closed mouth (M, B, P) - lips together but not clenched
-    "B": {"aa": 0.5, "ee": 0.0, "ih": 0.2, "oh": 0.0, "ou": 0.0},  # Slightly open (consonants like K, S, T)
-    "C": {"aa": 0.3, "ee": 0.8, "ih": 0.3, "oh": 0.0, "ou": 0.0},  # EE sound (beet, see) - wide mouth
-    "D": {"aa": 0.8, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # AA sound (bat, back) - jaw dropped
-    "E": {"aa": 0.5, "ee": 0.0, "ih": 0.0, "oh": 0.7, "ou": 0.0},  # AH/OH sound (bought, dog) - round open
-    "F": {"aa": 0.3, "ee": 0.0, "ih": 0.0, "oh": 0.3, "ou": 0.7},  # OO sound (boot, two) - puckered
-    "G": {"aa": 0.2, "ee": 0.0, "ih": 0.3, "oh": 0.0, "ou": 0.0},  # F/V sound - teeth on lip, slight opening
-    "H": {"aa": 0.4, "ee": 0.0, "ih": 0.2, "oh": 0.0, "ou": 0.0},  # L sound - tongue up, mouth slightly open
-    "X": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0, "_silence": True},  # Silence/rest - mouth closed (flag for fast decay)
+    "A": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.15},  # Closed mouth (M, B, P) - lips pressed together
+    "B": {"aa": 0.4, "ee": 0.0, "ih": 0.25, "oh": 0.0, "ou": 0.0},  # Slightly open (consonants like K, S, T)
+    "C": {"aa": 0.25, "ee": 0.85, "ih": 0.2, "oh": 0.0, "ou": 0.0},  # EE sound (beet, see) - wide smile, less jaw
+    "D": {"aa": 0.9, "ee": 0.0, "ih": 0.1, "oh": 0.0, "ou": 0.0},  # AA sound (bat, back) - jaw dropped wide
+    "E": {"aa": 0.55, "ee": 0.0, "ih": 0.0, "oh": 0.75, "ou": 0.0},  # AH/OH sound (bought, dog) - round open
+    "F": {"aa": 0.2, "ee": 0.0, "ih": 0.0, "oh": 0.2, "ou": 0.8},  # OO sound (boot, two) - tight pucker
+    "G": {"aa": 0.15, "ee": 0.0, "ih": 0.35, "oh": 0.0, "ou": 0.0},  # F/V sound - teeth on lip, slight tension
+    "H": {"aa": 0.35, "ee": 0.0, "ih": 0.15, "oh": 0.0, "ou": 0.0},  # L sound - tongue up, mouth slightly open
+    "X": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0, "_silence": True},  # Silence/rest - mouth fully closed
 }
 
 
