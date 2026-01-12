@@ -60,7 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (response.ok) {
           const userData = await response.json();
-          setUser(userData);
+          // Map backend snake_case to frontend camelCase
+          setUser({
+            id: userData.id,
+            email: userData.email,
+            name: userData.name || userData.email?.split("@")[0] || "User",
+            nickname: userData.nickname,
+            avatarUrl: userData.avatar_url,
+          });
         } else {
           // Not authenticated, set up guest session
           const sessionId = getGuestSessionId();
@@ -102,7 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fetch(`${BACKEND_URL}/auth/me`, { credentials: "include" })
         .then((res) => res.json())
         .then((userData) => {
-          setUser(userData);
+          // Map backend snake_case to frontend camelCase
+          setUser({
+            id: userData.id,
+            email: userData.email,
+            name: userData.name || userData.email?.split("@")[0] || "User",
+            nickname: userData.nickname,
+            avatarUrl: userData.avatar_url,
+          });
           setGuestSessionId(null);
           setGuestMessagesRemaining(null);
           setIsGuestLimitReached(false);

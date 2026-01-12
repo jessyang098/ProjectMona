@@ -74,13 +74,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       onClick={onClose}
     >
       <div
-        className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+        className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
         >
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -88,7 +88,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         </button>
 
         {/* Header */}
-        <h2 className="mb-6 text-xl font-bold text-slate-900">Profile</h2>
+        <h2 className="mb-6 text-xl font-bold text-slate-900 dark:text-white">Profile</h2>
 
         {/* Avatar and Name Display */}
         <div className="mb-6 flex items-center gap-4">
@@ -96,25 +96,25 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             {user.avatarUrl ? (
               <Image
                 src={user.avatarUrl}
-                alt={user.name}
+                alt={user.name || "User"}
                 fill
                 className="object-cover"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-2xl font-medium text-slate-500">
-                {user.name.charAt(0).toUpperCase()}
+                {(user.name || user.email || "U").charAt(0).toUpperCase()}
               </div>
             )}
           </div>
           <div>
-            <p className="font-medium text-slate-900">{user.name}</p>
-            <p className="text-sm text-slate-500">{user.email}</p>
+            <p className="font-medium text-slate-900 dark:text-white">{user.name || "User"}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
           </div>
         </div>
 
         {/* Nickname Input */}
         <div className="mb-6">
-          <label htmlFor="nickname" className="mb-2 block text-sm font-medium text-slate-700">
+          <label htmlFor="nickname" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
             What should Mona call you?
           </label>
           <input
@@ -124,9 +124,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             onChange={(e) => setNickname(e.target.value)}
             placeholder="Enter a nickname..."
             maxLength={50}
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-100"
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-100 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
           />
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
             Mona will use this name when talking to you. Leave empty to use your account name.
           </p>
         </div>
