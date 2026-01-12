@@ -75,6 +75,9 @@ export class LipSyncManager {
   // Track if we're supposed to be playing (even if blocked by autoplay)
   private shouldBePlaying: boolean = false;
 
+  // Callback for when audio ends (for queued playback)
+  private onAudioEndedCallback: (() => void) | null = null;
+
   constructor(vrm: VRM, config: Partial<LipSyncConfig> = {}) {
     this.vrm = vrm;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -421,6 +424,10 @@ export class LipSyncManager {
       this.audioElement.onended = () => {
         console.log("📱 [Mobile] Audio ended event fired");
         this.shouldBePlaying = false; // Audio finished, stop lip sync
+        // Call the callback for queued audio playback
+        if (this.onAudioEndedCallback) {
+          this.onAudioEndedCallback();
+        }
       };
       this.audioElement.onstalled = () => console.log("📱 [Mobile] Audio stalled event - network issue");
       this.audioElement.onwaiting = () => console.log("📱 [Mobile] Audio waiting event - buffering");
@@ -443,6 +450,10 @@ export class LipSyncManager {
       this.audioElement.onended = () => {
         console.log("🖥️ [Desktop] Audio ended event fired");
         this.shouldBePlaying = false;
+        // Call the callback for queued audio playback
+        if (this.onAudioEndedCallback) {
+          this.onAudioEndedCallback();
+        }
       };
       this.audioElement.onerror = () => {
         if (this.audioElement?.error) {
@@ -505,6 +516,13 @@ export class LipSyncManager {
     }
     this.mobileAnimationTimer = 0; // Reset mobile fallback animation
     this.resetMouth();
+  }
+
+  /**
+   * Set callback for when audio playback ends (for queued playback)
+   */
+  setOnAudioEnded(callback: (() => void) | null): void {
+    this.onAudioEndedCallback = callback;
   }
 
   /**

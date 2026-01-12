@@ -68,7 +68,7 @@ export default function ChatInterface() {
     }
   }, [updateGuestStatus]);
 
-  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, sendMessage } = useWebSocket(WEBSOCKET_URL, {
+  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, audioQueue, sendMessage } = useWebSocket(WEBSOCKET_URL, {
     onGuestLimitReached: handleGuestLimitReached,
     onAuthStatus: handleAuthStatus,
   });
@@ -331,7 +331,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} audioQueue={audioEnabled ? audioQueue : []} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>

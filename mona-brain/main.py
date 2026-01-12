@@ -27,7 +27,7 @@ from config import GUEST_MESSAGE_LIMIT
 from personality_loader import load_personality_from_yaml
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
-from text_utils import preprocess_tts_text
+from text_utils import preprocess_tts_text, extract_complete_sentences
 from openai import OpenAI
 
 # Initialize LLM and TTS (will be created on startup)
@@ -503,11 +503,50 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             # Generate response using LLM or fallback to dummy
             if mona_llm:
                 try:
+                    # Pipelined TTS: Track accumulated text and sentences already sent for TTS
+                    accumulated_text = ""
+                    sentences_sent_for_tts = set()
+                    audio_chunk_index = 0
+                    tts_tasks = []
+
+                    async def generate_sentence_audio(sentence: str, chunk_idx: int):
+                        """Generate TTS for a single sentence and send as audio chunk."""
+                        tts_text = preprocess_tts_text(sentence)
+                        audio_url = None
+                        lip_sync_data = None
+
+                        # Try GPT-SoVITS first
+                        if mona_tts_sovits:
+                            audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                            if audio_path:
+                                audio_url = f"/audio/{Path(audio_path).name}"
+                                print(f"✓ [PIPELINE] Chunk {chunk_idx}: GPT-SoVITS audio ready")
+
+                        # Fallback to OpenAI TTS
+                        if not audio_url and mona_tts:
+                            audio_path = await mona_tts.generate_speech(tts_text)
+                            if audio_path:
+                                audio_url = f"/audio/{Path(audio_path).name}"
+                                print(f"✓ [PIPELINE] Chunk {chunk_idx}: OpenAI TTS audio ready")
+
+                        if audio_url:
+                            audio_chunk = {
+                                "type": "audio_chunk",
+                                "audioUrl": audio_url,
+                                "lipSync": lip_sync_data,
+                                "chunkIndex": chunk_idx,
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                            await manager.send_message(audio_chunk, client_id)
+
                     async for event in mona_llm.stream_response(client_id, user_content, image_base64):
                         if event["event"] == "chunk":
+                            chunk_content = event.get("content", "")
+                            accumulated_text += chunk_content
+
                             chunk_message = {
                                 "type": "message_chunk",
-                                "content": event.get("content", ""),
+                                "content": chunk_content,
                                 "sender": "mona",
                                 "timestamp": datetime.now().isoformat(),
                             }
@@ -515,6 +554,17 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                             if typing_indicator["isTyping"]:
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
+
+                            # Check for complete sentences and start TTS immediately
+                            complete_sentences, remaining = extract_complete_sentences(accumulated_text)
+                            for sentence in complete_sentences:
+                                if sentence not in sentences_sent_for_tts:
+                                    sentences_sent_for_tts.add(sentence)
+                                    print(f"🎤 [PIPELINE] Starting TTS for sentence {audio_chunk_index}: '{sentence[:50]}...'")
+                                    task = asyncio.create_task(generate_sentence_audio(sentence, audio_chunk_index))
+                                    tts_tasks.append(task)
+                                    audio_chunk_index += 1
+
                         elif event["event"] in {"complete", "error"}:
                             # Send text message immediately (without audio)
                             mona_content = event.get("content", "")
@@ -525,13 +575,41 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                 "sender": "mona",
                                 "timestamp": datetime.now().isoformat(),
                                 "emotion": emotion_info,
-                                "audioUrl": None,  # Will update later
+                                "audioUrl": None,  # Audio comes via chunks
+                                "totalAudioChunks": audio_chunk_index,  # Tell frontend how many to expect
                             }
                             # Stop typing indicator before final payload
                             if typing_indicator["isTyping"]:
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
                             await manager.send_message(response_message, client_id)
+
+                            # Process any remaining text that wasn't a complete sentence
+                            if mona_content:
+                                # Get the final remaining text not yet sent for TTS
+                                _, remaining_text = extract_complete_sentences(mona_content)
+                                # Actually, just check what sentences we haven't processed
+                                all_sentences = mona_content.replace('!', '.').replace('?', '.').split('.')
+                                all_sentences = [s.strip() for s in all_sentences if s.strip()]
+
+                                # Make sure all parts get TTS'd (handles final fragment)
+                                final_remaining = accumulated_text
+                                for sent in sentences_sent_for_tts:
+                                    final_remaining = final_remaining.replace(sent, '', 1)
+                                final_remaining = final_remaining.strip()
+
+                                if final_remaining and final_remaining not in sentences_sent_for_tts:
+                                    print(f"🎤 [PIPELINE] Starting TTS for final fragment: '{final_remaining[:50]}...'")
+                                    task = asyncio.create_task(generate_sentence_audio(final_remaining, audio_chunk_index))
+                                    tts_tasks.append(task)
+                                    audio_chunk_index += 1
+
+                            # Send signal that all audio chunks have been queued
+                            await manager.send_message({
+                                "type": "audio_complete",
+                                "totalChunks": audio_chunk_index,
+                                "timestamp": datetime.now().isoformat(),
+                            }, client_id)
 
                             # Save Mona's response to database (for authenticated users)
                             if user and mona_content:
@@ -544,43 +622,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                     )
                                     db.add(chat_msg)
                                     await db.commit()
-
-                            # Generate TTS audio in background (non-blocking)
-                            if event.get("content"):
-                                async def generate_audio_background():
-                                    # Preprocess text to remove problematic phonemes
-                                    tts_text = preprocess_tts_text(event["content"])
-
-                                    audio_url = None
-                                    lip_sync_data = None
-                                    # Try GPT-SoVITS first (high-quality anime voice)
-                                    if mona_tts_sovits:
-                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
-                                        if audio_path:
-                                            audio_url = f"/audio/{Path(audio_path).name}"
-                                            print(f"✓ Using GPT-SoVITS audio")
-                                            if lip_sync_data:
-                                                print(f"✓ Lip sync: {len(lip_sync_data)} cues")
-
-                                    # Fall back to OpenAI TTS if SoVITS failed or unavailable
-                                    if not audio_url and mona_tts:
-                                        audio_path = await mona_tts.generate_speech(tts_text)
-                                        if audio_path:
-                                            audio_url = f"/audio/{Path(audio_path).name}"
-                                            print(f"✓ Using OpenAI TTS audio (fallback)")
-
-                                    # Send audio update when ready
-                                    if audio_url:
-                                        audio_update = {
-                                            "type": "audio_ready",
-                                            "audioUrl": audio_url,
-                                            "lipSync": lip_sync_data,  # Include lip sync timing data
-                                            "timestamp": datetime.now().isoformat(),
-                                        }
-                                        await manager.send_message(audio_update, client_id)
-
-                                # Start audio generation without awaiting
-                                asyncio.create_task(generate_audio_background())
                 except Exception as e:
                     print(f"LLM Error: {e}")
                     fallback_message = {

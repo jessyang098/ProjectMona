@@ -34,6 +34,65 @@ def preprocess_tts_text(text: str) -> str:
     return cleaned
 
 
+def split_into_sentences(text: str) -> list[str]:
+    """
+    Split text into sentences for pipelined TTS generation.
+
+    Args:
+        text: Full text to split
+
+    Returns:
+        List of sentence strings
+    """
+    if not text:
+        return []
+
+    # Split on sentence-ending punctuation followed by space or end of string
+    # Keep the punctuation with each sentence
+    pattern = r'(?<=[.!?])\s+'
+    sentences = re.split(pattern, text.strip())
+
+    # Filter out empty strings and very short fragments
+    sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 1]
+
+    return sentences
+
+
+def extract_complete_sentences(text: str) -> tuple[list[str], str]:
+    """
+    Extract complete sentences from streaming text, returning remaining incomplete text.
+
+    Args:
+        text: Accumulated streaming text
+
+    Returns:
+        Tuple of (list of complete sentences, remaining incomplete text)
+    """
+    if not text:
+        return [], ""
+
+    # Find the last sentence-ending punctuation
+    last_end = -1
+    for i, char in enumerate(text):
+        if char in '.!?':
+            # Check if this is likely end of sentence (not abbreviation like "Mr." or "e.g.")
+            # Simple heuristic: followed by space and capital letter, or end of string
+            if i == len(text) - 1:
+                last_end = i
+            elif i < len(text) - 1 and text[i + 1] == ' ':
+                last_end = i
+
+    if last_end == -1:
+        # No complete sentences yet
+        return [], text
+
+    complete_part = text[:last_end + 1]
+    remaining = text[last_end + 1:].strip()
+
+    sentences = split_into_sentences(complete_part)
+    return sentences, remaining
+
+
 def clean_llm_output(text: str) -> str:
     """
     Clean up LLM output artifacts like markdown, asterisks, etc.

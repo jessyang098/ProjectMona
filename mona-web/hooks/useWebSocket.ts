@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { EmotionData, Message, WebSocketMessage } from "@/types/chat";
+import { AudioChunk, EmotionData, Message, WebSocketMessage } from "@/types/chat";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -30,6 +30,9 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [latestEmotion, setLatestEmotion] = useState<EmotionData | null>(null);
   const [guestMessagesRemaining, setGuestMessagesRemaining] = useState<number | null>(null);
+  // Audio queue for pipelined TTS
+  const [audioQueue, setAudioQueue] = useState<AudioChunk[]>([]);
+  const [expectedChunks, setExpectedChunks] = useState(0);
   const websocketRef = useRef<WebSocket | null>(null);
   const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
 
@@ -82,11 +85,17 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
             hasEmotion: !!newMessage.emotion,
             hasImage: !!newMessage.imageUrl,
             audioUrl: newMessage.audioUrl,
+            totalAudioChunks: data.totalAudioChunks,
           });
 
-          // If this is Mona's message without audio, start generating audio
-          if (data.sender === "mona" && !audioUrl) {
-            setIsGeneratingAudio(true);
+          // If this is Mona's message, prepare for audio chunks
+          if (data.sender === "mona") {
+            // Reset audio queue for new message
+            setAudioQueue([]);
+            setExpectedChunks(data.totalAudioChunks || 0);
+            if (!audioUrl && data.totalAudioChunks && data.totalAudioChunks > 0) {
+              setIsGeneratingAudio(true);
+            }
           }
 
           setMessages((prev) => {
@@ -124,8 +133,52 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           });
         } else if (data.type === "typing") {
           setIsTyping(data.isTyping || false);
+        } else if (data.type === "audio_chunk" && data.audioUrl) {
+          // Pipelined TTS: Add audio chunk to queue
+          const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
+          const chunkIndex = data.chunkIndex ?? 0;
+
+          console.log(`🎵 [PIPELINE] Audio chunk ${chunkIndex} ready:`, fullAudioUrl);
+          if (data.lipSync) {
+            console.log(`👄 [PIPELINE] Chunk ${chunkIndex} lip sync:`, data.lipSync.length, "cues");
+          }
+
+          const newChunk: AudioChunk = {
+            audioUrl: fullAudioUrl,
+            lipSync: data.lipSync,
+            chunkIndex: chunkIndex,
+          };
+
+          setAudioQueue((prev) => {
+            // Insert in order by chunkIndex
+            const next = [...prev, newChunk].sort((a, b) => a.chunkIndex - b.chunkIndex);
+            return next;
+          });
+
+          // Update the last Mona message with the first available audio chunk
+          // (the AvatarStage will handle playing the queue)
+          if (chunkIndex === 0) {
+            setMessages((prev) => {
+              const lastMonaIndex = prev.length - 1 - [...prev].reverse().findIndex(m => m.sender === "mona");
+              if (lastMonaIndex >= 0 && lastMonaIndex < prev.length) {
+                const next = [...prev];
+                next[lastMonaIndex] = {
+                  ...next[lastMonaIndex],
+                  audioUrl: fullAudioUrl,
+                  lipSync: data.lipSync,
+                };
+                console.log("✓ [PIPELINE] Updated message with first audio chunk");
+                return next;
+              }
+              return prev;
+            });
+          }
+        } else if (data.type === "audio_complete") {
+          // All audio chunks have been sent
+          console.log(`✓ [PIPELINE] All ${data.totalChunks} audio chunks received`);
+          setIsGeneratingAudio(false);
         } else if (data.type === "audio_ready" && data.audioUrl) {
-          // Update the most recent Mona message with the audio URL and lip sync data
+          // Legacy: single audio file (backwards compatibility)
           const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
 
           console.log("🎵 Audio ready:", fullAudioUrl);
@@ -236,6 +289,8 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     isGeneratingAudio,
     latestEmotion,
     guestMessagesRemaining,
+    audioQueue,  // Expose audio queue for playback
+    expectedChunks,
     sendMessage,
   };
 }

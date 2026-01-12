@@ -30,8 +30,15 @@ export interface Message {
   lipSync?: LipSyncCue[];  // Lip sync timing data
 }
 
+// Audio chunk for pipelined TTS
+export interface AudioChunk {
+  audioUrl: string;
+  lipSync?: LipSyncCue[];
+  chunkIndex: number;
+}
+
 export interface WebSocketMessage {
-  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "auth_status" | "chat_history" | "guest_limit_reached";
+  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "audio_chunk" | "audio_complete" | "auth_status" | "chat_history" | "guest_limit_reached";
   content?: string;
   sender?: "user" | "mona";
   timestamp?: string;
@@ -41,6 +48,9 @@ export interface WebSocketMessage {
   audioUrl?: string;
   imageUrl?: string;  // For displaying uploaded images
   lipSync?: LipSyncCue[];  // Lip sync timing data
+  chunkIndex?: number;  // For audio chunks
+  totalChunks?: number;  // Total expected audio chunks
+  totalAudioChunks?: number;  // Total audio chunks in message
   // Auth-related fields
   isAuthenticated?: boolean;
   user?: {
