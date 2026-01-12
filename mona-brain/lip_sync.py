@@ -12,17 +12,20 @@ from typing import Optional, List, Dict, Any
 
 # Rhubarb mouth shapes mapped to VRM phoneme blend shapes
 # Rhubarb outputs: A, B, C, D, E, F, G, H, X
-# VRM uses: aa, ee, ih, oh, ou
+# VRM uses: aa (jaw open), ee (wide smile), ih (slight smile), oh (round), ou (pucker)
+#
+# Increased intensity values for more visible/accurate lip sync.
+# Real speech requires larger mouth movements to look natural on avatars.
 RHUBARB_TO_VRM = {
-    "A": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # Closed mouth (M, B, P)
-    "B": {"aa": 0.3, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # Slightly open (consonants)
-    "C": {"aa": 0.0, "ee": 0.6, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # EE sound
-    "D": {"aa": 0.5, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # AA sound
-    "E": {"aa": 0.3, "ee": 0.0, "ih": 0.0, "oh": 0.4, "ou": 0.0},  # OH sound
-    "F": {"aa": 0.2, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.5},  # OO sound
-    "G": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # F/V sound (teeth on lip)
-    "H": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # L sound (tongue)
-    "X": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # Silence/rest
+    "A": {"aa": 0.1, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # Closed mouth (M, B, P) - lips together but not clenched
+    "B": {"aa": 0.5, "ee": 0.0, "ih": 0.2, "oh": 0.0, "ou": 0.0},  # Slightly open (consonants like K, S, T)
+    "C": {"aa": 0.3, "ee": 0.8, "ih": 0.3, "oh": 0.0, "ou": 0.0},  # EE sound (beet, see) - wide mouth
+    "D": {"aa": 0.8, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0},  # AA sound (bat, back) - jaw dropped
+    "E": {"aa": 0.5, "ee": 0.0, "ih": 0.0, "oh": 0.7, "ou": 0.0},  # AH/OH sound (bought, dog) - round open
+    "F": {"aa": 0.3, "ee": 0.0, "ih": 0.0, "oh": 0.3, "ou": 0.7},  # OO sound (boot, two) - puckered
+    "G": {"aa": 0.2, "ee": 0.0, "ih": 0.3, "oh": 0.0, "ou": 0.0},  # F/V sound - teeth on lip, slight opening
+    "H": {"aa": 0.4, "ee": 0.0, "ih": 0.2, "oh": 0.0, "ou": 0.0},  # L sound - tongue up, mouth slightly open
+    "X": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0, "_silence": True},  # Silence/rest - mouth closed (flag for fast decay)
 }
 
 

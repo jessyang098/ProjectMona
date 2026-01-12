@@ -20,9 +20,9 @@ export interface LipSyncConfig {
 }
 
 const DEFAULT_CONFIG: LipSyncConfig = {
-  smoothingFactor: 0.3, // Higher = smoother transitions
+  smoothingFactor: 0.15, // Lower = snappier transitions for clearer enunciation
   amplitudeThreshold: 0.02, // Higher threshold to ignore quiet sounds
-  amplitudeScale: 0.5, // Reduced scale for smaller mouth movements
+  amplitudeScale: 0.8, // Increased scale for more visible mouth movements
   centroidThresholds: {
     wide: 0.75,
     ih: 0.5,
@@ -30,8 +30,11 @@ const DEFAULT_CONFIG: LipSyncConfig = {
   },
 };
 
-// Maximum mouth opening (0-1). Caps all phoneme values.
-const MAX_MOUTH_OPEN = 0.4;
+// Maximum mouth opening (0-1). Raised to allow more expressive movement.
+const MAX_MOUTH_OPEN = 0.85;
+
+// Faster smoothing for closing mouth on silence (between words)
+const SILENCE_SMOOTHING_FACTOR = 0.4;
 
 type PhonemeValues = {
   aa: number;
@@ -637,6 +640,7 @@ export class LipSyncManager {
   /**
    * Update lip sync using pre-computed phoneme timing data.
    * Much more accurate than real-time audio analysis.
+   * Includes interpolation between cues and faster closing on silence.
    */
   private updateTimedLipSync(
     expressionManager: NonNullable<VRM["expressionManager"]>
@@ -645,26 +649,54 @@ export class LipSyncManager {
 
     const currentTime = this.audioElement.currentTime;
 
-    // Find the current cue based on audio playback time
+    // Find the current cue and next cue for interpolation
     let currentCue: LipSyncCue | null = null;
-    for (const cue of this.lipSyncCues) {
+    let nextCue: LipSyncCue | null = null;
+
+    for (let i = 0; i < this.lipSyncCues.length; i++) {
+      const cue = this.lipSyncCues[i];
       if (currentTime >= cue.start && currentTime < cue.end) {
         currentCue = cue;
+        nextCue = this.lipSyncCues[i + 1] ?? null;
         break;
       }
     }
 
-    // Get target phoneme values from cue or default to closed mouth
-    const targetValues: PhonemeValues = currentCue?.phonemes ?? {
-      aa: 0,
-      ee: 0,
-      ih: 0,
-      oh: 0,
-      ou: 0,
-    };
+    // Check if this is a silence cue (mouth should close quickly)
+    const isSilence = currentCue?.phonemes && '_silence' in currentCue.phonemes;
 
-    // Apply smoothing for natural transitions
-    this.applySmoothedPhonemes(targetValues, expressionManager);
+    // Get target phoneme values
+    let targetValues: PhonemeValues;
+
+    if (!currentCue) {
+      // No cue found - close mouth
+      targetValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
+    } else {
+      // Get base values from current cue (filter out _silence flag)
+      const { _silence, ...phonemes } = currentCue.phonemes as PhonemeValues & { _silence?: boolean };
+      targetValues = {
+        aa: phonemes.aa ?? 0,
+        ee: phonemes.ee ?? 0,
+        ih: phonemes.ih ?? 0,
+        oh: phonemes.oh ?? 0,
+        ou: phonemes.ou ?? 0,
+      };
+
+      // Interpolate towards next cue if we're near the end of current cue
+      // This creates smoother coarticulation between phonemes
+      if (nextCue && currentCue.end - currentTime < 0.05) {
+        const blendFactor = 1 - ((currentCue.end - currentTime) / 0.05);
+        const { _silence: nextSilence, ...nextPhonemes } = nextCue.phonemes as PhonemeValues & { _silence?: boolean };
+
+        for (const key of ['aa', 'ee', 'ih', 'oh', 'ou'] as const) {
+          const nextVal = nextPhonemes[key] ?? 0;
+          targetValues[key] = targetValues[key] + (nextVal - targetValues[key]) * blendFactor * 0.5;
+        }
+      }
+    }
+
+    // Apply smoothing - use faster smoothing for silence to close mouth quickly between words
+    this.applySmoothedPhonemes(targetValues, expressionManager, isSilence);
   }
 
   /**
@@ -727,10 +759,12 @@ export class LipSyncManager {
 
   /**
    * Apply smoothed phoneme values to VRM expression manager
+   * @param useFastDecay - If true, use faster smoothing to close mouth quickly (for silence between words)
    */
   private applySmoothedPhonemes(
     targetValues: PhonemeValues,
-    expressionManager: NonNullable<VRM["expressionManager"]>
+    expressionManager: NonNullable<VRM["expressionManager"]>,
+    useFastDecay: boolean = false
   ): void {
     const { smoothingFactor } = this.config;
 
@@ -738,8 +772,14 @@ export class LipSyncManager {
       const target = targetValues[phoneme];
       const previous = this.previousPhonemeValues[phoneme];
 
+      // Use faster smoothing for silence to close mouth quickly between words
+      // Otherwise use normal smoothing for natural speech transitions
+      const effectiveSmoothingFactor = useFastDecay && target < previous
+        ? SILENCE_SMOOTHING_FACTOR
+        : smoothingFactor;
+
       // Exponential smoothing
-      const smoothed = previous + smoothingFactor * (target - previous);
+      const smoothed = previous + effectiveSmoothingFactor * (target - previous);
       this.previousPhonemeValues[phoneme] = smoothed;
 
       expressionManager.setValue(phoneme, smoothed);
