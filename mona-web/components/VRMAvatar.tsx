@@ -62,6 +62,9 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Cantarella - needs 180 rotation, raised position for model origin
   "Cantarella.vrm": { scale: 0.70, position: [0, 0.20, 0], rotateY: Math.PI },
   "/avatars/Cantarella.vrm": { scale: 0.70, position: [0, 0.20, 0], rotateY: Math.PI },
+  // Eimi - new avatar
+  "Eimi.vrm": { scale: 0.70, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/Eimi.vrm": { scale: 0.70, position: [0, 0.10, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars
@@ -137,6 +140,10 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
 function getMaxMouthOpen(avatarUrl: string): number {
   // Moe can handle larger mouth opening (0.55)
   if (avatarUrl.includes("Moe")) {
+    return 0.55;
+  }
+  // Cantarella and Eimi can also handle larger mouth opening
+  if (avatarUrl.includes("Cantarella") || avatarUrl.includes("Eimi")) {
     return 0.55;
   }
   // Mona, Tora, Sakura need smaller values (0.4)
