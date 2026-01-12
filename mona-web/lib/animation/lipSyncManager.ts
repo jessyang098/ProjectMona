@@ -30,8 +30,8 @@ const DEFAULT_CONFIG: LipSyncConfig = {
   },
 };
 
-// Maximum mouth opening (0-1). Raised to allow more expressive movement.
-const MAX_MOUTH_OPEN = 0.85;
+// Maximum mouth opening (0-1). Balanced for natural appearance.
+const MAX_MOUTH_OPEN = 0.55;
 
 // Faster smoothing for closing mouth on silence (between words)
 const SILENCE_SMOOTHING_FACTOR = 0.4;
