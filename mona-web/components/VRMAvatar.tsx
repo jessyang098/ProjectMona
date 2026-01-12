@@ -499,9 +499,17 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
     return cleanup;
   }, [vrm]);
 
-  // Handle audio playback with lip sync
+  // Handle audio playback with lip sync (legacy single-audio mode)
+  // This is used for welcome messages and fallback when pipelined TTS is not used
   useEffect(() => {
     if (!vrm || !audioUrl) {
+      return;
+    }
+
+    // IMPORTANT: Skip legacy audio playback if we're in pipelined mode (audioQueue has items)
+    // The audioQueue useEffect will handle playback instead
+    if (audioQueue.length > 0) {
+      console.log("⏭️ Skipping legacy audioUrl playback - pipelined mode active");
       return;
     }
 
@@ -518,7 +526,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
       lipSyncRef.current.stop();
     }
 
-    console.log("▶️ Setting up new audio:", audioUrl);
+    console.log("▶️ [LEGACY] Setting up new audio:", audioUrl);
 
     // CRITICAL FOR MOBILE: Setup and play must be called synchronously
     // to preserve the user interaction context required by mobile browsers
@@ -543,7 +551,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
 
       // Call play() synchronously to preserve user interaction context for mobile
       lipSyncRef.current.play();
-      console.log("✓ Playing audio with lip sync:", audioUrl);
+      console.log("✓ [LEGACY] Playing audio with lip sync:", audioUrl);
 
       // Only mark as current after successful setup (prevents retry blocking if setup fails)
       currentAudioRef.current = audioUrl;
@@ -553,17 +561,32 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
     }
 
     // No cleanup function needed - setupAudio() handles cleanup internally
-  }, [audioUrl, lipSync, vrm]);
+  }, [audioUrl, lipSync, vrm, audioQueue.length]);
 
   // Handle pipelined audio queue playback
   useEffect(() => {
-    if (!vrm || !lipSyncRef.current || audioQueue.length === 0) {
+    if (!vrm || audioQueue.length === 0) {
       return;
+    }
+
+    // Create LipSyncManager if it doesn't exist yet (first audio might be pipelined, not legacy)
+    if (!lipSyncRef.current) {
+      console.log("📦 [QUEUE] Creating new LipSyncManager for pipelined audio");
+      lipSyncRef.current = new LipSyncManager(vrm, {
+        smoothingFactor: 0.2,
+        amplitudeScale: 12.0,
+        amplitudeThreshold: 0.0005,
+      });
     }
 
     // Reset queue tracking when we get a new queue (first chunk arrives)
     if (audioQueue.length === 1 && audioQueue[0].chunkIndex === 0) {
       console.log("🎵 [QUEUE] New audio queue started");
+      // Stop any currently playing audio from previous queue
+      if (lipSyncRef.current && isPlayingQueueRef.current) {
+        console.log("⏹️ [QUEUE] Stopping previous audio for new queue");
+        lipSyncRef.current.stop();
+      }
       audioQueueIndexRef.current = 0;
       isPlayingQueueRef.current = false;
     }

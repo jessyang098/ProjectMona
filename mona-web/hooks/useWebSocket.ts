@@ -30,11 +30,12 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [latestEmotion, setLatestEmotion] = useState<EmotionData | null>(null);
   const [guestMessagesRemaining, setGuestMessagesRemaining] = useState<number | null>(null);
-  // Audio queue for pipelined TTS
+  // Audio queue for pipelined TTS (only for user responses, not greeting)
   const [audioQueue, setAudioQueue] = useState<AudioChunk[]>([]);
   const [expectedChunks, setExpectedChunks] = useState(0);
   const websocketRef = useRef<WebSocket | null>(null);
   const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
+  const hasUserSentMessageRef = useRef<boolean>(false);  // Track if user has sent a message
 
   useEffect(() => {
     // Get client ID from localStorage for guest persistence, or generate new one
@@ -134,7 +135,13 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         } else if (data.type === "typing") {
           setIsTyping(data.isTyping || false);
         } else if (data.type === "audio_chunk" && data.audioUrl) {
-          // Pipelined TTS: Add audio chunk to queue
+          // Pipelined TTS: Add audio chunk to queue (only after user has sent a message)
+          // The greeting uses legacy audio_ready, not pipelined chunks
+          if (!hasUserSentMessageRef.current) {
+            console.log("⏭️ [PIPELINE] Ignoring audio chunk - user hasn't sent a message yet");
+            return;
+          }
+
           const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
           const chunkIndex = data.chunkIndex ?? 0;
 
@@ -155,24 +162,9 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
             return next;
           });
 
-          // Update the last Mona message with the first available audio chunk
-          // (the AvatarStage will handle playing the queue)
-          if (chunkIndex === 0) {
-            setMessages((prev) => {
-              const lastMonaIndex = prev.length - 1 - [...prev].reverse().findIndex(m => m.sender === "mona");
-              if (lastMonaIndex >= 0 && lastMonaIndex < prev.length) {
-                const next = [...prev];
-                next[lastMonaIndex] = {
-                  ...next[lastMonaIndex],
-                  audioUrl: fullAudioUrl,
-                  lipSync: data.lipSync,
-                };
-                console.log("✓ [PIPELINE] Updated message with first audio chunk");
-                return next;
-              }
-              return prev;
-            });
-          }
+          // Note: We don't update the message's audioUrl in pipeline mode
+          // The audioQueue handles playback instead, which prevents conflicts
+          // with the legacy single-audio playback mechanism
         } else if (data.type === "audio_complete") {
           // All audio chunks have been sent
           console.log(`✓ [PIPELINE] All ${data.totalChunks} audio chunks received`);
@@ -263,6 +255,9 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
 
   const sendMessage = useCallback((content: string, imageBase64?: string) => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
+      // Mark that user has sent a message - this enables pipelined audio queue
+      hasUserSentMessageRef.current = true;
+
       // Store image for when we receive the echoed message back
       if (imageBase64) {
         pendingImageRef.current = imageBase64;

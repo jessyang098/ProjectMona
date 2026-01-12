@@ -76,17 +76,21 @@ export default function ChatInterface() {
   const { currentAnimation } = useAnimationState();
 
   // Get the latest audio URL and lip sync data from Mona's messages
+  // Note: Only use this for legacy single-audio mode (welcome message)
+  // When audioQueue has items, pipelined mode is active and audioUrl should be ignored
   const latestMonaMessageWithAudio = messages
     .slice()
     .reverse()
     .find((msg) => msg.sender === "mona" && msg.audioUrl);
 
-  const latestAudioUrl = latestMonaMessageWithAudio?.audioUrl;
-  const latestLipSync = latestMonaMessageWithAudio?.lipSync;
+  // Don't pass audioUrl when in pipelined mode (audioQueue has items)
+  // This prevents the greeting from replaying when a new response is being played via queue
+  const latestAudioUrl = audioQueue.length > 0 ? undefined : latestMonaMessageWithAudio?.audioUrl;
+  const latestLipSync = audioQueue.length > 0 ? undefined : latestMonaMessageWithAudio?.lipSync;
 
   useEffect(() => {
-    console.log("🎵 Latest audio URL updated:", latestAudioUrl);
-  }, [latestAudioUrl]);
+    console.log("🎵 Latest audio URL updated:", latestAudioUrl, "(queue length:", audioQueue.length, ")");
+  }, [latestAudioUrl, audioQueue.length]);
 
   // Enable audio on first user interaction
   const enableAudio = async () => {
