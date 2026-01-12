@@ -4,7 +4,7 @@ import { Suspense, useMemo, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import dynamic from "next/dynamic";
-import type { AudioChunk, EmotionData, LipSyncCue } from "@/types/chat";
+import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { OutfitVisibility } from "./VRMAvatar";
@@ -52,7 +52,6 @@ interface AvatarStageProps {
   emotion: EmotionData | null;
   audioUrl?: string;
   lipSync?: LipSyncCue[];
-  audioQueue?: AudioChunk[];  // Pipelined TTS audio chunks
   viewMode?: "portrait" | "full";
   outfitVisibility?: OutfitVisibility;
   avatarUrl?: string;
@@ -187,7 +186,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
   );
 }
 
-export default function AvatarStage({ emotion, audioUrl, lipSync, audioQueue = [], viewMode = "full", outfitVisibility, avatarUrl }: AvatarStageProps) {
+export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
@@ -233,7 +232,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, audioQueue = [
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
         <Suspense fallback={null}>
-          <VRMAvatar key={vrmUrl} url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} audioQueue={audioQueue} outfitVisibility={outfitVisibility} />
+          <VRMAvatar key={vrmUrl} url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
         </Suspense>
         <CameraController viewMode={viewMode} />
       </Canvas>

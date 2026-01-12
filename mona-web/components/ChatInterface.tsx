@@ -68,7 +68,7 @@ export default function ChatInterface() {
     }
   }, [updateGuestStatus]);
 
-  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, audioQueue, hasUserSentMessage, sendMessage } = useWebSocket(WEBSOCKET_URL, {
+  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, sendMessage } = useWebSocket(WEBSOCKET_URL, {
     onGuestLimitReached: handleGuestLimitReached,
     onAuthStatus: handleAuthStatus,
   });
@@ -76,21 +76,17 @@ export default function ChatInterface() {
   const { currentAnimation } = useAnimationState();
 
   // Get the latest audio URL and lip sync data from Mona's messages
-  // Note: Only use this for legacy single-audio mode (welcome message)
-  // After user sends first message, pipelined mode takes over and audioUrl is ignored
   const latestMonaMessageWithAudio = messages
     .slice()
     .reverse()
     .find((msg) => msg.sender === "mona" && msg.audioUrl);
 
-  // Don't pass audioUrl after user has sent a message - pipelined mode handles responses
-  // This prevents the greeting from replaying when responses come in
-  const latestAudioUrl = hasUserSentMessage ? undefined : latestMonaMessageWithAudio?.audioUrl;
-  const latestLipSync = hasUserSentMessage ? undefined : latestMonaMessageWithAudio?.lipSync;
+  const latestAudioUrl = latestMonaMessageWithAudio?.audioUrl;
+  const latestLipSync = latestMonaMessageWithAudio?.lipSync;
 
   useEffect(() => {
-    console.log("🎵 Latest audio URL updated:", latestAudioUrl, "(hasUserSentMessage:", hasUserSentMessage, ")");
-  }, [latestAudioUrl, hasUserSentMessage]);
+    console.log("🎵 Latest audio URL updated:", latestAudioUrl);
+  }, [latestAudioUrl]);
 
   // Enable audio on first user interaction
   const enableAudio = async () => {
@@ -335,7 +331,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} audioQueue={audioEnabled ? audioQueue : []} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>

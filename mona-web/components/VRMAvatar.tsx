@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
-import type { AudioChunk, EmotionData, LipSyncCue } from "@/types/chat";
+import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import { VRMLookAtQuaternionProxy } from "@pixiv/three-vrm-animation";
 import { LipSyncManager } from "@/lib/animation";
@@ -124,7 +124,6 @@ interface VRMAvatarProps {
   emotion: EmotionData | null;
   audioUrl?: string | null;
   lipSync?: LipSyncCue[];
-  audioQueue?: AudioChunk[];  // Pipelined TTS audio chunks
   outfitVisibility?: OutfitVisibility;
 }
 
@@ -137,8 +136,8 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
   lingerie: false,
 };
 
-export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue = [], outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
-  console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl, "lipSync:", lipSync?.length ?? 0, "cues", "audioQueue:", audioQueue.length);
+export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
+  console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl, "lipSync:", lipSync?.length ?? 0, "cues");
 
   const groupRef = useRef<THREE.Group>(null);
   const hipsRef = useRef<THREE.Object3D | null>(null);
@@ -155,9 +154,6 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
   const testExpressionRef = useRef<string | null>(null); // Track active test expression
   const emotionExpressionRef = useRef<string | null>(null); // Track emotion-based expression
   const prevExpressionRef = useRef<string | null>(null); // Track previous expression for clearing
-  // Audio queue tracking for pipelined TTS
-  const audioQueueIndexRef = useRef<number>(0);
-  const isPlayingQueueRef = useRef<boolean>(false);
 
   const baseRotations = useRef({
     hips: new THREE.Euler(),
@@ -499,17 +495,9 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
     return cleanup;
   }, [vrm]);
 
-  // Handle audio playback with lip sync (legacy single-audio mode)
-  // This is used for welcome messages and fallback when pipelined TTS is not used
+  // Handle audio playback with lip sync
   useEffect(() => {
     if (!vrm || !audioUrl) {
-      return;
-    }
-
-    // IMPORTANT: Skip legacy audio playback if we're in pipelined mode (audioQueue has items)
-    // The audioQueue useEffect will handle playback instead
-    if (audioQueue.length > 0) {
-      console.log("⏭️ Skipping legacy audioUrl playback - pipelined mode active");
       return;
     }
 
@@ -526,7 +514,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
       lipSyncRef.current.stop();
     }
 
-    console.log("▶️ [LEGACY] Setting up new audio:", audioUrl);
+    console.log("▶️ Setting up new audio:", audioUrl);
 
     // CRITICAL FOR MOBILE: Setup and play must be called synchronously
     // to preserve the user interaction context required by mobile browsers
@@ -551,7 +539,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
 
       // Call play() synchronously to preserve user interaction context for mobile
       lipSyncRef.current.play();
-      console.log("✓ [LEGACY] Playing audio with lip sync:", audioUrl);
+      console.log("✓ Playing audio with lip sync:", audioUrl);
 
       // Only mark as current after successful setup (prevents retry blocking if setup fails)
       currentAudioRef.current = audioUrl;
@@ -561,76 +549,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, audioQueue 
     }
 
     // No cleanup function needed - setupAudio() handles cleanup internally
-  }, [audioUrl, lipSync, vrm, audioQueue.length]);
-
-  // Handle pipelined audio queue playback
-  useEffect(() => {
-    if (!vrm || audioQueue.length === 0) {
-      return;
-    }
-
-    // Create LipSyncManager if it doesn't exist yet (first audio might be pipelined, not legacy)
-    if (!lipSyncRef.current) {
-      console.log("📦 [QUEUE] Creating new LipSyncManager for pipelined audio");
-      lipSyncRef.current = new LipSyncManager(vrm, {
-        smoothingFactor: 0.2,
-        amplitudeScale: 12.0,
-        amplitudeThreshold: 0.0005,
-      });
-    }
-
-    // Reset queue tracking when we get a new queue (first chunk arrives)
-    if (audioQueue.length === 1 && audioQueue[0].chunkIndex === 0) {
-      console.log("🎵 [QUEUE] New audio queue started");
-      // Stop any currently playing audio from previous queue
-      if (lipSyncRef.current && isPlayingQueueRef.current) {
-        console.log("⏹️ [QUEUE] Stopping previous audio for new queue");
-        lipSyncRef.current.stop();
-      }
-      audioQueueIndexRef.current = 0;
-      isPlayingQueueRef.current = false;
-    }
-
-    // Function to play next chunk in queue
-    const playNextChunk = () => {
-      const nextIndex = audioQueueIndexRef.current;
-      const nextChunk = audioQueue.find(c => c.chunkIndex === nextIndex);
-
-      if (nextChunk) {
-        console.log(`🎵 [QUEUE] Playing chunk ${nextIndex}:`, nextChunk.audioUrl);
-        isPlayingQueueRef.current = true;
-
-        // Setup and play the next chunk
-        lipSyncRef.current!.setupAudio(nextChunk.audioUrl);
-        lipSyncRef.current!.setLipSyncData(nextChunk.lipSync ?? null);
-        lipSyncRef.current!.play();
-
-        currentAudioRef.current = nextChunk.audioUrl;
-        audioQueueIndexRef.current = nextIndex + 1;
-      } else {
-        console.log(`🎵 [QUEUE] No chunk ${nextIndex} available yet, waiting...`);
-        isPlayingQueueRef.current = false;
-      }
-    };
-
-    // Set up callback to play next chunk when current one ends
-    lipSyncRef.current.setOnAudioEnded(() => {
-      console.log("🎵 [QUEUE] Audio chunk ended, checking for next...");
-      playNextChunk();
-    });
-
-    // Start playing if we have chunks and aren't already playing
-    if (!isPlayingQueueRef.current && audioQueue.length > audioQueueIndexRef.current) {
-      playNextChunk();
-    }
-
-    return () => {
-      // Clean up callback when component unmounts or queue changes
-      if (lipSyncRef.current) {
-        lipSyncRef.current.setOnAudioEnded(null);
-      }
-    };
-  }, [audioQueue, vrm]);
+  }, [audioUrl, lipSync, vrm]);
 
   useFrame((_, delta) => {
     if (!vrm) return;
