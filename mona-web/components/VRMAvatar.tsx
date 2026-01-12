@@ -53,18 +53,18 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   // Mona1.vrm - original avatar, no rotation needed
   "Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
   "/avatars/Mona1.vrm": { scale: 0.95, position: [0, 0.10, 0], rotateY: 0 },
-  // Hana - VRoid Hub model (taller, lowered position)
-  "Hana.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
-  "/avatars/Hana.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
-  // Tora - VRoid Hub model (taller, lowered position)
-  "Tora.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
-  "/avatars/Tora.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
-  // Sakura - VRoid Hub model (lowered position)
-  "sakura.vrm": { scale: 0.70, position: [0, -0.10, 0], rotateY: Math.PI },
-  "/avatars/sakura.vrm": { scale: 0.70, position: [0, -0.10, 0], rotateY: Math.PI },
-  // Lily - VRoid Hub model (lowered position)
-  "Lily.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
-  "/avatars/Lily.vrm": { scale: 0.65, position: [0, -0.10, 0], rotateY: Math.PI },
+  // Hana - VRoid Hub model
+  "Hana.vrm": { scale: 0.65, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/Hana.vrm": { scale: 0.65, position: [0, 0.10, 0], rotateY: Math.PI },
+  // Tora - VRoid Hub model
+  "Tora.vrm": { scale: 0.65, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/Tora.vrm": { scale: 0.65, position: [0, 0.10, 0], rotateY: Math.PI },
+  // Sakura - VRoid Hub model
+  "sakura.vrm": { scale: 0.70, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/sakura.vrm": { scale: 0.70, position: [0, 0.10, 0], rotateY: Math.PI },
+  // Lily - VRoid Hub model
+  "Lily.vrm": { scale: 0.65, position: [0, 0.10, 0], rotateY: Math.PI },
+  "/avatars/Lily.vrm": { scale: 0.65, position: [0, 0.10, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars
@@ -135,6 +135,16 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
   colorVariant: false,
   lingerie: false,
 };
+
+// Get max mouth open value based on avatar - some avatars need smaller values
+function getMaxMouthOpen(avatarUrl: string): number {
+  // Moe and Lily can handle larger mouth opening (0.55)
+  if (avatarUrl.includes("Moe") || avatarUrl.includes("Lily")) {
+    return 0.55;
+  }
+  // Mona, Hana, Tora, Sakura need smaller values (0.4)
+  return 0.4;
+}
 
 export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
   console.log("🎭 VRMAvatar rendered with audioUrl:", audioUrl, "lipSync:", lipSync?.length ?? 0, "cues");
@@ -521,11 +531,13 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     try {
       // Create or reuse LipSyncManager
       if (!lipSyncRef.current) {
-        console.log("📦 Creating new LipSyncManager");
+        const maxMouthOpen = getMaxMouthOpen(url);
+        console.log("📦 Creating new LipSyncManager with maxMouthOpen:", maxMouthOpen);
         lipSyncRef.current = new LipSyncManager(vrm, {
           smoothingFactor: 0.2,
           amplitudeScale: 12.0, // Increased for more visible mouth movement
           amplitudeThreshold: 0.0005, // Lower threshold to catch quieter audio (like OpenAI TTS fallback)
+          maxMouthOpen,
         });
       }
 

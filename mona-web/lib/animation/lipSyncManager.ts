@@ -11,6 +11,8 @@ export interface LipSyncConfig {
   amplitudeThreshold: number;
   /** Multiplier for mouth opening intensity */
   amplitudeScale: number;
+  /** Maximum mouth opening (0-1) - varies by avatar */
+  maxMouthOpen: number;
   /** Spectral centroid thresholds for phoneme classification */
   centroidThresholds: {
     wide: number; // ee sound
@@ -19,19 +21,20 @@ export interface LipSyncConfig {
   };
 }
 
+// Default max mouth open for avatars (Moe, Lily use higher value)
+const DEFAULT_MAX_MOUTH_OPEN = 0.55;
+
 const DEFAULT_CONFIG: LipSyncConfig = {
   smoothingFactor: 0.15, // Lower = snappier transitions for clearer enunciation
   amplitudeThreshold: 0.02, // Higher threshold to ignore quiet sounds
   amplitudeScale: 0.8, // Increased scale for more visible mouth movements
+  maxMouthOpen: DEFAULT_MAX_MOUTH_OPEN,
   centroidThresholds: {
     wide: 0.75,
     ih: 0.5,
     oh: 0.25,
   },
 };
-
-// Maximum mouth opening (0-1). Balanced for natural appearance.
-const MAX_MOUTH_OPEN = 0.55;
 
 // Faster smoothing for closing mouth on silence (between words)
 const SILENCE_SMOOTHING_FACTOR = 0.4;
@@ -637,8 +640,8 @@ export class LipSyncManager {
     const wave2 = Math.sin(this.mobileAnimationTimer * 3) * 0.3 + 0.5; // Slower variation
     const combined = (wave1 * 0.6 + wave2 * 0.4);
 
-    // Cap at MAX_MOUTH_OPEN for natural appearance
-    const mouthOpen = Math.min(MAX_MOUTH_OPEN, combined * 0.5);
+    // Cap at maxMouthOpen for natural appearance
+    const mouthOpen = Math.min(this.config.maxMouthOpen, combined * 0.5);
 
     // Alternate between different mouth shapes for variety
     const shapePhase = Math.floor(this.mobileAnimationTimer * 4) % 4;
@@ -749,13 +752,13 @@ export class LipSyncManager {
    * Estimate phoneme values based on amplitude and spectral centroid
    */
   private estimatePhonemes(amplitude: number, centroid: number): PhonemeValues {
-    const { amplitudeThreshold, amplitudeScale, centroidThresholds } = this.config;
+    const { amplitudeThreshold, amplitudeScale, maxMouthOpen, centroidThresholds } = this.config;
     const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
 
     if (amplitude > amplitudeThreshold) {
       // Calculate level and cap it to prevent mouth opening too wide
       const rawLevel = (amplitude - amplitudeThreshold) * amplitudeScale;
-      const level = Math.min(MAX_MOUTH_OPEN, rawLevel);
+      const level = Math.min(maxMouthOpen, rawLevel);
 
       // aa (jaw open) always gets some level for any speech
       phonemes.aa = level;
