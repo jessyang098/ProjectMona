@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Html } from "@react-three/drei";
 import dynamic from "next/dynamic";
 import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
@@ -11,6 +11,18 @@ import type { OutfitVisibility } from "./VRMAvatar";
 export type { OutfitVisibility };
 
 const VRMAvatar = dynamic(() => import("./VRMAvatar"), { ssr: false });
+
+// Loading indicator component for 3D canvas
+function LoadingIndicator() {
+  return (
+    <Html center>
+      <div className="flex flex-col items-center justify-center gap-3 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-300 border-t-purple-600" />
+        <p className="text-sm text-gray-600">Your companion is loading...</p>
+      </div>
+    </Html>
+  );
+}
 
 const emotionPalette: Record<string, { primary: string; accent: string }> = {
   // Positive emotions
@@ -231,7 +243,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
         <ambientLight intensity={0.6} color="#ffffff" />
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
-        <Suspense fallback={null}>
+        <Suspense fallback={<LoadingIndicator />}>
           <VRMAvatar key={vrmUrl} url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
         </Suspense>
         <CameraController viewMode={viewMode} />
