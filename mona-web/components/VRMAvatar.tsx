@@ -63,8 +63,8 @@ const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number,
   "Cantarella.vrm": { scale: 0.70, position: [0, 0.20, 0], rotateY: Math.PI },
   "/avatars/Cantarella.vrm": { scale: 0.70, position: [0, 0.20, 0], rotateY: Math.PI },
   // Eimi - new avatar, shorter so raise position to center on screen
-  "Eimi.vrm": { scale: 0.70, position: [0, 0.35, 0], rotateY: Math.PI },
-  "/avatars/Eimi.vrm": { scale: 0.70, position: [0, 0.35, 0], rotateY: Math.PI },
+  "Eimi.vrm": { scale: 0.70, position: [0, 0.50, 0], rotateY: Math.PI },
+  "/avatars/Eimi.vrm": { scale: 0.70, position: [0, 0.50, 0], rotateY: Math.PI },
 };
 
 // Default config for unknown avatars
