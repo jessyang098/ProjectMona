@@ -1,0 +1,35 @@
+PROJECT MONA - INTELLECTUAL PROPERTY NOTICE
+
+Copyright (c) 2024 Jessica Yang. All rights reserved.
+
+OWNERSHIP
+---------
+All code, documentation, designs, algorithms, and other intellectual property
+in this repository are the sole property of Jessica Yang, unless explicitly
+stated otherwise in the file header.
+
+CONTRIBUTIONS
+-------------
+By contributing to this repository (via pull request, commit, or any other
+means), you agree that:
+
+1. You assign all intellectual property rights in your contribution to
+   Jessica Yang, including all copyright, patent, and trade secret rights.
+
+2. Your contribution becomes the sole property of Jessica Yang.
+
+3. You waive any claims to ownership, compensation, or equity based solely
+   on your contributions to this codebase.
+
+4. This agreement applies regardless of the size or significance of the
+   contribution.
+
+THIRD-PARTY COMPONENTS
+----------------------
+This project may include third-party libraries or components subject to their
+own licenses. Such components remain the property of their respective owners.
+See individual file headers or LICENSE files in subdirectories for details.
+
+CONTACT
+-------
+For licensing, partnership, or acquisition inquiries: [your email]
