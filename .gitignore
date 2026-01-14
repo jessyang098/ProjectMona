@@ -75,6 +75,3 @@ RUNPOD_SETUP.md
 SETUP.md
 TODO.md
 
-# Avatar and animation assets (downloaded separately)
-mona-web/public/avatars/*.vrm
-mona-web/public/animations/*.vrma
