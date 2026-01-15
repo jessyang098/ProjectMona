@@ -19,6 +19,7 @@ export type GestureName =
   | "blush"
   | "sad"
   | "looking_around"
+  | "kyoro"
   | "angry"
   | "relax"
   | "sleepy"
@@ -56,6 +57,7 @@ const GESTURE_CONFIGS: GestureConfig[] = [
   // Curious gestures
   { name: "thinking", path: "/animations/Thinking.vrma", triggerEmotions: ["curious"], priority: 7 },
   { name: "looking_around", path: "/animations/LookAround.vrma", triggerEmotions: ["curious"], priority: 6 },
+  { name: "kyoro", path: "/animations/kyoro.fbx", triggerEmotions: ["curious"], priority: 8 },
 
   // Embarrassed gestures - Blush.vrma doesn't exist, use Sleepy as shy/embarrassed fallback
   { name: "blush", path: "/animations/Sleepy.vrma", triggerEmotions: ["embarrassed"], priority: 8 },
