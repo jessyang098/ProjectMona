@@ -4,6 +4,7 @@ Handles phoneme filtering and text cleanup for better TTS quality
 """
 
 import re
+from typing import List, Tuple
 
 
 def preprocess_tts_text(text: str) -> str:
@@ -34,7 +35,7 @@ def preprocess_tts_text(text: str) -> str:
     return cleaned
 
 
-def split_into_sentences(text: str) -> list[str]:
+def split_into_sentences(text: str) -> List[str]:
     """
     Split text into sentences for pipelined TTS generation.
 
@@ -58,7 +59,7 @@ def split_into_sentences(text: str) -> list[str]:
     return sentences
 
 
-def extract_complete_sentences(text: str) -> tuple[list[str], str]:
+def extract_complete_sentences(text: str) -> Tuple[List[str], str]:
     """
     Extract complete sentences from streaming text, returning remaining incomplete text.
 

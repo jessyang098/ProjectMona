@@ -300,8 +300,6 @@ export function parseTestCommand(input: string): {
         return { command: { type: "play", pose: "stand1" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "wave":
         return { command: { type: "play", pose: "wave" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "kyoro":
-        return { command: { type: "play", pose: "kyoro" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "rest":
       case "stop":
         return { command: { type: "stop" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };

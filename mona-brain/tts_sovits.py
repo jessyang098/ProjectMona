@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
 from lip_sync import get_lip_sync_generator
+from tts_preprocess import clean_for_tts
 
 
 class MonaTTSSoVITS:
@@ -31,7 +32,7 @@ class MonaTTSSoVITS:
         Initialize SoVITS TTS.
 
         Args:
-            sovits_url: URL of the GPT-SoVITS API endpoint
+            sovits_url: URL of the GPT-SoVITS API endpoint (set to "mock" for testing without TTS)
             ref_audio_path: Path to reference audio for voice cloning
             prompt_text: Transcription of the reference audio
             text_lang: Language of input text
@@ -45,6 +46,11 @@ class MonaTTSSoVITS:
         self.text_lang = text_lang
         self.prompt_lang = prompt_lang
         self.speed_factor = speed_factor
+
+        # Check if running in mock mode (for local testing without TTS)
+        self.mock_mode = sovits_url.lower() == "mock"
+        if self.mock_mode:
+            print("🎭 GPT-SoVITS running in MOCK MODE (no actual audio generation)")
 
         # Setup audio cache directory
         self.audio_dir = Path(audio_dir)
@@ -63,6 +69,12 @@ class MonaTTSSoVITS:
         """
         if self._warmed_up:
             print("🔥 GPT-SoVITS already warmed up")
+            return True
+
+        # Skip warmup in mock mode
+        if self.mock_mode:
+            self._warmed_up = True
+            print("🎭 Mock mode: Skipping GPT-SoVITS warmup")
             return True
 
         print("🔥 Warming up GPT-SoVITS model...")
@@ -124,7 +136,8 @@ class MonaTTSSoVITS:
         text: str,
         use_cache: bool = True,
         convert_to_mp3: bool = False,
-        generate_lip_sync: bool = True
+        generate_lip_sync: bool = True,
+        preprocess: bool = True
     ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
         """
         Generate speech audio from text using GPT-SoVITS.
@@ -134,11 +147,23 @@ class MonaTTSSoVITS:
             use_cache: Whether to use cached audio if available
             convert_to_mp3: Whether to convert WAV to MP3 (for mobile compatibility)
             generate_lip_sync: Whether to generate lip sync timing data
+            preprocess: Whether to clean text for TTS (remove markdown, emojis, etc.)
 
         Returns:
             Tuple of (path to generated audio file, lip sync data) or (None, None) if failed
         """
         if not text or not text.strip():
+            return None, None
+
+        # Clean text for TTS (remove markdown, emojis, code blocks, etc.)
+        if preprocess:
+            original_text = text
+            text = clean_for_tts(text)
+            if text != original_text:
+                print(f"🧹 TTS preprocessing: '{original_text[:50]}...' → '{text[:50]}...'")
+
+        if not text or not text.strip():
+            print("⚠️ Text empty after preprocessing, skipping TTS")
             return None, None
 
         # Determine output format based on conversion flag
@@ -158,6 +183,11 @@ class MonaTTSSoVITS:
                 except Exception:
                     pass
             return str(cache_path), lip_sync_data
+
+        # Mock mode: Return None (no audio) but log what would be generated
+        if self.mock_mode:
+            print(f"🎭 Mock TTS: Would generate speech for: '{text[:50]}...'")
+            return None, None
 
         try:
             print(f"⚡ Generating SoVITS speech for: {text[:50]}...")
