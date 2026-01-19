@@ -405,10 +405,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             if not audio_url and mona_tts:
                 print(f"🎤 [STARTUP AUDIO] Attempting OpenAI TTS fallback...")
                 try:
-                    audio_path = await mona_tts.generate_speech(tts_text)
+                    audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text)
                     print(f"🎤 [STARTUP AUDIO] OpenAI TTS returned: {audio_path}")
                     if audio_path:
                         audio_url = f"/audio/{Path(audio_path).name}"
+                        # Use OpenAI TTS lip sync if GPT-SoVITS didn't provide any
+                        if not lip_sync_data and openai_lip_sync:
+                            lip_sync_data = openai_lip_sync
+                            print(f"✓ [STARTUP AUDIO] Lip sync from OpenAI TTS: {len(lip_sync_data)} cues")
                         print(f"✓ [STARTUP AUDIO] Generated startup greeting voice with OpenAI TTS: {audio_url}")
                     else:
                         print(f"⚠️ [STARTUP AUDIO] OpenAI TTS returned None")
@@ -564,9 +568,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                                     # Fall back to OpenAI TTS if SoVITS failed or unavailable
                                     if not audio_url and mona_tts:
-                                        audio_path = await mona_tts.generate_speech(tts_text)
+                                        audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text)
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
+                                            # Use OpenAI TTS lip sync if GPT-SoVITS didn't provide any
+                                            if not lip_sync_data and openai_lip_sync:
+                                                lip_sync_data = openai_lip_sync
+                                                print(f"✓ Lip sync from OpenAI TTS: {len(lip_sync_data)} cues")
                                             print(f"✓ Using OpenAI TTS audio (fallback)")
 
                                     # Send audio update when ready

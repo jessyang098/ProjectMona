@@ -11,6 +11,13 @@ import type { OutfitVisibility } from "./VRMAvatar";
 export type { OutfitVisibility };
 
 const VRMAvatar = dynamic(() => import("./VRMAvatar"), { ssr: false });
+const Live2DAvatar = dynamic(() => import("./Live2DAvatar"), { ssr: false });
+
+// Detect if a URL points to a Live2D model (folder with .model3.json)
+function isLive2DModel(url: string): boolean {
+  // Live2D models are referenced by their .model3.json file
+  return url.includes(".model3.json");
+}
 
 // Loading indicator component for 3D canvas
 function LoadingIndicator() {
@@ -50,12 +57,13 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
 
 // Available avatar options
 export const AVATAR_OPTIONS = [
-  { id: "moe", label: "Moe", url: "/avatars/Moe.vrm" },
-  { id: "mona1", label: "Mona", url: "/avatars/Mona1.vrm" },
-  { id: "tora", label: "Tora", url: "/avatars/Tora.vrm" },
-  { id: "sakura", label: "Sakura", url: "/avatars/sakura.vrm" },
-  { id: "cantarella", label: "Cantarella", url: "/avatars/Cantarella.vrm" },
-  { id: "eimi", label: "Eimi", url: "/avatars/Eimi.vrm" },
+  { id: "moe", label: "Moe", url: "/avatars/Moe.vrm", type: "vrm" as const },
+  { id: "mona1", label: "Mona", url: "/avatars/Mona1.vrm", type: "vrm" as const },
+  { id: "tora", label: "Tora", url: "/avatars/Tora.vrm", type: "vrm" as const },
+  { id: "sakura", label: "Sakura", url: "/avatars/sakura.vrm", type: "vrm" as const },
+  { id: "cantarella", label: "Cantarella", url: "/avatars/Cantarella.vrm", type: "vrm" as const },
+  { id: "eimi", label: "Eimi", url: "/avatars/Eimi.vrm", type: "vrm" as const },
+  { id: "bear-pajama", label: "Bear Pajama", url: "/avatars/bear Pajama V1.1/bear Pajama V1.1.model3.json", type: "live2d" as const },
 ] as const;
 
 export type AvatarId = typeof AVATAR_OPTIONS[number]["id"];
@@ -198,6 +206,18 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
   );
 }
 
+// Loading indicator for Live2D canvas
+function Live2DLoadingIndicator() {
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="flex flex-col items-center justify-center gap-3 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-300 border-t-purple-600" />
+        <p className="text-sm text-gray-600">Your companion is loading...</p>
+      </div>
+    </div>
+  );
+}
+
 export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
@@ -226,12 +246,33 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
   console.log("🎬 Absolute audioUrl:", absoluteAudioUrl);
 
   // Use provided avatarUrl, then env var, then default to Moe
-  const vrmUrl = avatarUrl || process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
+  const modelUrl = avatarUrl || process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
+
+  // Detect if this is a Live2D model
+  const isLive2D = isLive2DModel(modelUrl);
 
   // Get the initial preset based on device and view mode
   const initialPresetKey = typeof window !== "undefined" ? getPresetKey(viewMode) : viewMode;
   const initialPreset = VIEW_PRESETS[initialPresetKey];
 
+  // Render Live2D avatar if it's a Live2D model
+  if (isLive2D) {
+    return (
+      <div className="h-full w-full" style={{ backgroundColor: "#fffdf8" }}>
+        <Suspense fallback={<Live2DLoadingIndicator />}>
+          <Live2DAvatar
+            key={modelUrl}
+            modelUrl={modelUrl}
+            emotion={emotion}
+            audioUrl={absoluteAudioUrl}
+            lipSync={lipSync}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // Render VRM avatar (Three.js canvas)
   return (
     <div className="h-full w-full">
       <Canvas
@@ -244,7 +285,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
         <Suspense fallback={<LoadingIndicator />}>
-          <VRMAvatar key={vrmUrl} url={vrmUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
+          <VRMAvatar key={modelUrl} url={modelUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
         </Suspense>
         <CameraController viewMode={viewMode} />
       </Canvas>

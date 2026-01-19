@@ -56,6 +56,7 @@ class LipSyncGenerator:
             "/usr/local/bin/rhubarb",
             "/usr/bin/rhubarb",
             os.path.expanduser("~/rhubarb/rhubarb"),
+            os.path.expanduser("~/Rhubarb-Lip-Sync-1.14.0-macOS/rhubarb"),  # macOS download location
             "./rhubarb/rhubarb",
             "rhubarb",  # In PATH
         ]

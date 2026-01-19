@@ -1,0 +1,31 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "bear Pajama V1.1.moc3",
+		"Textures": [
+			"bear Pajama V1.1.4096/texture_00.png",
+			"bear Pajama V1.1.4096/texture_01.png",
+			"bear Pajama V1.1.4096/texture_02.png",
+			"bear Pajama V1.1.4096/texture_03.png",
+			"bear Pajama V1.1.4096/texture_04.png",
+			"bear Pajama V1.1.4096/texture_05.png",
+			"bear Pajama V1.1.4096/texture_06.png",
+			"bear Pajama V1.1.4096/texture_07.png",
+			"bear Pajama V1.1.4096/texture_08.png"
+		],
+		"Physics": "bear Pajama V1.1.physics3.json",
+		"DisplayInfo": "bear Pajama V1.1.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		}
+	]
+}
