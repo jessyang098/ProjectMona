@@ -542,9 +542,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             }
             await manager.send_message(typing_indicator, client_id)
 
-            # Simulate thinking time
-            await simulate_typing_delay()
-            timer.checkpoint("3_typing_delay_done")
+            timer.checkpoint("3_ready_for_llm")
 
             # Generate response using LLM or fallback to dummy
             if mona_llm:

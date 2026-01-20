@@ -3,6 +3,7 @@ Lip Sync Generation using Rhubarb Lip Sync
 Analyzes audio files and generates mouth shape timing data for realistic lip sync animation.
 """
 
+import asyncio
 import json
 import os
 import subprocess
@@ -189,6 +190,106 @@ class LipSyncGenerator:
     def is_available(self) -> bool:
         """Check if Rhubarb is available."""
         return self.rhubarb_path is not None
+
+    async def generate_lip_sync_async(
+        self,
+        audio_path: str,
+        dialog_text: Optional[str] = None,
+        extended_shapes: bool = False
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Async version of generate_lip_sync using asyncio subprocess.
+
+        Args:
+            audio_path: Path to the audio file (WAV or MP3)
+            dialog_text: Optional transcript to improve accuracy
+            extended_shapes: Whether to use extended mouth shapes (G, H)
+
+        Returns:
+            List of mouth cues with timing and VRM blend shape values, or None if failed.
+        """
+        if not self.rhubarb_path:
+            return None
+
+        if not os.path.isfile(audio_path):
+            print(f"✗ Audio file not found: {audio_path}")
+            return None
+
+        try:
+            # Build command
+            cmd = [
+                self.rhubarb_path,
+                "-f", "json",
+                "-r", "phonetic",
+            ]
+
+            if extended_shapes:
+                cmd.extend(["--extendedShapes", "GHX"])
+
+            # Add dialog text for better accuracy if provided
+            dialog_file = None
+            if dialog_text:
+                dialog_file = Path(audio_path).with_suffix(".txt")
+                dialog_file.write_text(dialog_text)
+                cmd.extend(["-d", str(dialog_file)])
+
+            cmd.append(audio_path)
+
+            # Run rhubarb asynchronously
+            rhubarb_start = time.perf_counter()
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
+
+            # Clean up dialog file
+            if dialog_file and dialog_file.exists():
+                dialog_file.unlink()
+
+            if proc.returncode != 0:
+                print(f"⏱️  Lip Sync [RHUBARB FAILED] {rhubarb_ms:.0f}ms - {stderr.decode()}")
+                return None
+
+            # Parse JSON output
+            parse_start = time.perf_counter()
+            data = json.loads(stdout.decode())
+            mouth_cues = data.get("mouthCues", [])
+
+            # Convert to our format with VRM phoneme values
+            lip_sync_data = []
+            for i, cue in enumerate(mouth_cues):
+                shape = cue.get("value", "X")
+                start = cue.get("start", 0)
+
+                if i + 1 < len(mouth_cues):
+                    end = mouth_cues[i + 1].get("start", start + 0.1)
+                else:
+                    end = start + 0.1
+
+                lip_sync_data.append({
+                    "start": start,
+                    "end": end,
+                    "shape": shape,
+                    "phonemes": RHUBARB_TO_VRM.get(shape, RHUBARB_TO_VRM["X"])
+                })
+
+            parse_ms = (time.perf_counter() - parse_start) * 1000
+            total_ms = rhubarb_ms + parse_ms
+            print(f"⏱️  Lip Sync [Rhubarb] {rhubarb_ms:.0f}ms | [Parse] {parse_ms:.0f}ms | [TOTAL] {total_ms:.0f}ms ({len(lip_sync_data)} cues)")
+            return lip_sync_data
+
+        except asyncio.TimeoutError:
+            print("✗ Rhubarb timed out after 30 seconds")
+            return None
+        except json.JSONDecodeError as e:
+            print(f"✗ Failed to parse Rhubarb output: {e}")
+            return None
+        except Exception as e:
+            print(f"✗ Lip sync generation failed: {e}")
+            return None
 
 
 # Global instance for easy access

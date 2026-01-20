@@ -3,14 +3,15 @@ GPT-SoVITS TTS Integration for Mona
 Uses local GPT-SoVITS server for high-quality anime voice synthesis
 """
 
+import asyncio
 import hashlib
 import json
 import os
-import requests
-import subprocess
 import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
+
+import aiohttp
 
 from lip_sync import get_lip_sync_generator
 from tts_preprocess import clean_for_tts
@@ -93,25 +94,20 @@ class MonaTTSSoVITS:
                 "streaming_mode": 1,
             }
 
-            response = requests.post(
-                self.sovits_url,
-                json=payload,
-                timeout=60,  # Allow extra time for first load
-                stream=True
-            )
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(self.sovits_url, json=payload) as response:
+                    if response.status == 200:
+                        # Consume the response to trigger model loading
+                        await response.read()
+                        self._warmed_up = True
+                        print("✓ GPT-SoVITS model warmed up successfully!")
+                        return True
+                    else:
+                        print(f"✗ GPT-SoVITS warmup failed: {response.status}")
+                        return False
 
-            if response.status_code == 200:
-                # Just consume the response to trigger model loading
-                for _ in response.iter_content(chunk_size=1024):
-                    pass
-                self._warmed_up = True
-                print("✓ GPT-SoVITS model warmed up successfully!")
-                return True
-            else:
-                print(f"✗ GPT-SoVITS warmup failed: {response.status_code}")
-                return False
-
-        except requests.exceptions.Timeout:
+        except asyncio.TimeoutError:
             print("✗ GPT-SoVITS warmup timed out (model may still be loading)")
             return False
         except Exception as e:
@@ -199,70 +195,76 @@ class MonaTTSSoVITS:
                 "streaming_mode": 1,
             }
 
-            # Call GPT-SoVITS API
+            # Call GPT-SoVITS API (async with aiohttp)
             api_start = time.perf_counter()
-            response = requests.post(self.sovits_url, json=payload, timeout=30)
-            api_ms = (time.perf_counter() - api_start) * 1000
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(self.sovits_url, json=payload) as response:
+                    api_ms = (time.perf_counter() - api_start) * 1000
 
-            if response.status_code != 200:
-                print(f"⏱️  TTS [API ERROR] {api_ms:.0f}ms - Status: {response.status_code}")
-                return None, None
+                    if response.status != 200:
+                        print(f"⏱️  TTS [API ERROR] {api_ms:.0f}ms - Status: {response.status}")
+                        return None, None
 
-            response.raise_for_status()
-            print(f"⏱️  TTS [GPT-SoVITS API] {api_ms:.0f}ms ({api_ms/1000:.2f}s)")
+                    print(f"⏱️  TTS [GPT-SoVITS API] {api_ms:.0f}ms ({api_ms/1000:.2f}s)")
 
-            # Save WAV file
-            save_start = time.perf_counter()
-            wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav" if convert_to_mp3 else cache_path
-            with open(wav_path, "wb") as f:
-                f.write(response.content)
-            save_ms = (time.perf_counter() - save_start) * 1000
-            print(f"⏱️  TTS [Save WAV] {save_ms:.0f}ms")
+                    # Save WAV file
+                    save_start = time.perf_counter()
+                    wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav" if convert_to_mp3 else cache_path
+                    audio_content = await response.read()
+                    with open(wav_path, "wb") as f:
+                        f.write(audio_content)
+                    save_ms = (time.perf_counter() - save_start) * 1000
+                    print(f"⏱️  TTS [Save WAV] {save_ms:.0f}ms")
 
-            # Generate lip sync data
+            # Generate lip sync and convert to MP3 (parallel if mobile)
             lip_sync_data = None
-            if generate_lip_sync:
-                lip_start = time.perf_counter()
-                lip_sync_generator = get_lip_sync_generator()
-                if lip_sync_generator.is_available():
-                    lip_sync_data = lip_sync_generator.generate_lip_sync(
+            lip_sync_generator = get_lip_sync_generator()
+
+            if convert_to_mp3 and generate_lip_sync and lip_sync_generator.is_available():
+                # PARALLEL: Run Rhubarb and FFmpeg simultaneously for mobile
+                parallel_start = time.perf_counter()
+
+                async def run_lip_sync():
+                    return await lip_sync_generator.generate_lip_sync_async(
                         str(wav_path),
                         dialog_text=text
                     )
-                    if lip_sync_data:
-                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-                lip_ms = (time.perf_counter() - lip_start) * 1000
-                print(f"⏱️  TTS [Rhubarb Lip Sync] {lip_ms:.0f}ms ({lip_ms/1000:.2f}s)")
 
-            # Convert to MP3 if requested
-            if convert_to_mp3:
-                mp3_start = time.perf_counter()
+                async def run_ffmpeg():
+                    proc = await asyncio.create_subprocess_exec(
+                        "ffmpeg",
+                        "-i", str(wav_path),
+                        "-codec:a", "libmp3lame",
+                        "-b:a", "128k",
+                        "-ar", "44100",
+                        "-ac", "1",
+                        "-y",
+                        str(cache_path),
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    await asyncio.wait_for(proc.communicate(), timeout=30)
+                    return proc.returncode
+
                 try:
-                    result = subprocess.run(
-                        [
-                            "ffmpeg",
-                            "-i", str(wav_path),
-                            "-codec:a", "libmp3lame",
-                            "-b:a", "128k",
-                            "-ar", "44100",
-                            "-ac", "1",
-                            "-y",
-                            str(cache_path)
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
+                    lip_sync_data, ffmpeg_returncode = await asyncio.gather(
+                        run_lip_sync(),
+                        run_ffmpeg()
                     )
 
-                    mp3_ms = (time.perf_counter() - mp3_start) * 1000
-                    if result.returncode == 0:
+                    parallel_ms = (time.perf_counter() - parallel_start) * 1000
+                    if ffmpeg_returncode == 0:
                         wav_path.unlink()
-                        print(f"⏱️  TTS [FFmpeg MP3] {mp3_ms:.0f}ms ({mp3_ms/1000:.2f}s)")
+                        print(f"⏱️  TTS [Rhubarb + FFmpeg PARALLEL] {parallel_ms:.0f}ms ({parallel_ms/1000:.2f}s)")
                     else:
-                        print(f"⏱️  TTS [FFmpeg FAILED] {mp3_ms:.0f}ms")
+                        print(f"⏱️  TTS [FFmpeg FAILED] {parallel_ms:.0f}ms")
                         return None, None
 
-                except subprocess.TimeoutExpired:
+                    if lip_sync_data:
+                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+
+                except asyncio.TimeoutError:
                     if wav_path.exists():
                         wav_path.unlink()
                     return None, None
@@ -275,16 +277,64 @@ class MonaTTSSoVITS:
                         wav_path.unlink()
                     return None, None
 
+            else:
+                # SEQUENTIAL: Non-mobile or no lip sync needed
+                if generate_lip_sync and lip_sync_generator.is_available():
+                    lip_start = time.perf_counter()
+                    lip_sync_data = await lip_sync_generator.generate_lip_sync_async(
+                        str(wav_path),
+                        dialog_text=text
+                    )
+                    if lip_sync_data:
+                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+                    lip_ms = (time.perf_counter() - lip_start) * 1000
+                    print(f"⏱️  TTS [Rhubarb Lip Sync] {lip_ms:.0f}ms ({lip_ms/1000:.2f}s)")
+
+                if convert_to_mp3:
+                    mp3_start = time.perf_counter()
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            "ffmpeg",
+                            "-i", str(wav_path),
+                            "-codec:a", "libmp3lame",
+                            "-b:a", "128k",
+                            "-ar", "44100",
+                            "-ac", "1",
+                            "-y",
+                            str(cache_path),
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE
+                        )
+                        await asyncio.wait_for(proc.communicate(), timeout=30)
+
+                        mp3_ms = (time.perf_counter() - mp3_start) * 1000
+                        if proc.returncode == 0:
+                            wav_path.unlink()
+                            print(f"⏱️  TTS [FFmpeg MP3] {mp3_ms:.0f}ms ({mp3_ms/1000:.2f}s)")
+                        else:
+                            print(f"⏱️  TTS [FFmpeg FAILED] {mp3_ms:.0f}ms")
+                            return None, None
+
+                    except asyncio.TimeoutError:
+                        if wav_path.exists():
+                            wav_path.unlink()
+                        return None, None
+                    except FileNotFoundError:
+                        if wav_path.exists():
+                            wav_path.unlink()
+                        return None, None
+                    except Exception:
+                        if wav_path.exists():
+                            wav_path.unlink()
+                        return None, None
+
             total_ms = (time.perf_counter() - tts_start) * 1000
             print(f"⏱️  TTS [TOTAL] {total_ms:.0f}ms ({total_ms/1000:.2f}s)")
 
             return str(cache_path), lip_sync_data
 
-        except requests.exceptions.ConnectionError:
-            print(f"⏱️  TTS [CONNECTION ERROR] Server not running: {self.sovits_url}")
-            return None, None
-        except requests.exceptions.HTTPError as e:
-            print(f"⏱️  TTS [HTTP ERROR] {e}")
+        except aiohttp.ClientError as e:
+            print(f"⏱️  TTS [CONNECTION ERROR] {e}")
             return None, None
         except Exception as e:
             print(f"⏱️  TTS [ERROR] {e}")
