@@ -57,7 +57,6 @@ export function triggerPose(pose: GestureName): void {
       detail: { type: "play", pose },
     })
   );
-  console.log(`🎭 Pose command: play ${pose}`);
 }
 
 /**
@@ -69,7 +68,6 @@ export function returnToRest(): void {
       detail: { type: "stop" },
     })
   );
-  console.log(`🎭 Pose command: return to rest`);
 }
 
 /**
@@ -93,7 +91,6 @@ export function triggerExpression(expression: string, weight: number = 1.0): voi
       detail: { type: "set", expression, weight },
     })
   );
-  console.log(`😊 Expression command: set ${expression} to ${weight}`);
 }
 
 /**
@@ -105,7 +102,6 @@ export function clearExpressions(): void {
       detail: { type: "clear" },
     })
   );
-  console.log(`😊 Expression command: clear all`);
 }
 
 /**
@@ -207,9 +203,6 @@ export function triggerTestSpeak(text: string): void {
       detail: { text, lipSync, audioUrl: testAudioUrl },
     })
   );
-
-  console.log(`🎤 Test speak: "${text}" (~${estimatedDuration.toFixed(1)}s, ${lipSync.length} cues)`);
-  console.log(`🎵 Will try test audio: ${testAudioUrl}`);
 }
 
 /**
@@ -278,7 +271,6 @@ export function parseTestCommand(input: string): {
         return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, speakCommand: false, speakText: null, remainingText: null };
       }
 
-      console.warn(`Unknown expression: ${exprName}. Valid: ${VALID_EXPRESSIONS.join(", ")}`);
       return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
     }
 
@@ -304,7 +296,6 @@ export function parseTestCommand(input: string): {
       case "stop":
         return { command: { type: "stop" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       default:
-        console.warn(`Unknown test command: ${command}`);
         return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
     }
   }

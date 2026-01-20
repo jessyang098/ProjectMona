@@ -124,8 +124,6 @@ export class GestureManager {
     try {
       let clip: THREE.AnimationClip | null = null;
 
-      console.log(`🎭 Loading gesture: ${gesture.name} from ${gesture.path}`);
-
       if (isVRMAFile(gesture.path)) {
         // Load VRM-native animation
         clip = await loadVRMAAnimation(gesture.path, this.vrm);
@@ -136,16 +134,9 @@ export class GestureManager {
 
       if (clip) {
         this.loadedGestures.set(gesture.name, clip);
-        console.log(`✓ Loaded gesture: ${gesture.name} (${isVRMAFile(gesture.path) ? 'VRMA' : 'Mixamo'}) - duration: ${clip.duration.toFixed(2)}s, tracks: ${clip.tracks.length}`);
-      } else {
-        console.warn(`⚠️ Gesture ${gesture.name} returned null clip`);
       }
     } catch (error) {
-      console.error(`❌ Failed to load gesture ${gesture.name}:`, error);
-      // Log the full error stack for better debugging
-      if (error instanceof Error) {
-        console.error(`   Stack: ${error.stack}`);
-      }
+      // Silently handle loading errors
     }
   }
 
@@ -153,10 +144,8 @@ export class GestureManager {
    * Load all gesture animations
    */
   async loadAllGestures(): Promise<void> {
-    console.log("Loading gesture animations...");
     const loadPromises = GESTURE_CONFIGS.map((config) => this.loadGesture(config));
     await Promise.allSettled(loadPromises);
-    console.log(`✓ Loaded ${this.loadedGestures.size}/${GESTURE_CONFIGS.length} gestures`);
   }
 
   /**
@@ -172,12 +161,8 @@ export class GestureManager {
    * @param fadeInDuration Duration of fade-in transition (longer = smoother)
    */
   playGesture(gestureName: GestureName, fadeInDuration: number = 0.5): boolean {
-    console.log(`🎬 playGesture called: ${gestureName}`);
-    console.log(`🎬 Available gestures: ${Array.from(this.loadedGestures.keys()).join(', ')}`);
-
     const clip = this.loadedGestures.get(gestureName);
     if (!clip) {
-      console.warn(`⚠️ Gesture ${gestureName} not loaded - available: ${Array.from(this.loadedGestures.keys()).join(', ')}`);
       return false;
     }
 
@@ -230,7 +215,6 @@ export class GestureManager {
       }, Math.max(0, gestureEndTime));
     }
 
-    console.log(`▶ Playing gesture: ${gestureName}${isLoopingIdle ? ' (looping)' : isHoldPose ? ' (holding)' : ''}`);
     return true;
   }
 
@@ -238,7 +222,6 @@ export class GestureManager {
    * Return to standing idle animation
    */
   returnToIdle(fadeInDuration: number = 0.5): void {
-    console.log(`↩ Returning to standing idle from: ${this.currentGestureName}`);
     this.playGesture("standing_idle", fadeInDuration);
   }
 

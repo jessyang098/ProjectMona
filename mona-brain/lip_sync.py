@@ -6,6 +6,7 @@ Analyzes audio files and generates mouth shape timing data for realistic lip syn
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -126,15 +127,15 @@ class LipSyncGenerator:
 
             cmd.append(audio_path)
 
-            print(f"🎤 Running Rhubarb: {' '.join(cmd)}")
-
             # Run rhubarb
+            rhubarb_start = time.perf_counter()
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=30  # 30 second timeout
             )
+            rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
 
             # Clean up dialog file
             if dialog_text:
@@ -143,10 +144,11 @@ class LipSyncGenerator:
                     dialog_file.unlink()
 
             if result.returncode != 0:
-                print(f"✗ Rhubarb failed: {result.stderr}")
+                print(f"⏱️  Lip Sync [RHUBARB FAILED] {rhubarb_ms:.0f}ms - {result.stderr}")
                 return None
 
             # Parse JSON output
+            parse_start = time.perf_counter()
             data = json.loads(result.stdout)
             mouth_cues = data.get("mouthCues", [])
 
@@ -169,7 +171,9 @@ class LipSyncGenerator:
                     "phonemes": RHUBARB_TO_VRM.get(shape, RHUBARB_TO_VRM["X"])
                 })
 
-            print(f"✓ Generated {len(lip_sync_data)} lip sync cues")
+            parse_ms = (time.perf_counter() - parse_start) * 1000
+            total_ms = rhubarb_ms + parse_ms
+            print(f"⏱️  Lip Sync [Rhubarb] {rhubarb_ms:.0f}ms | [Parse] {parse_ms:.0f}ms | [TOTAL] {total_ms:.0f}ms ({len(lip_sync_data)} cues)")
             return lip_sync_data
 
         except subprocess.TimeoutExpired:

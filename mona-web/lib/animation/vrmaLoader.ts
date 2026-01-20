@@ -41,7 +41,7 @@ export async function loadVRMAAnimation(
     const vrmAnimations = gltf.userData.vrmAnimations as VRMAnimation[] | undefined;
 
     if (!vrmAnimations || vrmAnimations.length === 0) {
-      console.warn(`No VRM animations found in ${url}`);
+      // Warning removed(`No VRM animations found in ${url}`);
       return null;
     }
 
@@ -51,10 +51,10 @@ export async function loadVRMAAnimation(
     // Convert to THREE.AnimationClip compatible with the VRM
     const clip = createVRMAnimationClip(vrmAnimation, vrm);
 
-    console.log(`✓ Loaded VRMA animation: ${url} (${clip.duration.toFixed(2)}s)`);
+    // Log removed(`✓ Loaded VRMA animation: ${url} (${clip.duration.toFixed(2)}s)`);
     return clip;
   } catch (error) {
-    console.error(`Failed to load VRMA animation ${url}:`, error);
+    // Error removed(`Failed to load VRMA animation ${url}:`, error);
     return null;
   }
 }

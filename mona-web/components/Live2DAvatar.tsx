@@ -289,7 +289,7 @@ export default function Live2DAvatar({
         const script = document.createElement("script");
         script.src = "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js";
         script.onload = () => {
-          console.log("✅ Cubism 4 SDK loaded");
+          // Log removed("✅ Cubism 4 SDK loaded");
           resolve();
         };
         script.onerror = () => reject(new Error("Failed to load Cubism SDK"));
@@ -330,7 +330,7 @@ export default function Live2DAvatar({
         appRef.current = app;
 
         // Load the Live2D model
-        console.log("🎭 Loading Live2D model from:", modelUrl);
+        // Log removed("🎭 Loading Live2D model from:", modelUrl);
         const model = await Live2DModelClass.from(modelUrl) as unknown as Live2DModel;
 
         if (!mounted) {
@@ -339,18 +339,8 @@ export default function Live2DAvatar({
           return;
         }
 
-        // Debug: log model dimensions
-        const modelAny = model as any;
-        console.log("📐 Live2D model dimensions:", {
-          width: modelAny.width,
-          height: modelAny.height,
-          internalWidth: modelAny.internalModel?.width,
-          internalHeight: modelAny.internalModel?.height,
-          canvasWidth: width,
-          canvasHeight: height,
-        });
-
         // Scale to fit canvas height (larger)
+        const modelAny = model as any;
         const modelOriginalHeight = modelAny.height || 1200;
         const scale = (height * 1.3) / modelOriginalHeight;
         model.scale.set(scale);
@@ -385,55 +375,25 @@ export default function Live2DAvatar({
         modelAny.on('pointerup', () => {
           if (dragging) {
             dragging = false;
-            // Log the final position when drag ends
-            console.log("🎯 DRAG ENDED - Final position:", {
-              x: model.x,
-              y: model.y,
-              // Also log as percentage of canvas for responsive positioning
-              xPercent: (model.x / width * 100).toFixed(1) + "%",
-              yPercent: (model.y / height * 100).toFixed(1) + "%",
-            });
           }
         });
 
         modelAny.on('pointerupoutside', () => {
           if (dragging) {
             dragging = false;
-            console.log("🎯 DRAG ENDED (outside) - Final position:", {
-              x: model.x,
-              y: model.y,
-              xPercent: (model.x / width * 100).toFixed(1) + "%",
-              yPercent: (model.y / height * 100).toFixed(1) + "%",
-            });
           }
         });
 
         app.stage.addChild(model as any);
         modelRef.current = model;
 
-        // Log initial position for debugging
-        console.log("📍 Live2D model initial position (drag to adjust):", {
-          x: model.x,
-          y: model.y,
-          scale: scale,
-          scaledWidth: (modelAny.width || 0) * scale,
-          scaledHeight: (modelAny.height || 0) * scale,
-        });
-
         // Hide watermark on initial load
         hideWatermark(model);
-        console.log("✅ Watermark hiding initialized");
+        // Log removed("✅ Watermark hiding initialized");
 
         // Verify lip sync parameters exist
-        const coreModel = model.internalModel.coreModel as any;
         const mouthOpenParam = findParam(model, LIP_SYNC_PARAMS.mouthOpen);
         const mouthFormParam = findParam(model, LIP_SYNC_PARAMS.mouthForm);
-        console.log("👄 Lip sync parameters found:", {
-          mouthOpen: mouthOpenParam,
-          mouthForm: mouthFormParam,
-        });
-
-        console.log("✅ Live2D model loaded successfully");
 
         // Start animation loop
         animStateRef.current.lastTime = performance.now();
@@ -473,7 +433,7 @@ export default function Live2DAvatar({
         animate();
 
       } catch (error) {
-        console.error("❌ Failed to load Live2D model:", error);
+        // Error removed("❌ Failed to load Live2D model:", error);
       }
     };
 
@@ -512,7 +472,7 @@ export default function Live2DAvatar({
         const expressionName = expressionCandidates[index];
         const success = await modelRef.current.expression(expressionName);
         if (success) {
-          console.log(`😊 Live2D expression set: ${expressionName}`);
+          // Log removed(`😊 Live2D expression set: ${expressionName}`);
         } else {
           // Try next candidate
           tryExpression(index + 1);
@@ -559,7 +519,7 @@ export default function Live2DAvatar({
     audio.onerror = (e) => {
       // Ignore abort errors that happen during cleanup
       if (audio.error?.code !== MediaError.MEDIA_ERR_ABORTED) {
-        console.error("❌ Live2D audio error:", e);
+        // Error removed("❌ Live2D audio error:", e);
       }
     };
 
@@ -573,12 +533,12 @@ export default function Live2DAvatar({
         playPromise.then(() => {
           if (isActive) {
             animStateRef.current.isPlaying = true;
-            console.log("▶️ Live2D audio playing");
+            // Log removed("▶️ Live2D audio playing");
           }
         }).catch((error) => {
           // Ignore abort errors from cleanup
           if (error.name !== "AbortError") {
-            console.error("❌ Live2D audio playback failed:", error);
+            // Error removed("❌ Live2D audio playback failed:", error);
           }
         });
       }

@@ -136,7 +136,7 @@ export default function ShopModal({ isOpen, onClose, isAuthenticated = false, on
       setShowLoginPrompt(true);
     } else {
       // TODO: Handle actual purchase
-      console.log("Purchase clicked");
+      // Purchase clicked
     }
   };
 

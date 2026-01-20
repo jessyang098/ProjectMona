@@ -84,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
-        console.error("Auth check failed:", error);
         // Set up guest session on error
         const sessionId = getGuestSessionId();
         setGuestSessionId(sessionId);
@@ -121,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setGuestMessagesRemaining(null);
           setIsGuestLimitReached(false);
         })
-        .catch(console.error);
+        .catch(() => {});
     }
   }, []);
 
@@ -137,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
     } catch (error) {
-      console.error("Logout failed:", error);
+      // Silently handle logout errors
     }
 
     setUser(null);

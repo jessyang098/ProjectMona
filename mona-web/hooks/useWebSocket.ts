@@ -42,20 +42,16 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     }
     const wsUrl = `${url}/${clientId}`;
 
-    console.log("Connecting to WebSocket:", wsUrl);
-
     const ws = new WebSocket(wsUrl);
     websocketRef.current = ws;
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
       setIsConnected(true);
     };
 
     ws.onmessage = (event) => {
       try {
         const data: WebSocketMessage = JSON.parse(event.data);
-        console.log("Received message:", data);
 
         if (data.type === "message" && data.sender) {
           // Construct full audio URL if provided
@@ -76,13 +72,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
             audioUrl: audioUrl,
             imageUrl: imageUrl,
           };
-
-          console.log("📨 Message received:", {
-            sender: newMessage.sender,
-            hasEmotion: !!newMessage.emotion,
-            hasImage: !!newMessage.imageUrl,
-            audioUrl: newMessage.audioUrl,
-          });
 
           // If this is Mona's message without audio, start generating audio
           if (data.sender === "mona" && !audioUrl) {
@@ -128,11 +117,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           // Update the most recent Mona message with the audio URL and lip sync data
           const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
 
-          console.log("🎵 Audio ready:", fullAudioUrl);
-          if (data.lipSync) {
-            console.log("👄 Lip sync data:", data.lipSync.length, "cues");
-          }
-
           // Stop audio generation indicator
           setIsGeneratingAudio(false);
 
@@ -148,7 +132,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
                 lipSync: data.lipSync,  // Include lip sync timing data
               };
 
-              console.log("✓ Updated message with audio URL and lip sync");
               return next;
             }
 
@@ -156,7 +139,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           });
         } else if (data.type === "auth_status") {
           // Handle auth status from server
-          console.log("🔐 Auth status:", data);
           setGuestMessagesRemaining(data.guestMessagesRemaining ?? null);
           if (options?.onAuthStatus) {
             options.onAuthStatus({
@@ -168,7 +150,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           }
         } else if (data.type === "chat_history") {
           // Handle chat history from server (for authenticated users)
-          console.log("📜 Chat history received:", data.messages?.length, "messages");
           if (data.messages && options?.onChatHistory) {
             const historyMessages: Message[] = data.messages.map((msg: { content: string; sender: string; timestamp: string; emotion?: EmotionData }) => ({
               content: msg.content,
@@ -181,23 +162,21 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           }
         } else if (data.type === "guest_limit_reached") {
           // Handle guest limit reached
-          console.log("⚠️ Guest limit reached:", data);
           setGuestMessagesRemaining(0);
           if (options?.onGuestLimitReached) {
             options.onGuestLimitReached(data.messagesUsed ?? 0, data.messageLimit ?? 10);
           }
         }
       } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
+        // Silently handle parse errors
       }
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    ws.onerror = () => {
+      // Silently handle WebSocket errors
     };
 
     ws.onclose = () => {
-      console.log("WebSocket disconnected");
       setIsConnected(false);
     };
 
@@ -223,9 +202,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         message.image = imageBase64;
       }
       websocketRef.current.send(JSON.stringify(message));
-      console.log("Sent message:", { ...message, image: imageBase64 ? "[base64 image]" : undefined });
-    } else {
-      console.error("WebSocket is not connected");
     }
   }, []);
 

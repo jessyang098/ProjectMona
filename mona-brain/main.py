@@ -1,10 +1,48 @@
 import asyncio
 import random
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 from contextlib import asynccontextmanager
+
+
+class PipelineTimer:
+    """Tracks timing for the message-to-voice pipeline."""
+
+    def __init__(self, client_id: str):
+        self.client_id = client_id
+        self.start_time = time.perf_counter()
+        self.checkpoints: Dict[str, float] = {}
+
+    def checkpoint(self, name: str):
+        """Record a checkpoint time."""
+        self.checkpoints[name] = time.perf_counter()
+
+    def get_elapsed(self, checkpoint_name: str = None) -> float:
+        """Get elapsed time in ms from start or from a checkpoint."""
+        if checkpoint_name and checkpoint_name in self.checkpoints:
+            return (time.perf_counter() - self.checkpoints[checkpoint_name]) * 1000
+        return (time.perf_counter() - self.start_time) * 1000
+
+    def log_summary(self):
+        """Log a summary of all timing checkpoints."""
+        total_ms = self.get_elapsed()
+        print(f"\n{'='*60}")
+        print(f"⏱️  PIPELINE TIMING SUMMARY (Client: {self.client_id[:8]}...)")
+        print(f"{'='*60}")
+
+        prev_time = self.start_time
+        for name, checkpoint_time in self.checkpoints.items():
+            step_ms = (checkpoint_time - prev_time) * 1000
+            total_at_checkpoint = (checkpoint_time - self.start_time) * 1000
+            print(f"  {name:<30} +{step_ms:>7.0f}ms  (total: {total_at_checkpoint:>7.0f}ms)")
+            prev_time = checkpoint_time
+
+        print(f"{'─'*60}")
+        print(f"  {'TOTAL':<30} {total_ms:>8.0f}ms  ({total_ms/1000:.2f}s)")
+        print(f"{'='*60}\n")
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles as BaseStaticFiles
@@ -444,11 +482,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             data = await websocket.receive_text()
             message_data = json.loads(data)
 
+            # Start pipeline timer
+            timer = PipelineTimer(client_id)
+            timer.checkpoint("1_message_received")
+
             # Extract image data if present
             image_base64 = message_data.get("image")
             has_image = bool(image_base64)
             user_content = message_data.get("content", "") or ""
-            print(f"Received from {client_id}: {user_content[:100]}... (has_image: {has_image})")
 
             # Check guest message limit
             if is_guest:
@@ -470,8 +511,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                         guest_session.message_count += 1
                         guest_session.last_active = datetime.now()
                         await db.commit()
-                        remaining = max(0, GUEST_MESSAGE_LIMIT - guest_session.message_count)
-                        print(f"👤 Guest {guest_session_id}: {guest_session.message_count}/{GUEST_MESSAGE_LIMIT} messages used, {remaining} remaining")
+
+            timer.checkpoint("2_validation_complete")
 
             # Echo user message back (for confirmation)
             user_message = {
@@ -503,6 +544,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
             # Simulate thinking time
             await simulate_typing_delay()
+            timer.checkpoint("3_typing_delay_done")
 
             # Generate response using LLM or fallback to dummy
             if mona_llm:
@@ -520,6 +562,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
                         elif event["event"] in {"complete", "error"}:
+                            timer.checkpoint("4_llm_complete")
+
                             # Send text message immediately (without audio)
                             mona_content = event.get("content", "")
                             emotion_info = event.get("emotion", {})
@@ -551,41 +595,51 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                             # Generate TTS audio in background (non-blocking)
                             if event.get("content"):
+                                # Capture timer reference for background task
+                                bg_timer = timer
+
                                 async def generate_audio_background():
+                                    bg_timer.checkpoint("5_tts_start")
+
                                     # Preprocess text to remove problematic phonemes
                                     tts_text = preprocess_tts_text(event["content"])
+                                    bg_timer.checkpoint("6_text_preprocessed")
 
                                     audio_url = None
                                     lip_sync_data = None
                                     # Try GPT-SoVITS first (high-quality anime voice)
                                     if mona_tts_sovits:
                                         audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        bg_timer.checkpoint("7_tts_generated")
+
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
-                                            print(f"✓ Using GPT-SoVITS audio")
-                                            if lip_sync_data:
-                                                print(f"✓ Lip sync: {len(lip_sync_data)} cues")
 
                                     # Fall back to OpenAI TTS if SoVITS failed or unavailable
                                     if not audio_url and mona_tts:
                                         audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text)
+                                        bg_timer.checkpoint("7_tts_generated")
+
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
                                             # Use OpenAI TTS lip sync if GPT-SoVITS didn't provide any
                                             if not lip_sync_data and openai_lip_sync:
                                                 lip_sync_data = openai_lip_sync
-                                                print(f"✓ Lip sync from OpenAI TTS: {len(lip_sync_data)} cues")
-                                            print(f"✓ Using OpenAI TTS audio (fallback)")
 
                                     # Send audio update when ready
                                     if audio_url:
+                                        bg_timer.checkpoint("8_audio_ready_to_send")
+
                                         audio_update = {
                                             "type": "audio_ready",
                                             "audioUrl": audio_url,
-                                            "lipSync": lip_sync_data,  # Include lip sync timing data
+                                            "lipSync": lip_sync_data,
                                             "timestamp": datetime.now().isoformat(),
                                         }
                                         await manager.send_message(audio_update, client_id)
+
+                                        bg_timer.checkpoint("9_audio_sent_to_client")
+                                        bg_timer.log_summary()
 
                                 # Start audio generation without awaiting
                                 asyncio.create_task(generate_audio_background())

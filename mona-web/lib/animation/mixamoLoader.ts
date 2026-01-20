@@ -16,13 +16,13 @@ export async function loadMixamoAnimation(
 ): Promise<THREE.AnimationClip> {
   const fbxLoader = new FBXLoader();
 
-  console.log(`📦 Loading FBX: ${url}`);
+  // Log removed(`📦 Loading FBX: ${url}`);
   const animationAsset = await fbxLoader.loadAsync(url);
-  console.log(`📦 FBX loaded: ${url}, animations count: ${animationAsset.animations.length}`);
+  // Log removed(`📦 FBX loaded: ${url}, animations count: ${animationAsset.animations.length}`);
 
   // Log all available animations for debugging
   if (animationAsset.animations.length > 0) {
-    console.log(`📦 Available animations in ${url}:`, animationAsset.animations.map(a => `"${a.name}" (${a.duration.toFixed(2)}s)`).join(', '));
+    // Log removed(`📦 Available animations in ${url}:`, animationAsset.animations.map(a => `"${a.name}" (${a.duration.toFixed(2)}s)`).join(', '));
   }
 
   // Extract the animation clip from the loaded FBX
@@ -35,11 +35,11 @@ export async function loadMixamoAnimation(
   if (!sourceClip && animationAsset.animations.length > 0) {
     // Use first animation if "mixamo.com" not found
     sourceClip = animationAsset.animations[0];
-    console.log(`ℹ️ Using animation "${sourceClip.name}" from ${url} (no "mixamo.com" clip found)`);
+    // Log removed(`ℹ️ Using animation "${sourceClip.name}" from ${url} (no "mixamo.com" clip found)`);
   }
 
   if (!sourceClip) {
-    console.error(`❌ No animation found in ${url}`);
+    // Error removed(`❌ No animation found in ${url}`);
     throw new Error(`No animation found in ${url}`);
   }
 
@@ -55,10 +55,10 @@ export async function loadMixamoAnimation(
     animationAsset.traverse((obj) => {
       if (obj.type === 'Bone') bones.push(obj.name);
     });
-    console.error(`❌ Mixamo rig not found in ${url}. Available bones:`, bones.slice(0, 20).join(', '));
+    // Error removed(`❌ Mixamo rig not found in ${url}. Available bones:`, bones.slice(0, 20).join(', '));
     throw new Error("Mixamo rig not found - missing 'mixamorigHips' node");
   }
-  console.log(`📦 Mixamo hips found at height: ${mixamoHipsNode.position.y}`)
+  // Log removed(`📦 Mixamo hips found at height: ${mixamoHipsNode.position.y}`)
 
   const mixamoHipsHeight = mixamoHipsNode.position.y;
   const vrmHipsPosition = vrm.humanoid.normalizedRestPose.hips?.position;
@@ -73,7 +73,7 @@ export async function loadMixamoAnimation(
   // VRoid Studio exports VRM 0.x by default, so we assume 0.x if version is undefined
   const vrmMetaVersion = (vrm.meta as { metaVersion?: string })?.metaVersion;
   const isVRM0 = vrmMetaVersion === '0' || vrmMetaVersion === undefined;
-  console.log(`📦 VRM meta version: ${vrmMetaVersion ?? 'undefined'}, treating as VRM0: ${isVRM0}`);
+  // Log removed(`📦 VRM meta version: ${vrmMetaVersion ?? 'undefined'}, treating as VRM0: ${isVRM0}`);
 
   // Convert tracks to VRM bone space
   const vrmTracks: THREE.KeyframeTrack[] = [];

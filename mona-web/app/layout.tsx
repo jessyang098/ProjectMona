@@ -49,7 +49,6 @@ export default function RootLayout({
                   script.src = 'https://cdn.jsdelivr.net/npm/eruda';
                   script.onload = function() {
                     eruda.init();
-                    console.log('📱 Eruda mobile console initialized');
                   };
                   document.head.appendChild(script);
                 }

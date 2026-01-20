@@ -8,6 +8,7 @@ import json
 import os
 import requests
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
@@ -155,15 +156,13 @@ class MonaTTSSoVITS:
         if not text or not text.strip():
             return None, None
 
+        tts_start = time.perf_counter()
+
         # Clean text for TTS (remove markdown, emojis, code blocks, etc.)
         if preprocess:
-            original_text = text
             text = clean_for_tts(text)
-            if text != original_text:
-                print(f"🧹 TTS preprocessing: '{original_text[:50]}...' → '{text[:50]}...'")
 
         if not text or not text.strip():
-            print("⚠️ Text empty after preprocessing, skipping TTS")
             return None, None
 
         # Determine output format based on conversion flag
@@ -173,25 +172,21 @@ class MonaTTSSoVITS:
 
         # Return cached file if it exists
         if use_cache and cache_path.exists():
-            print(f"✓ Using cached SoVITS audio: {cache_path.name}")
-            # Also load cached lip sync if available
+            cache_ms = (time.perf_counter() - tts_start) * 1000
             lip_sync_data = None
             if lip_sync_cache_path.exists():
                 try:
                     lip_sync_data = json.loads(lip_sync_cache_path.read_text())
-                    print(f"✓ Using cached lip sync data: {len(lip_sync_data)} cues")
                 except Exception:
                     pass
+            print(f"⏱️  TTS [CACHE HIT] {cache_ms:.0f}ms")
             return str(cache_path), lip_sync_data
 
         # Mock mode: Return None (no audio) but log what would be generated
         if self.mock_mode:
-            print(f"🎭 Mock TTS: Would generate speech for: '{text[:50]}...'")
             return None, None
 
         try:
-            print(f"⚡ Generating SoVITS speech for: {text[:50]}...")
-
             # Prepare payload for GPT-SoVITS
             payload = {
                 "text": text,
@@ -200,31 +195,34 @@ class MonaTTSSoVITS:
                 "prompt_text": self.prompt_text,
                 "prompt_lang": self.prompt_lang,
                 "speed_factor": self.speed_factor,
-                "text_split_method": "cut0",  # cut0 = faster, simpler splitting
-                "streaming_mode": 1,  # Mode 1: return fragments without streaming (faster response)
+                "text_split_method": "cut0",
+                "streaming_mode": 1,
             }
 
             # Call GPT-SoVITS API
-            print(f"📤 Sending payload to {self.sovits_url}:")
-            print(f"   {payload}")
+            api_start = time.perf_counter()
             response = requests.post(self.sovits_url, json=payload, timeout=30)
+            api_ms = (time.perf_counter() - api_start) * 1000
 
-            # Log response for debugging
-            print(f"📥 Response status: {response.status_code}")
             if response.status_code != 200:
-                print(f"❌ Error response body: {response.text}")
+                print(f"⏱️  TTS [API ERROR] {api_ms:.0f}ms - Status: {response.status_code}")
+                return None, None
 
             response.raise_for_status()
+            print(f"⏱️  TTS [GPT-SoVITS API] {api_ms:.0f}ms ({api_ms/1000:.2f}s)")
 
-            # Always save WAV first (needed for lip sync analysis)
+            # Save WAV file
+            save_start = time.perf_counter()
             wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav" if convert_to_mp3 else cache_path
             with open(wav_path, "wb") as f:
                 f.write(response.content)
-            print(f"✓ SoVITS WAV generated: {wav_path.name}")
+            save_ms = (time.perf_counter() - save_start) * 1000
+            print(f"⏱️  TTS [Save WAV] {save_ms:.0f}ms")
 
-            # Generate lip sync data from the WAV file BEFORE MP3 conversion
+            # Generate lip sync data
             lip_sync_data = None
             if generate_lip_sync:
+                lip_start = time.perf_counter()
                 lip_sync_generator = get_lip_sync_generator()
                 if lip_sync_generator.is_available():
                     lip_sync_data = lip_sync_generator.generate_lip_sync(
@@ -232,66 +230,64 @@ class MonaTTSSoVITS:
                         dialog_text=text
                     )
                     if lip_sync_data:
-                        # Cache the lip sync data
                         lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-                        print(f"✓ Lip sync data cached: {len(lip_sync_data)} cues")
+                lip_ms = (time.perf_counter() - lip_start) * 1000
+                print(f"⏱️  TTS [Rhubarb Lip Sync] {lip_ms:.0f}ms ({lip_ms/1000:.2f}s)")
 
-            # Convert to MP3 if requested (for mobile clients)
+            # Convert to MP3 if requested
             if convert_to_mp3:
-                print(f"✓ Converting to MP3 for mobile compatibility...")
+                mp3_start = time.perf_counter()
                 try:
                     result = subprocess.run(
                         [
                             "ffmpeg",
-                            "-i", str(wav_path),  # Input WAV file
-                            "-codec:a", "libmp3lame",  # MP3 encoder
-                            "-b:a", "128k",  # 128kbps bitrate
-                            "-ar", "44100",  # 44.1kHz sample rate (standard for web)
-                            "-ac", "1",  # Mono audio
-                            "-y",  # Overwrite output file
-                            str(cache_path)  # Output MP3 file
+                            "-i", str(wav_path),
+                            "-codec:a", "libmp3lame",
+                            "-b:a", "128k",
+                            "-ar", "44100",
+                            "-ac", "1",
+                            "-y",
+                            str(cache_path)
                         ],
                         capture_output=True,
                         text=True,
                         timeout=30
                     )
 
+                    mp3_ms = (time.perf_counter() - mp3_start) * 1000
                     if result.returncode == 0:
-                        wav_path.unlink()  # Delete temporary WAV file
-                        print(f"✓ SoVITS audio converted to MP3: {cache_path.name}")
+                        wav_path.unlink()
+                        print(f"⏱️  TTS [FFmpeg MP3] {mp3_ms:.0f}ms ({mp3_ms/1000:.2f}s)")
                     else:
-                        print(f"❌ ffmpeg conversion failed with return code {result.returncode}")
-                        print(f"   stderr: {result.stderr[:200]}")
+                        print(f"⏱️  TTS [FFmpeg FAILED] {mp3_ms:.0f}ms")
                         return None, None
 
                 except subprocess.TimeoutExpired:
-                    print(f"❌ MP3 conversion timed out after 30 seconds")
                     if wav_path.exists():
                         wav_path.unlink()
                     return None, None
                 except FileNotFoundError:
-                    print(f"❌ ffmpeg not found - cannot convert to MP3 for mobile")
-                    print(f"   Install ffmpeg: apt-get install ffmpeg (or brew install ffmpeg on macOS)")
                     if wav_path.exists():
                         wav_path.unlink()
                     return None, None
-                except Exception as e:
-                    print(f"❌ MP3 conversion failed: {e}")
+                except Exception:
                     if wav_path.exists():
                         wav_path.unlink()
                     return None, None
+
+            total_ms = (time.perf_counter() - tts_start) * 1000
+            print(f"⏱️  TTS [TOTAL] {total_ms:.0f}ms ({total_ms/1000:.2f}s)")
 
             return str(cache_path), lip_sync_data
 
         except requests.exceptions.ConnectionError:
-            print(f"✗ SoVITS server not running. Start GPT-SoVITS on {self.sovits_url}")
+            print(f"⏱️  TTS [CONNECTION ERROR] Server not running: {self.sovits_url}")
             return None, None
         except requests.exceptions.HTTPError as e:
-            print(f"✗ SoVITS API error: {e}")
-            print(f"✗ Response body: {e.response.text if hasattr(e, 'response') else 'No response body'}")
+            print(f"⏱️  TTS [HTTP ERROR] {e}")
             return None, None
         except Exception as e:
-            print(f"✗ SoVITS generation failed: {e}")
+            print(f"⏱️  TTS [ERROR] {e}")
             return None, None
 
     def clear_cache(self) -> int:

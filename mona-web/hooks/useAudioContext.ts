@@ -23,27 +23,21 @@ export function useAudioContext() {
    */
   const initAudioContext = useCallback(async () => {
     if (initializedRef.current && audioContextRef.current) {
-      console.log("ℹ️ AudioContext already initialized");
       // Resume if suspended
       if (audioContextRef.current.state === "suspended") {
         await audioContextRef.current.resume();
-        console.log("✅ AudioContext resumed");
       }
       return audioContextRef.current;
     }
 
-    console.log("🎵 Creating AudioContext from user interaction...");
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new AudioContextClass();
       initializedRef.current = true;
 
-      console.log("✅ AudioContext created, state:", audioContextRef.current.state);
-
       // Mobile browsers may start suspended - resume immediately
       if (audioContextRef.current.state === "suspended") {
         await audioContextRef.current.resume();
-        console.log("✅ AudioContext resumed after creation");
       }
 
       // Store globally for LipSyncManager access
@@ -55,7 +49,6 @@ export function useAudioContext() {
 
       return audioContextRef.current;
     } catch (error) {
-      console.error("❌ Failed to create AudioContext:", error);
       throw error;
     }
   }, []);
@@ -71,11 +64,8 @@ export function useAudioContext() {
 async function unlockMobileAudio(): Promise<void> {
   // Check if already unlocked
   if ((window as any).__monaUnlockedAudio) {
-    console.log("ℹ️ Mobile audio already unlocked");
     return;
   }
-
-  console.log("📱 Unlocking mobile audio...");
 
   // Create a new audio element
   const audio = new Audio();
@@ -98,7 +88,6 @@ async function unlockMobileAudio(): Promise<void> {
   try {
     // Play the silent audio - this "unlocks" the element
     await audio.play();
-    console.log("✅ Mobile audio unlocked successfully");
 
     // Store globally for LipSyncManager to reuse
     (window as any).__monaUnlockedAudio = audio;
@@ -107,7 +96,6 @@ async function unlockMobileAudio(): Promise<void> {
     audio.pause();
     audio.currentTime = 0;
   } catch (error) {
-    console.error("❌ Failed to unlock mobile audio:", error);
     // Don't throw - this is not critical on desktop
   }
 }

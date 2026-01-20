@@ -85,7 +85,7 @@ export default function ChatInterface() {
   const latestLipSync = latestMonaMessageWithAudio?.lipSync;
 
   useEffect(() => {
-    console.log("🎵 Latest audio URL updated:", latestAudioUrl);
+    // Log removed("🎵 Latest audio URL updated:", latestAudioUrl);
   }, [latestAudioUrl]);
 
   // Enable audio on first user interaction
@@ -94,9 +94,9 @@ export default function ChatInterface() {
       // Initialize AudioContext from user interaction (CRITICAL for mobile)
       await initAudioContext();
       setAudioEnabled(true);
-      console.log("🔊 Audio enabled by user interaction");
+      // Log removed("🔊 Audio enabled by user interaction");
     } catch (error) {
-      console.error("❌ Failed to enable audio:", error);
+      // Error removed("❌ Failed to enable audio:", error);
     }
   };
 
@@ -219,7 +219,7 @@ export default function ChatInterface() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      // Error removed('Failed to start recording:', error);
       alert('Microphone access denied. Please allow microphone access to use voice input.');
     }
   };
@@ -262,7 +262,7 @@ export default function ChatInterface() {
         }
       }
     } catch (error) {
-      console.error('Transcription failed:', error);
+      // Error removed('Transcription failed:', error);
       alert('Failed to transcribe audio. Make sure the backend transcription endpoint is available.');
     } finally {
       setIsProcessing(false);

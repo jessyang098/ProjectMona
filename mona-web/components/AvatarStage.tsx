@@ -238,12 +238,8 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
     // If it's a relative URL, prepend the backend URL
     const backendUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL?.replace('/ws', '').replace('ws://', 'http://').replace('wss://', 'https://') || 'http://localhost:8000';
     const fullUrl = `${backendUrl}${audioUrl.startsWith('/') ? '' : '/'}${audioUrl}`;
-    console.log(`🔗 Converted relative audio URL: ${audioUrl} -> ${fullUrl}`);
     return fullUrl;
   }, [audioUrl]);
-
-  console.log("🎬 AvatarStage received audioUrl:", audioUrl);
-  console.log("🎬 Absolute audioUrl:", absoluteAudioUrl);
 
   // Use provided avatarUrl, then env var, then default to Moe
   const modelUrl = avatarUrl || process.env.NEXT_PUBLIC_VRM_URL || "/avatars/Moe.vrm";
