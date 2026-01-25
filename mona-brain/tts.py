@@ -2,13 +2,14 @@
 Text-to-Speech integration for Mona using OpenAI TTS API.
 """
 
+import asyncio
 import json
 import os
 import hashlib
-import subprocess
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from lip_sync import get_lip_sync_generator
 
@@ -34,7 +35,7 @@ class MonaTTS:
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
 
-        self.client = OpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key)
         self.voice = voice
         self.model = model
 
@@ -90,51 +91,64 @@ class MonaTTS:
 
         try:
             print(f"⚡ Generating speech for: {text[:50]}...")
+            tts_start = time.perf_counter()
 
-            # Generate speech using OpenAI TTS
-            response = self.client.audio.speech.create(
-                model=self.model,
-                voice=self.voice,
-                input=text,
-            )
+            lip_sync_generator = get_lip_sync_generator() if generate_lip_sync else None
+            use_wav_workflow = generate_lip_sync and lip_sync_generator and lip_sync_generator.is_available()
 
-            # Save to cache
-            response.stream_to_file(cache_path)
-            print(f"✓ Audio saved: {cache_path.name}")
+            if use_wav_workflow:
+                # Get MP3 from OpenAI and save directly as final cache
+                # (OpenAI's WAV has malformed headers that Rhubarb can't read)
+                response = await self.client.audio.speech.create(
+                    model=self.model,
+                    voice=self.voice,
+                    input=text,
+                )
+                cache_path.write_bytes(response.content)
+                tts_ms = (time.perf_counter() - tts_start) * 1000
+                print(f"✓ OpenAI TTS complete ({tts_ms:.0f}ms)")
 
-            # Generate lip sync data from the audio file
-            # Rhubarb requires WAV format, so convert MP3 to WAV first
-            lip_sync_data = None
-            if generate_lip_sync:
-                lip_sync_generator = get_lip_sync_generator()
-                if lip_sync_generator.is_available():
-                    # Convert MP3 to WAV for Rhubarb
-                    wav_path = cache_path.with_suffix('.wav')
-                    try:
-                        result = subprocess.run(
-                            ['ffmpeg', '-i', str(cache_path), '-y', str(wav_path)],
-                            capture_output=True,
-                            text=True,
-                            timeout=30
-                        )
-                        if result.returncode == 0:
-                            lip_sync_data = lip_sync_generator.generate_lip_sync(
-                                str(wav_path),
-                                dialog_text=text
-                            )
-                            # Clean up temporary WAV file
-                            if wav_path.exists():
-                                wav_path.unlink()
-                            if lip_sync_data:
-                                # Cache the lip sync data
-                                lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-                                print(f"✓ Lip sync data cached: {len(lip_sync_data)} cues")
-                        else:
-                            print(f"⚠ Failed to convert MP3 to WAV for lip sync: {result.stderr[:100]}")
-                    except FileNotFoundError:
-                        print("⚠ ffmpeg not found - cannot generate lip sync for OpenAI TTS")
-                    except Exception as e:
-                        print(f"⚠ Lip sync conversion error: {e}")
+                # Convert MP3 to WAV for Rhubarb (proper headers)
+                wav_path = cache_path.with_suffix('.wav')
+                convert_proc = await asyncio.create_subprocess_exec(
+                    'ffmpeg', '-y', '-i', str(cache_path), str(wav_path),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await asyncio.wait_for(convert_proc.communicate(), timeout=30)
+
+                if convert_proc.returncode != 0:
+                    print(f"⚠ WAV conversion failed")
+                    return str(cache_path), None  # Return MP3 but no lip sync
+
+                # Run Rhubarb on WAV
+                rhubarb_start = time.perf_counter()
+                lip_sync_data = await lip_sync_generator.generate_lip_sync_async(
+                    str(wav_path),
+                    dialog_text=text
+                )
+                rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
+
+                # Clean up WAV
+                if wav_path.exists():
+                    wav_path.unlink()
+
+                print(f"✓ Rhubarb: {rhubarb_ms:.0f}ms, {len(lip_sync_data) if lip_sync_data else 0} cues")
+                if lip_sync_data:
+                    lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+
+            else:
+                # No lip sync needed - just get MP3 directly
+                response = await self.client.audio.speech.create(
+                    model=self.model,
+                    voice=self.voice,
+                    input=text,
+                )
+                audio_content = response.content
+                cache_path.write_bytes(audio_content)
+                tts_ms = (time.perf_counter() - tts_start) * 1000
+                print(f"✓ Audio saved: {cache_path.name} ({tts_ms:.0f}ms)")
+                lip_sync_data = None
 
             return str(cache_path), lip_sync_data
 
