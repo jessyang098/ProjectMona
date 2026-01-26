@@ -206,16 +206,21 @@ class MonaTTSSoVITS:
                         print(f"⏱️  TTS [API ERROR] {api_ms:.0f}ms - Status: {response.status}")
                         return None, None
 
-                    print(f"⏱️  TTS [GPT-SoVITS API] {api_ms:.0f}ms ({api_ms/1000:.2f}s)")
+                    print(f"⏱️  TTS [GPT-SoVITS API] First byte in {api_ms:.0f}ms")
 
-                    # Save WAV file
+                    # Download full audio (this is where the actual generation time is)
+                    download_start = time.perf_counter()
+                    audio_content = await response.read()
+                    download_ms = (time.perf_counter() - download_start) * 1000
+                    print(f"⏱️  TTS [Audio Generation + Download] {download_ms:.0f}ms ({download_ms/1000:.2f}s) - {len(audio_content)/1024:.1f}KB")
+
+                    # Save to disk
                     save_start = time.perf_counter()
                     wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav" if convert_to_mp3 else cache_path
-                    audio_content = await response.read()
                     with open(wav_path, "wb") as f:
                         f.write(audio_content)
                     save_ms = (time.perf_counter() - save_start) * 1000
-                    print(f"⏱️  TTS [Save WAV] {save_ms:.0f}ms")
+                    print(f"⏱️  TTS [Save to Disk] {save_ms:.0f}ms")
 
             # Generate lip sync and convert to MP3 (parallel if mobile)
             lip_sync_data = None

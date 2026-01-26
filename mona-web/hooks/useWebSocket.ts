@@ -187,19 +187,22 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     };
   }, [url]);
 
-  const sendMessage = useCallback((content: string, imageBase64?: string) => {
+  const sendMessage = useCallback((content: string, imageBase64?: string, ttsEngine?: string) => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
       // Store image for when we receive the echoed message back
       if (imageBase64) {
         pendingImageRef.current = imageBase64;
       }
 
-      const message: { content: string; timestamp: string; image?: string } = {
+      const message: { content: string; timestamp: string; image?: string; tts_engine?: string } = {
         content: content || (imageBase64 ? "What do you think of this?" : ""),
         timestamp: new Date().toISOString(),
       };
       if (imageBase64) {
         message.image = imageBase64;
+      }
+      if (ttsEngine) {
+        message.tts_engine = ttsEngine;
       }
       websocketRef.current.send(JSON.stringify(message));
     }

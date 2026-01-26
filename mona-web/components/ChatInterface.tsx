@@ -11,7 +11,7 @@ import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./Avata
 import LoginPrompt from "./LoginPrompt";
 import UserMenu from "./UserMenu";
 import ProfileModal from "./ProfileModal";
-import SettingsModal from "./SettingsModal";
+import SettingsModal, { TtsEngine } from "./SettingsModal";
 import ShopModal from "./ShopModal";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
@@ -37,6 +37,7 @@ export default function ChatInterface() {
   const [isInitialPrompt, setIsInitialPrompt] = useState(false);
   const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
   const [volume, setVolume] = useState(1);
+  const [ttsEngine, setTtsEngine] = useState<TtsEngine>("sovits");
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
     shirt: true,
     skirt: true,
@@ -188,7 +189,7 @@ export default function ChatInterface() {
     }
 
     if ((inputValue.trim() || selectedImage) && isConnected) {
-      sendMessage(inputValue.trim(), selectedImage?.base64);
+      sendMessage(inputValue.trim(), selectedImage?.base64, ttsEngine);
       setInputValue("");
       clearSelectedImage();
       // Blur input to close mobile keyboard and reset scroll position
@@ -257,7 +258,7 @@ export default function ChatInterface() {
 
         // Automatically send the message
         if (isConnected) {
-          sendMessage(transcribedText.trim());
+          sendMessage(transcribedText.trim(), undefined, ttsEngine);
           setInputValue(''); // Clear after sending
         }
       }
@@ -306,6 +307,8 @@ export default function ChatInterface() {
         onVolumeChange={setVolume}
         isDarkMode={isDarkMode}
         onDarkModeChange={setDarkMode}
+        ttsEngine={ttsEngine}
+        onTtsEngineChange={setTtsEngine}
       />
 
       {/* Shop modal */}

@@ -65,6 +65,7 @@ from config import GUEST_MESSAGE_LIMIT
 from personality_loader import load_personality_from_yaml
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
+from tts_cosyvoice import MonaTTSCosyVoice
 from text_utils import preprocess_tts_text
 from openai import OpenAI
 
@@ -72,13 +73,14 @@ from openai import OpenAI
 mona_llm: Optional[MonaLLM] = None
 mona_tts: Optional[MonaTTS] = None
 mona_tts_sovits: Optional[MonaTTSSoVITS] = None
+mona_tts_cosyvoice: Optional[MonaTTSCosyVoice] = None
 openai_client: Optional[OpenAI] = None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Initialize LLM, TTS, and database on startup"""
-    global mona_llm, mona_tts, mona_tts_sovits, openai_client
+    global mona_llm, mona_tts, mona_tts_sovits, mona_tts_cosyvoice, openai_client
 
     # Initialize database
     await init_db()
@@ -109,15 +111,21 @@ async def lifespan(_app: FastAPI):
         print("⚠ Running in DUMMY mode. Set OPENAI_API_KEY to enable GPT.")
         mona_llm = None
 
-    # Initialize GPT-SoVITS TTS (primary voice system)
+    # Initialize GPT-SoVITS TTS
     try:
-        # Initialize with default settings (uses RunPod server or local if available)
         mona_tts_sovits = MonaTTSSoVITS()
-        print(f"✓ Mona GPT-SoVITS initialized (using RunPod GPU server)")
+        print(f"✓ Mona GPT-SoVITS initialized")
     except Exception as e:
         print(f"⚠ Warning: Could not initialize GPT-SoVITS - {e}")
-        print("⚠ Will fall back to OpenAI TTS.")
         mona_tts_sovits = None
+
+    # Initialize CosyVoice TTS
+    try:
+        mona_tts_cosyvoice = MonaTTSCosyVoice()
+        print(f"✓ Mona CosyVoice initialized")
+    except Exception as e:
+        print(f"⚠ Warning: Could not initialize CosyVoice - {e}")
+        mona_tts_cosyvoice = None
 
     # Initialize OpenAI TTS (fallback)
     try:
@@ -486,10 +494,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             timer = PipelineTimer(client_id)
             timer.checkpoint("1_message_received")
 
-            # Extract image data if present
+            # Extract image data and TTS engine preference
             image_base64 = message_data.get("image")
             has_image = bool(image_base64)
             user_content = message_data.get("content", "") or ""
+            tts_engine = message_data.get("tts_engine", "sovits")  # "sovits" or "cosyvoice"
 
             # Check guest message limit
             if is_guest:
@@ -593,8 +602,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                             # Generate TTS audio in background (non-blocking)
                             if event.get("content"):
-                                # Capture timer reference for background task
+                                # Capture variables for background task
                                 bg_timer = timer
+                                bg_tts_engine = tts_engine
 
                                 async def generate_audio_background():
                                     bg_timer.checkpoint("5_tts_start")
@@ -605,22 +615,45 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                                     audio_url = None
                                     lip_sync_data = None
-                                    # Try GPT-SoVITS first (high-quality anime voice)
-                                    if mona_tts_sovits:
-                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
-                                        bg_timer.checkpoint("7_tts_generated")
+                                    used_engine = None
 
+                                    # Use selected TTS engine
+                                    if bg_tts_engine == "cosyvoice" and mona_tts_cosyvoice:
+                                        audio_path, lip_sync_data = await mona_tts_cosyvoice.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        used_engine = "cosyvoice"
+                                        bg_timer.checkpoint("7_tts_generated")
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
 
-                                    # Fall back to OpenAI TTS if SoVITS failed or unavailable
+                                    elif bg_tts_engine == "sovits" and mona_tts_sovits:
+                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        used_engine = "sovits"
+                                        bg_timer.checkpoint("7_tts_generated")
+                                        if audio_path:
+                                            audio_url = f"/audio/{Path(audio_path).name}"
+
+                                    # Fall back to other engine if selected one failed
+                                    if not audio_url:
+                                        if bg_tts_engine == "cosyvoice" and mona_tts_sovits:
+                                            audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                            used_engine = "sovits"
+                                            bg_timer.checkpoint("7_tts_generated")
+                                            if audio_path:
+                                                audio_url = f"/audio/{Path(audio_path).name}"
+                                        elif bg_tts_engine == "sovits" and mona_tts_cosyvoice:
+                                            audio_path, lip_sync_data = await mona_tts_cosyvoice.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                            used_engine = "cosyvoice"
+                                            bg_timer.checkpoint("7_tts_generated")
+                                            if audio_path:
+                                                audio_url = f"/audio/{Path(audio_path).name}"
+
+                                    # Fall back to OpenAI TTS as last resort
                                     if not audio_url and mona_tts:
                                         audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text)
+                                        used_engine = "openai"
                                         bg_timer.checkpoint("7_tts_generated")
-
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
-                                            # Use OpenAI TTS lip sync if GPT-SoVITS didn't provide any
                                             if not lip_sync_data and openai_lip_sync:
                                                 lip_sync_data = openai_lip_sync
 
@@ -632,6 +665,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                             "type": "audio_ready",
                                             "audioUrl": audio_url,
                                             "lipSync": lip_sync_data,
+                                            "ttsEngine": used_engine,
                                             "timestamp": datetime.now().isoformat(),
                                         }
                                         await manager.send_message(audio_update, client_id)
