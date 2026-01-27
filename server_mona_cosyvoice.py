@@ -79,8 +79,8 @@ def get_model():
     global cosyvoice_model
     if cosyvoice_model is None:
         print("Loading CosyVoice model...")
-        # Use CosyVoice2-0.5B for best quality/speed balance
-        cosyvoice_model = CosyVoice("iic/CosyVoice2-0.5B", load_jit=False, load_trt=False)
+        # Use CosyVoice-300M (v1) for stability
+        cosyvoice_model = CosyVoice("iic/CosyVoice-300M", load_jit=False, load_trt=False)
         print("✓ CosyVoice model loaded")
     return cosyvoice_model
 
