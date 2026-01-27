@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-export type TtsEngine = "sovits" | "cosyvoice";
+export type TtsEngine = "sovits" | "fishspeech";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -164,20 +164,20 @@ export default function SettingsModal({
               GPT-SoVITS
             </button>
             <button
-              onClick={() => onTtsEngineChange("cosyvoice")}
+              onClick={() => onTtsEngineChange("fishspeech")}
               className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                ttsEngine === "cosyvoice"
+                ttsEngine === "fishspeech"
                   ? "bg-pink-500 text-white"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
               }`}
             >
-              CosyVoice
+              Fish Speech
             </button>
           </div>
           <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
             {ttsEngine === "sovits"
-              ? "GPT-SoVITS: Fine-tuned voice, no streaming"
-              : "CosyVoice: Zero-shot cloning, streaming (~150ms faster)"}
+              ? "GPT-SoVITS: Fine-tuned Mona voice"
+              : "Fish Speech: Zero-shot voice cloning via API"}
           </p>
         </div>
 

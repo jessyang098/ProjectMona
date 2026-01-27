@@ -66,6 +66,7 @@ from personality_loader import load_personality_from_yaml
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
 from tts_cosyvoice import MonaTTSCosyVoice
+from tts_fishspeech import MonaTTSFishSpeech
 from text_utils import preprocess_tts_text
 from openai import OpenAI
 
@@ -74,13 +75,14 @@ mona_llm: Optional[MonaLLM] = None
 mona_tts: Optional[MonaTTS] = None
 mona_tts_sovits: Optional[MonaTTSSoVITS] = None
 mona_tts_cosyvoice: Optional[MonaTTSCosyVoice] = None
+mona_tts_fishspeech: Optional[MonaTTSFishSpeech] = None
 openai_client: Optional[OpenAI] = None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Initialize LLM, TTS, and database on startup"""
-    global mona_llm, mona_tts, mona_tts_sovits, mona_tts_cosyvoice, openai_client
+    global mona_llm, mona_tts, mona_tts_sovits, mona_tts_cosyvoice, mona_tts_fishspeech, openai_client
 
     # Initialize database
     await init_db()
@@ -126,6 +128,17 @@ async def lifespan(_app: FastAPI):
     except Exception as e:
         print(f"⚠ Warning: Could not initialize CosyVoice - {e}")
         mona_tts_cosyvoice = None
+
+    # Initialize Fish Speech TTS
+    try:
+        mona_tts_fishspeech = MonaTTSFishSpeech()
+        if not mona_tts_fishspeech.mock_mode:
+            print(f"✓ Mona Fish Speech initialized")
+        else:
+            print(f"⚠ Fish Speech: No API key set (FISH_AUDIO_API_KEY)")
+    except Exception as e:
+        print(f"⚠ Warning: Could not initialize Fish Speech - {e}")
+        mona_tts_fishspeech = None
 
     # Initialize OpenAI TTS (fallback)
     try:
@@ -618,7 +631,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                     used_engine = None
 
                                     # Use selected TTS engine
-                                    if bg_tts_engine == "cosyvoice" and mona_tts_cosyvoice:
+                                    if bg_tts_engine == "fishspeech" and mona_tts_fishspeech and not mona_tts_fishspeech.mock_mode:
+                                        audio_path, lip_sync_data = await mona_tts_fishspeech.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        used_engine = "fishspeech"
+                                        bg_timer.checkpoint("7_tts_generated")
+                                        if audio_path:
+                                            audio_url = f"/audio/{Path(audio_path).name}"
+
+                                    elif bg_tts_engine == "cosyvoice" and mona_tts_cosyvoice:
                                         audio_path, lip_sync_data = await mona_tts_cosyvoice.generate_speech(tts_text, convert_to_mp3=is_mobile)
                                         used_engine = "cosyvoice"
                                         bg_timer.checkpoint("7_tts_generated")
@@ -632,18 +652,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
 
-                                    # Fall back to other engine if selected one failed
-                                    if not audio_url:
-                                        if bg_tts_engine == "cosyvoice" and mona_tts_sovits:
-                                            audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
-                                            used_engine = "sovits"
-                                            bg_timer.checkpoint("7_tts_generated")
-                                            if audio_path:
-                                                audio_url = f"/audio/{Path(audio_path).name}"
-                                        elif bg_tts_engine == "sovits" and mona_tts_cosyvoice:
-                                            audio_path, lip_sync_data = await mona_tts_cosyvoice.generate_speech(tts_text, convert_to_mp3=is_mobile)
-                                            used_engine = "cosyvoice"
-                                            bg_timer.checkpoint("7_tts_generated")
+                                    # Fall back to sovits if selected engine failed
+                                    if not audio_url and mona_tts_sovits:
+                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        used_engine = "sovits"
+                                        bg_timer.checkpoint("7_tts_generated")
+                                        if audio_path:
+                                            audio_url = f"/audio/{Path(audio_path).name}"
                                             if audio_path:
                                                 audio_url = f"/audio/{Path(audio_path).name}"
 
