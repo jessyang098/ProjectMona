@@ -108,6 +108,21 @@ class LipSyncGenerator:
             return None
 
         try:
+            # Resample audio to 16kHz for Rhubarb compatibility
+            resampled_path = None
+            try:
+                resample_result = subprocess.run(
+                    ["ffmpeg", "-i", audio_path, "-ar", "16000", "-y",
+                     str(Path(audio_path).with_suffix(".rhubarb.wav"))],
+                    capture_output=True, timeout=10
+                )
+                if resample_result.returncode == 0:
+                    resampled_path = str(Path(audio_path).with_suffix(".rhubarb.wav"))
+            except Exception:
+                pass
+
+            rhubarb_input = resampled_path or audio_path
+
             # Build command
             cmd = [
                 self.rhubarb_path,
@@ -126,7 +141,7 @@ class LipSyncGenerator:
                 dialog_file.write_text(dialog_text)
                 cmd.extend(["-d", str(dialog_file)])
 
-            cmd.append(audio_path)
+            cmd.append(rhubarb_input)
 
             # Run rhubarb
             rhubarb_start = time.perf_counter()
@@ -138,11 +153,13 @@ class LipSyncGenerator:
             )
             rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
 
-            # Clean up dialog file
+            # Clean up temp files
             if dialog_text:
                 dialog_file = Path(audio_path).with_suffix(".txt")
                 if dialog_file.exists():
                     dialog_file.unlink()
+            if resampled_path and Path(resampled_path).exists():
+                Path(resampled_path).unlink()
 
             if result.returncode != 0:
                 print(f"⏱️  Lip Sync [RHUBARB FAILED] {rhubarb_ms:.0f}ms - {result.stderr}")
@@ -216,6 +233,24 @@ class LipSyncGenerator:
             return None
 
         try:
+            # Resample audio to 16kHz for Rhubarb compatibility
+            # Rhubarb fails on non-standard sample rates (e.g. 32kHz from GPT-SoVITS)
+            resampled_path = None
+            try:
+                resample_proc = await asyncio.create_subprocess_exec(
+                    "ffmpeg", "-i", audio_path, "-ar", "16000", "-y",
+                    str(Path(audio_path).with_suffix(".rhubarb.wav")),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await asyncio.wait_for(resample_proc.communicate(), timeout=10)
+                if resample_proc.returncode == 0:
+                    resampled_path = str(Path(audio_path).with_suffix(".rhubarb.wav"))
+            except Exception:
+                pass  # Fall back to original file
+
+            rhubarb_input = resampled_path or audio_path
+
             # Build command
             cmd = [
                 self.rhubarb_path,
@@ -233,7 +268,7 @@ class LipSyncGenerator:
                 dialog_file.write_text(dialog_text)
                 cmd.extend(["-d", str(dialog_file)])
 
-            cmd.append(audio_path)
+            cmd.append(rhubarb_input)
 
             # Run rhubarb asynchronously
             rhubarb_start = time.perf_counter()
@@ -245,9 +280,11 @@ class LipSyncGenerator:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
             rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
 
-            # Clean up dialog file
+            # Clean up temp files
             if dialog_file and dialog_file.exists():
                 dialog_file.unlink()
+            if resampled_path and Path(resampled_path).exists():
+                Path(resampled_path).unlink()
 
             if proc.returncode != 0:
                 print(f"⏱️  Lip Sync [RHUBARB FAILED] {rhubarb_ms:.0f}ms - {stderr.decode()}")
