@@ -1,11 +1,12 @@
 """
-Lip Sync Generation using Rhubarb Lip Sync
+Lip Sync Generation using Rhubarb Lip Sync or text-based phoneme estimation.
 Analyzes audio files and generates mouth shape timing data for realistic lip sync animation.
 """
 
 import asyncio
 import json
 import os
+import struct
 import subprocess
 import time
 from pathlib import Path
@@ -32,6 +33,126 @@ RHUBARB_TO_VRM = {
     "H": {"aa": 0.35, "ee": 0.0, "ih": 0.15, "oh": 0.0, "ou": 0.0},  # L sound - tongue up, mouth slightly open
     "X": {"aa": 0.0, "ee": 0.0, "ih": 0.0, "oh": 0.0, "ou": 0.0, "_silence": True},  # Silence/rest - mouth fully closed
 }
+
+
+# Grapheme-to-Rhubarb shape mapping for text-based lip sync
+# Maps lowercase letter(s) to Rhubarb mouth shapes (A-H, X)
+GRAPHEME_TO_SHAPE = {
+    # A - Closed lips (M, B, P)
+    "m": "A", "b": "A", "p": "A",
+    # B - Slightly open (most consonants)
+    "k": "B", "s": "B", "t": "B", "d": "B", "n": "B",
+    "g": "B", "z": "B", "c": "B", "j": "B", "q": "B",
+    "x": "B", "h": "B",
+    # C - EE shape (wide smile)
+    "e": "C", "i": "C", "y": "C",
+    # D - AA shape (jaw open)
+    "a": "D",
+    # E - OH shape (round open)
+    "o": "E",
+    # F - OO shape (pucker)
+    "u": "F", "w": "F",
+    # G - F/V sound (teeth on lip)
+    "f": "G", "v": "G",
+    # H - L/R sound (tongue up)
+    "l": "H", "r": "H",
+}
+
+
+def get_wav_duration(wav_path: str) -> float:
+    """Get duration of a WAV file by reading its header. Returns seconds."""
+    try:
+        with open(wav_path, "rb") as f:
+            f.read(22)  # skip to num_channels
+            num_channels = struct.unpack("<H", f.read(2))[0]
+            sample_rate = struct.unpack("<I", f.read(4))[0]
+            f.read(6)  # skip byte_rate(4) + block_align(2)
+            bits_per_sample = struct.unpack("<H", f.read(2))[0]
+            # Find "data" chunk
+            while True:
+                chunk_id = f.read(4)
+                if not chunk_id:
+                    break
+                chunk_size = struct.unpack("<I", f.read(4))[0]
+                if chunk_id == b"data":
+                    bytes_per_sample = bits_per_sample // 8
+                    return chunk_size / (sample_rate * num_channels * bytes_per_sample)
+                f.seek(chunk_size, 1)  # skip non-data chunks
+    except Exception as e:
+        print(f"⏱️  Lip Sync [WAV Duration ERROR] {e}")
+    return 0.0
+
+
+def generate_lip_sync_from_text(
+    text: str,
+    audio_duration: float,
+) -> Optional[List[Dict[str, Any]]]:
+    """
+    Generate lip sync data from text using grapheme-to-phoneme estimation.
+    Much faster than Rhubarb (~0ms vs ~3000ms) at the cost of less accurate timing.
+
+    Args:
+        text: The spoken text
+        audio_duration: Duration of the audio in seconds
+
+    Returns:
+        List of mouth cues in the same format as Rhubarb output.
+    """
+    if not text or audio_duration <= 0:
+        return None
+
+    gen_start = time.perf_counter()
+
+    # Build phoneme sequence: each character maps to a shape, spaces become X (silence)
+    shapes = []
+    for char in text.lower():
+        if char in GRAPHEME_TO_SHAPE:
+            shapes.append(GRAPHEME_TO_SHAPE[char])
+        elif char == " ":
+            shapes.append("X")
+        # Skip punctuation and other characters (they don't produce mouth shapes)
+
+    if not shapes:
+        return None
+
+    # Merge consecutive identical shapes for more natural timing
+    merged = []
+    for shape in shapes:
+        if merged and merged[-1][0] == shape:
+            merged[-1] = (shape, merged[-1][1] + 1)
+        else:
+            merged.append((shape, 1))
+
+    # Distribute timing across audio duration
+    # Give silence (X) less weight than speech shapes
+    total_weight = sum(
+        count * (0.3 if shape == "X" else 1.0)
+        for shape, count in merged
+    )
+    if total_weight == 0:
+        return None
+
+    time_per_weight = audio_duration / total_weight
+    current_time = 0.0
+    lip_sync_data = []
+
+    for shape, count in merged:
+        weight = count * (0.3 if shape == "X" else 1.0)
+        duration = weight * time_per_weight
+        end_time = current_time + duration
+
+        lip_sync_data.append({
+            "start": round(current_time, 3),
+            "end": round(end_time, 3),
+            "shape": shape,
+            "phonemes": RHUBARB_TO_VRM.get(shape, RHUBARB_TO_VRM["X"]),
+        })
+
+        current_time = end_time
+
+    gen_ms = (time.perf_counter() - gen_start) * 1000
+    print(f"⏱️  Lip Sync [Text-Based] {gen_ms:.1f}ms ({len(lip_sync_data)} cues, {audio_duration:.1f}s audio)")
+    return lip_sync_data
 
 
 class LipSyncGenerator:

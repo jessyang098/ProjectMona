@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 import aiohttp
 
-from lip_sync import get_lip_sync_generator
+from lip_sync import generate_lip_sync_from_text, get_wav_duration
 from tts_preprocess import clean_for_tts
 
 
@@ -222,21 +222,18 @@ class MonaTTSSoVITS:
                     save_ms = (time.perf_counter() - save_start) * 1000
                     print(f"⏱️  TTS [Save to Disk] {save_ms:.0f}ms")
 
-            # Generate lip sync and convert to MP3 (parallel if mobile)
+            # Generate text-based lip sync (near-instant, no Rhubarb needed)
             lip_sync_data = None
-            lip_sync_generator = get_lip_sync_generator()
+            if generate_lip_sync:
+                audio_duration = get_wav_duration(str(wav_path))
+                if audio_duration > 0:
+                    lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
+                    if lip_sync_data:
+                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
 
-            if convert_to_mp3 and generate_lip_sync and lip_sync_generator.is_available():
-                # PARALLEL: Run Rhubarb and FFmpeg simultaneously for mobile
-                parallel_start = time.perf_counter()
-
-                async def run_lip_sync():
-                    return await lip_sync_generator.generate_lip_sync_async(
-                        str(wav_path),
-                        dialog_text=text
-                    )
-
-                async def run_ffmpeg():
+            if convert_to_mp3:
+                mp3_start = time.perf_counter()
+                try:
                     proc = await asyncio.create_subprocess_exec(
                         "ffmpeg",
                         "-i", str(wav_path),
@@ -250,24 +247,14 @@ class MonaTTSSoVITS:
                         stderr=asyncio.subprocess.PIPE
                     )
                     await asyncio.wait_for(proc.communicate(), timeout=30)
-                    return proc.returncode
 
-                try:
-                    lip_sync_data, ffmpeg_returncode = await asyncio.gather(
-                        run_lip_sync(),
-                        run_ffmpeg()
-                    )
-
-                    parallel_ms = (time.perf_counter() - parallel_start) * 1000
-                    if ffmpeg_returncode == 0:
+                    mp3_ms = (time.perf_counter() - mp3_start) * 1000
+                    if proc.returncode == 0:
                         wav_path.unlink()
-                        print(f"⏱️  TTS [Rhubarb + FFmpeg PARALLEL] {parallel_ms:.0f}ms ({parallel_ms/1000:.2f}s)")
+                        print(f"⏱️  TTS [FFmpeg MP3] {mp3_ms:.0f}ms ({mp3_ms/1000:.2f}s)")
                     else:
-                        print(f"⏱️  TTS [FFmpeg FAILED] {parallel_ms:.0f}ms")
+                        print(f"⏱️  TTS [FFmpeg FAILED] {mp3_ms:.0f}ms")
                         return None, None
-
-                    if lip_sync_data:
-                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
 
                 except asyncio.TimeoutError:
                     if wav_path.exists():
@@ -281,57 +268,6 @@ class MonaTTSSoVITS:
                     if wav_path.exists():
                         wav_path.unlink()
                     return None, None
-
-            else:
-                # SEQUENTIAL: Non-mobile or no lip sync needed
-                if generate_lip_sync and lip_sync_generator.is_available():
-                    lip_start = time.perf_counter()
-                    lip_sync_data = await lip_sync_generator.generate_lip_sync_async(
-                        str(wav_path),
-                        dialog_text=text
-                    )
-                    if lip_sync_data:
-                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-                    lip_ms = (time.perf_counter() - lip_start) * 1000
-                    print(f"⏱️  TTS [Rhubarb Lip Sync] {lip_ms:.0f}ms ({lip_ms/1000:.2f}s)")
-
-                if convert_to_mp3:
-                    mp3_start = time.perf_counter()
-                    try:
-                        proc = await asyncio.create_subprocess_exec(
-                            "ffmpeg",
-                            "-i", str(wav_path),
-                            "-codec:a", "libmp3lame",
-                            "-b:a", "128k",
-                            "-ar", "44100",
-                            "-ac", "1",
-                            "-y",
-                            str(cache_path),
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
-                        )
-                        await asyncio.wait_for(proc.communicate(), timeout=30)
-
-                        mp3_ms = (time.perf_counter() - mp3_start) * 1000
-                        if proc.returncode == 0:
-                            wav_path.unlink()
-                            print(f"⏱️  TTS [FFmpeg MP3] {mp3_ms:.0f}ms ({mp3_ms/1000:.2f}s)")
-                        else:
-                            print(f"⏱️  TTS [FFmpeg FAILED] {mp3_ms:.0f}ms")
-                            return None, None
-
-                    except asyncio.TimeoutError:
-                        if wav_path.exists():
-                            wav_path.unlink()
-                        return None, None
-                    except FileNotFoundError:
-                        if wav_path.exists():
-                            wav_path.unlink()
-                        return None, None
-                    except Exception:
-                        if wav_path.exists():
-                            wav_path.unlink()
-                        return None, None
 
             total_ms = (time.perf_counter() - tts_start) * 1000
             print(f"⏱️  TTS [TOTAL] {total_ms:.0f}ms ({total_ms/1000:.2f}s)")
