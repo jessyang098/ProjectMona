@@ -110,8 +110,8 @@ export default function Live2DAvatar({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const timeDomainBufferRef = useRef<Uint8Array | null>(null);
-  const frequencyBufferRef = useRef<Uint8Array | null>(null);
+  const timeDomainBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const frequencyBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const prevPhonemeRef = useRef({ aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
 
   // Keep lipSync ref updated
