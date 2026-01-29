@@ -175,168 +175,34 @@ class LipSyncGenerator:
     def _find_rhubarb(self) -> Optional[str]:
         """Find the rhubarb executable in common locations."""
         common_paths = [
+            "./rhubarb/rhubarb.exe",  # Windows local
+            "./rhubarb/rhubarb",      # Linux/Mac local
             "/workspace/rhubarb/rhubarb",  # Runpod workspace
             "/usr/local/bin/rhubarb",
             "/usr/bin/rhubarb",
             os.path.expanduser("~/rhubarb/rhubarb"),
             os.path.expanduser("~/Rhubarb-Lip-Sync-1.14.0-macOS/rhubarb"),  # macOS download location
-            "./rhubarb/rhubarb",
-            "rhubarb",  # In PATH
         ]
 
         for path in common_paths:
-            if os.path.isfile(path) and os.access(path, os.X_OK):
+            if os.path.isfile(path):
                 return path
-            # Check if it's in PATH
-            if path == "rhubarb":
-                try:
-                    result = subprocess.run(
-                        ["which", "rhubarb"],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if result.returncode == 0:
-                        return result.stdout.strip()
-                except Exception:
-                    pass
 
-        return None
-
-    def generate_lip_sync(
-        self,
-        audio_path: str,
-        dialog_text: Optional[str] = None,
-        extended_shapes: bool = False
-    ) -> Optional[List[Dict[str, Any]]]:
-        """
-        Generate lip sync timing data from an audio file.
-
-        Args:
-            audio_path: Path to the audio file (WAV or MP3)
-            dialog_text: Optional transcript to improve accuracy
-            extended_shapes: Whether to use extended mouth shapes (G, H)
-
-        Returns:
-            List of mouth cues with timing and VRM blend shape values, or None if failed.
-            Each cue: {"start": float, "end": float, "shape": str, "phonemes": dict}
-        """
-        if not self.rhubarb_path:
-            return None
-
-        if not os.path.isfile(audio_path):
-            print(f"✗ Audio file not found: {audio_path}")
-            return None
-
+        # Check if rhubarb is in PATH
         try:
-            # Resample audio to 16kHz PCM for Rhubarb compatibility
-            resampled_path = None
-            try:
-                resample_start = time.perf_counter()
-                resample_result = subprocess.run(
-                    ["ffmpeg", "-i", audio_path, "-ar", "16000", "-acodec", "pcm_s16le", "-ac", "1", "-y",
-                     str(Path(audio_path).with_suffix(".rhubarb.wav"))],
-                    capture_output=True, timeout=10
-                )
-                resample_ms = (time.perf_counter() - resample_start) * 1000
-                if resample_result.returncode == 0:
-                    resampled_path = str(Path(audio_path).with_suffix(".rhubarb.wav"))
-                    print(f"⏱️  Lip Sync [Resample] {resample_ms:.0f}ms -> 16kHz PCM")
-                else:
-                    print(f"⏱️  Lip Sync [Resample FAILED] {resample_ms:.0f}ms - {resample_result.stderr.decode() if isinstance(resample_result.stderr, bytes) else resample_result.stderr}")
-            except Exception as e:
-                print(f"⏱️  Lip Sync [Resample ERROR] {e}")
-
-            rhubarb_input = resampled_path or audio_path
-
-            # Build command
-            cmd = [
-                self.rhubarb_path,
-                "-f", "json",  # JSON output format
-                "-r", "phonetic",  # Use phonetic recognition (faster)
-            ]
-
-            if extended_shapes:
-                cmd.append("--extendedShapes")
-                cmd.append("GHX")
-
-            # Add dialog text for better accuracy if provided
-            if dialog_text:
-                # Write dialog to temp file
-                dialog_file = Path(audio_path).with_suffix(".txt")
-                dialog_file.write_text(dialog_text)
-                cmd.extend(["-d", str(dialog_file)])
-                print(f"⏱️  Lip Sync [Dialog] provided ({len(dialog_text)} chars): \"{dialog_text[:80]}{'...' if len(dialog_text) > 80 else ''}\"")
-            else:
-                print("⏱️  Lip Sync [Dialog] none provided (audio-only recognition)")
-
-            cmd.append(rhubarb_input)
-            print(f"⏱️  Lip Sync [CMD] {' '.join(cmd)}")
-
-            # Run rhubarb
-            rhubarb_start = time.perf_counter()
+            cmd = "where" if os.name == "nt" else "which"
             result = subprocess.run(
-                cmd,
+                [cmd, "rhubarb"],
                 capture_output=True,
                 text=True,
-                timeout=30  # 30 second timeout
+                timeout=5
             )
-            rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
+            if result.returncode == 0:
+                return result.stdout.strip().split('\n')[0]
+        except Exception:
+            pass
 
-            # Log stderr even on success (Rhubarb reports warnings there)
-            if result.stderr and result.stderr.strip():
-                print(f"⏱️  Lip Sync [Rhubarb stderr] {result.stderr.strip()}")
-
-            # Clean up temp files
-            if dialog_text:
-                dialog_file = Path(audio_path).with_suffix(".txt")
-                if dialog_file.exists():
-                    dialog_file.unlink()
-            if resampled_path and Path(resampled_path).exists():
-                Path(resampled_path).unlink()
-
-            if result.returncode != 0:
-                print(f"⏱️  Lip Sync [RHUBARB FAILED] {rhubarb_ms:.0f}ms (exit code {result.returncode})")
-                return None
-
-            # Parse JSON output
-            parse_start = time.perf_counter()
-            data = json.loads(result.stdout)
-            mouth_cues = data.get("mouthCues", [])
-
-            # Convert to our format with VRM phoneme values
-            lip_sync_data = []
-            for i, cue in enumerate(mouth_cues):
-                shape = cue.get("value", "X")
-                start = cue.get("start", 0)
-
-                # Calculate end time from next cue or add 0.1s default
-                if i + 1 < len(mouth_cues):
-                    end = mouth_cues[i + 1].get("start", start + 0.1)
-                else:
-                    end = start + 0.1
-
-                lip_sync_data.append({
-                    "start": start,
-                    "end": end,
-                    "shape": shape,
-                    "phonemes": RHUBARB_TO_VRM.get(shape, RHUBARB_TO_VRM["X"])
-                })
-
-            parse_ms = (time.perf_counter() - parse_start) * 1000
-            total_ms = rhubarb_ms + parse_ms
-            print(f"⏱️  Lip Sync [Rhubarb] {rhubarb_ms:.0f}ms | [Parse] {parse_ms:.0f}ms | [TOTAL] {total_ms:.0f}ms ({len(lip_sync_data)} cues)")
-            return lip_sync_data
-
-        except subprocess.TimeoutExpired:
-            print("✗ Rhubarb timed out after 30 seconds")
-            return None
-        except json.JSONDecodeError as e:
-            print(f"✗ Failed to parse Rhubarb output: {e}")
-            return None
-        except Exception as e:
-            print(f"✗ Lip sync generation failed: {e}")
-            return None
+        return None
 
     def is_available(self) -> bool:
         """Check if Rhubarb is available."""

@@ -5,7 +5,7 @@ Uses SQLAlchemy with async SQLite support.
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Boolean, create_engine
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from config import DATABASE_URL

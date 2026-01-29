@@ -107,6 +107,12 @@ export default function Live2DAvatar({
   const animationFrameRef = useRef<number | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
   const lipSyncRef = useRef<LipSyncCue[] | undefined>(lipSync);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const timeDomainBufferRef = useRef<Uint8Array | null>(null);
+  const frequencyBufferRef = useRef<Uint8Array | null>(null);
+  const prevPhonemeRef = useRef({ aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
 
   // Keep lipSync ref updated
   useEffect(() => {
@@ -407,24 +413,69 @@ export default function Live2DAvatar({
           // Update idle animations
           updateIdleAnimations(modelRef.current, delta);
 
-          // Update lip sync if audio is playing and we have lip sync data
-          if (audioRef.current && !audioRef.current.paused && lipSyncRef.current && lipSyncRef.current.length > 0) {
+          // Update lip sync if audio is playing
+          if (audioRef.current && !audioRef.current.paused) {
             const currentTime = audioRef.current.currentTime;
             const audioDuration = audioRef.current.duration;
 
-            // Only apply lip sync if we're not past the audio duration
-            if (currentTime < audioDuration - 0.1) {
-              // Find current lip sync cue
-              const cue = lipSyncRef.current.find(c => currentTime >= c.start && currentTime < c.end);
-              if (cue) {
-                applyLipSync(modelRef.current, cue.phonemes);
+            if (lipSyncRef.current && lipSyncRef.current.length > 0) {
+              // Rhubarb timed lip sync
+              if (currentTime < audioDuration - 0.1) {
+                const cue = lipSyncRef.current.find(c => currentTime >= c.start && currentTime < c.end);
+                if (cue) {
+                  applyLipSync(modelRef.current, cue.phonemes);
+                } else {
+                  applyLipSync(modelRef.current, { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
+                }
               } else {
-                // Close mouth when between cues
                 applyLipSync(modelRef.current, { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
               }
-            } else {
-              // Near end of audio - ensure mouth is closed
-              applyLipSync(modelRef.current, { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
+            } else if (analyserRef.current && timeDomainBufferRef.current && frequencyBufferRef.current) {
+              // Real-time audio analysis fallback
+              analyserRef.current.getByteTimeDomainData(timeDomainBufferRef.current);
+              analyserRef.current.getByteFrequencyData(frequencyBufferRef.current);
+
+              // RMS amplitude
+              let sumSquares = 0;
+              for (let i = 0; i < timeDomainBufferRef.current.length; i++) {
+                const n = (timeDomainBufferRef.current[i] - 128) / 128;
+                sumSquares += n * n;
+              }
+              const amplitude = Math.sqrt(sumSquares / timeDomainBufferRef.current.length);
+
+              // Spectral centroid
+              let weightedSum = 0, magSum = 0;
+              for (let i = 0; i < frequencyBufferRef.current.length; i++) {
+                const mag = frequencyBufferRef.current[i];
+                weightedSum += i * mag;
+                magSum += mag;
+              }
+              const centroid = magSum > 0 ? weightedSum / magSum / frequencyBufferRef.current.length : 0;
+
+              // Map to phonemes
+              const threshold = 0.0005;
+              const phonemes = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
+              if (amplitude > threshold) {
+                const level = Math.min(0.8, (amplitude - threshold) * 12);
+                phonemes.aa = level;
+                if (centroid > 0.45) phonemes.ee = level * 0.7;
+                else if (centroid > 0.35) phonemes.ih = level * 0.8;
+                else if (centroid > 0.25) phonemes.oh = level * 0.9;
+                else phonemes.ou = level;
+              }
+
+              // Smooth
+              const smooth = 0.2;
+              const prev = prevPhonemeRef.current;
+              const smoothed = {
+                aa: prev.aa + smooth * (phonemes.aa - prev.aa),
+                ee: prev.ee + smooth * (phonemes.ee - prev.ee),
+                ih: prev.ih + smooth * (phonemes.ih - prev.ih),
+                oh: prev.oh + smooth * (phonemes.oh - prev.oh),
+                ou: prev.ou + smooth * (phonemes.ou - prev.ou),
+              };
+              prevPhonemeRef.current = smoothed;
+              applyLipSync(modelRef.current, smoothed);
             }
           }
 
@@ -508,8 +559,35 @@ export default function Live2DAvatar({
     audio.preload = "auto";
     audioRef.current = audio;
 
+    // Set up Web Audio API analyser for real-time lip sync fallback
+    const hasRhubarbData = lipSyncRef.current && lipSyncRef.current.length > 0;
+    if (!hasRhubarbData) {
+      try {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const ctx = audioContextRef.current;
+        if (ctx.state === "suspended") {
+          ctx.resume();
+        }
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyserRef.current = analyser;
+        timeDomainBufferRef.current = new Uint8Array(analyser.fftSize);
+        frequencyBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+        const source = ctx.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        sourceRef.current = source;
+      } catch {
+        // Web Audio API not available, lip sync will be skipped
+      }
+    }
+
     audio.onended = () => {
       animStateRef.current.isPlaying = false;
+      prevPhonemeRef.current = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
       // Close mouth when audio ends
       if (modelRef.current) {
         applyLipSync(modelRef.current, { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
@@ -546,6 +624,14 @@ export default function Live2DAvatar({
 
     return () => {
       isActive = false;
+      if (sourceRef.current) {
+        sourceRef.current.disconnect();
+        sourceRef.current = null;
+      }
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+        analyserRef.current = null;
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.oncanplaythrough = null;

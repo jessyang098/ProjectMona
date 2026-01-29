@@ -11,7 +11,7 @@ import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./Avata
 import LoginPrompt from "./LoginPrompt";
 import UserMenu from "./UserMenu";
 import ProfileModal from "./ProfileModal";
-import SettingsModal, { TtsEngine } from "./SettingsModal";
+import SettingsModal, { TtsEngine, LipSyncMode } from "./SettingsModal";
 import ShopModal from "./ShopModal";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
@@ -38,6 +38,7 @@ export default function ChatInterface() {
   const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
   const [volume, setVolume] = useState(1);
   const [ttsEngine, setTtsEngine] = useState<TtsEngine>("sovits");
+  const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>("textbased");
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
     shirt: true,
     skirt: true,
@@ -85,19 +86,13 @@ export default function ChatInterface() {
   const latestAudioUrl = latestMonaMessageWithAudio?.audioUrl;
   const latestLipSync = latestMonaMessageWithAudio?.lipSync;
 
-  useEffect(() => {
-    // Log removed("🎵 Latest audio URL updated:", latestAudioUrl);
-  }, [latestAudioUrl]);
-
   // Enable audio on first user interaction
   const enableAudio = async () => {
     try {
-      // Initialize AudioContext from user interaction (CRITICAL for mobile)
       await initAudioContext();
       setAudioEnabled(true);
-      // Log removed("🔊 Audio enabled by user interaction");
-    } catch (error) {
-      // Error removed("❌ Failed to enable audio:", error);
+    } catch {
+      // Audio init failed silently
     }
   };
 
@@ -189,7 +184,7 @@ export default function ChatInterface() {
     }
 
     if ((inputValue.trim() || selectedImage) && isConnected) {
-      sendMessage(inputValue.trim(), selectedImage?.base64, ttsEngine);
+      sendMessage(inputValue.trim(), selectedImage?.base64, ttsEngine, lipSyncMode);
       setInputValue("");
       clearSelectedImage();
       // Blur input to close mobile keyboard and reset scroll position
@@ -220,7 +215,7 @@ export default function ChatInterface() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
-      // Error removed('Failed to start recording:', error);
+      // Microphone access denied
       alert('Microphone access denied. Please allow microphone access to use voice input.');
     }
   };
@@ -258,12 +253,12 @@ export default function ChatInterface() {
 
         // Automatically send the message
         if (isConnected) {
-          sendMessage(transcribedText.trim(), undefined, ttsEngine);
+          sendMessage(transcribedText.trim(), undefined, ttsEngine, lipSyncMode);
           setInputValue(''); // Clear after sending
         }
       }
     } catch (error) {
-      // Error removed('Transcription failed:', error);
+      // Transcription failed
       alert('Failed to transcribe audio. Make sure the backend transcription endpoint is available.');
     } finally {
       setIsProcessing(false);
@@ -309,6 +304,8 @@ export default function ChatInterface() {
         onDarkModeChange={setDarkMode}
         ttsEngine={ttsEngine}
         onTtsEngineChange={setTtsEngine}
+        lipSyncMode={lipSyncMode}
+        onLipSyncModeChange={setLipSyncMode}
       />
 
       {/* Shop modal */}
@@ -340,7 +337,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled && lipSyncMode !== "realtime" ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>

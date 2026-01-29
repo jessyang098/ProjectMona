@@ -279,12 +279,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-class Message(BaseModel):
-    content: str
-    sender: str  # "user" or "mona"
-    timestamp: str
-
-
 def get_dummy_response(user_message: str) -> str:
     """Generate a dummy response from Mona"""
     # Simple keyword-based responses
@@ -304,11 +298,6 @@ def get_dummy_response(user_message: str) -> str:
         ])
     else:
         return random.choice(DUMMY_RESPONSES)
-
-
-async def simulate_typing_delay():
-    """Simulate Mona 'thinking' before responding"""
-    await asyncio.sleep(random.uniform(0.5, 1.5))
 
 
 @app.get("/")
@@ -512,6 +501,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             has_image = bool(image_base64)
             user_content = message_data.get("content", "") or ""
             tts_engine = message_data.get("tts_engine", "sovits")  # "sovits" or "cosyvoice"
+            lip_sync_mode = message_data.get("lip_sync_mode", "textbased")  # "textbased", "rhubarb", or "realtime"
+            use_lip_sync = lip_sync_mode in ("textbased", "rhubarb")
+            use_rhubarb = lip_sync_mode == "rhubarb"
+            print(f"⚙ Lip sync mode: {lip_sync_mode} (lip_sync={'enabled' if use_lip_sync else 'disabled'}, rhubarb={'yes' if use_rhubarb else 'no'})")
 
             # Check guest message limit
             if is_guest:
@@ -632,21 +625,21 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                                     # Use selected TTS engine
                                     if bg_tts_engine == "fishspeech" and mona_tts_fishspeech and not mona_tts_fishspeech.mock_mode:
-                                        audio_path, lip_sync_data = await mona_tts_fishspeech.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        audio_path, lip_sync_data = await mona_tts_fishspeech.generate_speech(tts_text, convert_to_mp3=is_mobile, generate_lip_sync=use_lip_sync)
                                         used_engine = "fishspeech"
                                         bg_timer.checkpoint("7_tts_generated")
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
 
                                     elif bg_tts_engine == "cosyvoice" and mona_tts_cosyvoice:
-                                        audio_path, lip_sync_data = await mona_tts_cosyvoice.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        audio_path, lip_sync_data = await mona_tts_cosyvoice.generate_speech(tts_text, convert_to_mp3=is_mobile, generate_lip_sync=use_lip_sync)
                                         used_engine = "cosyvoice"
                                         bg_timer.checkpoint("7_tts_generated")
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
 
                                     elif bg_tts_engine == "sovits" and mona_tts_sovits:
-                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile, generate_lip_sync=use_lip_sync, use_rhubarb=use_rhubarb)
                                         used_engine = "sovits"
                                         bg_timer.checkpoint("7_tts_generated")
                                         if audio_path:
@@ -654,17 +647,15 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                                     # Fall back to sovits if selected engine failed
                                     if not audio_url and mona_tts_sovits:
-                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile)
+                                        audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, convert_to_mp3=is_mobile, generate_lip_sync=use_lip_sync, use_rhubarb=use_rhubarb)
                                         used_engine = "sovits"
                                         bg_timer.checkpoint("7_tts_generated")
                                         if audio_path:
                                             audio_url = f"/audio/{Path(audio_path).name}"
-                                            if audio_path:
-                                                audio_url = f"/audio/{Path(audio_path).name}"
 
                                     # Fall back to OpenAI TTS as last resort
                                     if not audio_url and mona_tts:
-                                        audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text)
+                                        audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
                                         used_engine = "openai"
                                         bg_timer.checkpoint("7_tts_generated")
                                         if audio_path:
@@ -674,6 +665,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                                     # Send audio update when ready
                                     if audio_url:
+                                        lip_sync_cue_count = len(lip_sync_data) if lip_sync_data else 0
+                                        print(f"🎤 TTS complete | engine={used_engine} | lip_sync_mode={lip_sync_mode} | rhubarb_cues={lip_sync_cue_count}")
                                         bg_timer.checkpoint("8_audio_ready_to_send")
 
                                         audio_update = {

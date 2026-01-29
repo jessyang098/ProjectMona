@@ -187,14 +187,14 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     };
   }, [url]);
 
-  const sendMessage = useCallback((content: string, imageBase64?: string, ttsEngine?: string) => {
+  const sendMessage = useCallback((content: string, imageBase64?: string, ttsEngine?: string, lipSyncMode?: string) => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
       // Store image for when we receive the echoed message back
       if (imageBase64) {
         pendingImageRef.current = imageBase64;
       }
 
-      const message: { content: string; timestamp: string; image?: string; tts_engine?: string } = {
+      const message: { content: string; timestamp: string; image?: string; tts_engine?: string; lip_sync_mode?: string } = {
         content: content || (imageBase64 ? "What do you think of this?" : ""),
         timestamp: new Date().toISOString(),
       };
@@ -203,6 +203,9 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
       }
       if (ttsEngine) {
         message.tts_engine = ttsEngine;
+      }
+      if (lipSyncMode) {
+        message.lip_sync_mode = lipSyncMode;
       }
       websocketRef.current.send(JSON.stringify(message));
     }

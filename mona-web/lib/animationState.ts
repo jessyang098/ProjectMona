@@ -30,13 +30,6 @@ export function setAnimationState(animation: string | null, isPlaying: boolean =
 }
 
 /**
- * Get the current animation state
- */
-export function getAnimationState(): AnimationState {
-  return currentState;
-}
-
-/**
  * Subscribe to animation state changes
  * @returns Cleanup function to unsubscribe
  */
