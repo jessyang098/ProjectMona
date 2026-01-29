@@ -23,7 +23,7 @@ class MonaTTSSoVITS:
     def __init__(
         self,
         sovits_url: str = os.getenv("SOVITS_URL", "http://localhost:9880/tts"),
-        ref_audio_path: str = os.getenv("SOVITS_REF_AUDIO", r"C:\Users\jtyan\Desktop\GPT-SoVITS\assets\mona_voice\main_sample.wav"),
+        ref_audio_path: str = os.getenv("SOVITS_REF_AUDIO", "/workspace/GPT-SoVITS/assets/mona_voice/main_sample.wav"),
         prompt_text: str = "This is a sample voice for you to get started with. It sounds kind of cute, but make sure there aren't long silences.",
         text_lang: str = "en",
         prompt_lang: str = "en",
