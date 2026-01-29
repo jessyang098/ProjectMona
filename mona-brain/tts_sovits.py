@@ -226,10 +226,13 @@ class MonaTTSSoVITS:
             lip_sync_data = None
             if generate_lip_sync:
                 audio_duration = get_wav_duration(str(wav_path))
+                print(f"⏱️  TTS [WAV Duration] {audio_duration:.2f}s from {wav_path}")
                 if audio_duration > 0:
                     lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
                     if lip_sync_data:
                         lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+                else:
+                    print(f"⚠️  TTS [Lip Sync] Skipped - audio duration is 0")
 
             if convert_to_mp3:
                 mp3_start = time.perf_counter()
