@@ -5,11 +5,11 @@ export interface EmotionData {
   gesture?: string;  // Optional gesture animation to play (e.g., "wave", "clapping", "thinking")
 }
 
-// Lip sync cue from Rhubarb - timing data for mouth shapes
+// Lip sync cue - timing data for mouth shapes
 export interface LipSyncCue {
   start: number;  // Start time in seconds
   end: number;    // End time in seconds
-  shape: string;  // Rhubarb mouth shape (A-H, X)
+  shape: string;  // Mouth shape (A-H, X)
   phonemes: {     // VRM blend shape values
     aa: number;
     ee: number;

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from openai import AsyncOpenAI
 
-from lip_sync import get_lip_sync_generator
+from lip_sync import generate_lip_sync_from_text, get_wav_duration
 
 
 class MonaTTS:
@@ -93,22 +93,19 @@ class MonaTTS:
             print(f"⚡ Generating speech for: {text[:50]}...")
             tts_start = time.perf_counter()
 
-            lip_sync_generator = get_lip_sync_generator() if generate_lip_sync else None
-            use_wav_workflow = generate_lip_sync and lip_sync_generator and lip_sync_generator.is_available()
+            # Get MP3 from OpenAI
+            response = await self.client.audio.speech.create(
+                model=self.model,
+                voice=self.voice,
+                input=text,
+            )
+            cache_path.write_bytes(response.content)
+            tts_ms = (time.perf_counter() - tts_start) * 1000
+            print(f"✓ OpenAI TTS complete ({tts_ms:.0f}ms)")
 
-            if use_wav_workflow:
-                # Get MP3 from OpenAI and save directly as final cache
-                # (OpenAI's WAV has malformed headers that Rhubarb can't read)
-                response = await self.client.audio.speech.create(
-                    model=self.model,
-                    voice=self.voice,
-                    input=text,
-                )
-                cache_path.write_bytes(response.content)
-                tts_ms = (time.perf_counter() - tts_start) * 1000
-                print(f"✓ OpenAI TTS complete ({tts_ms:.0f}ms)")
-
-                # Convert MP3 to WAV for Rhubarb (proper headers)
+            lip_sync_data = None
+            if generate_lip_sync:
+                # Convert MP3 to WAV temporarily to get duration
                 wav_path = cache_path.with_suffix('.wav')
                 convert_proc = await asyncio.create_subprocess_exec(
                     'ffmpeg', '-y', '-i', str(cache_path), str(wav_path),
@@ -117,38 +114,19 @@ class MonaTTS:
                 )
                 await asyncio.wait_for(convert_proc.communicate(), timeout=30)
 
-                if convert_proc.returncode != 0:
-                    print(f"⚠ WAV conversion failed")
-                    return str(cache_path), None  # Return MP3 but no lip sync
+                if convert_proc.returncode == 0:
+                    # Get duration and generate text-based lip sync
+                    audio_duration = get_wav_duration(str(wav_path))
+                    if audio_duration > 0:
+                        lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
+                        if lip_sync_data:
+                            lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
 
-                # Run Rhubarb on WAV
-                rhubarb_start = time.perf_counter()
-                lip_sync_data = await lip_sync_generator.generate_lip_sync_async(
-                    str(wav_path),
-                    dialog_text=text
-                )
-                rhubarb_ms = (time.perf_counter() - rhubarb_start) * 1000
-
-                # Clean up WAV
-                if wav_path.exists():
-                    wav_path.unlink()
-
-                print(f"✓ Rhubarb: {rhubarb_ms:.0f}ms, {len(lip_sync_data) if lip_sync_data else 0} cues")
-                if lip_sync_data:
-                    lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-
-            else:
-                # No lip sync needed - just get MP3 directly
-                response = await self.client.audio.speech.create(
-                    model=self.model,
-                    voice=self.voice,
-                    input=text,
-                )
-                audio_content = response.content
-                cache_path.write_bytes(audio_content)
-                tts_ms = (time.perf_counter() - tts_start) * 1000
-                print(f"✓ Audio saved: {cache_path.name} ({tts_ms:.0f}ms)")
-                lip_sync_data = None
+                    # Clean up WAV
+                    if wav_path.exists():
+                        wav_path.unlink()
+                else:
+                    print(f"⚠ WAV conversion failed for lip sync")
 
             return str(cache_path), lip_sync_data
 

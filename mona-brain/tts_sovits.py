@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 import aiohttp
 
-from lip_sync import generate_lip_sync_from_text, get_wav_duration, get_lip_sync_generator
+from lip_sync import generate_lip_sync_from_text, get_wav_duration
 from tts_preprocess import clean_for_tts
 
 
@@ -134,7 +134,6 @@ class MonaTTSSoVITS:
         use_cache: bool = True,
         convert_to_mp3: bool = False,
         generate_lip_sync: bool = True,
-        use_rhubarb: bool = False,
         preprocess: bool = True
     ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
         """
@@ -223,26 +222,14 @@ class MonaTTSSoVITS:
                     save_ms = (time.perf_counter() - save_start) * 1000
                     print(f"⏱️  TTS [Save to Disk] {save_ms:.0f}ms")
 
-            # Generate text-based lip sync (near-instant, no Rhubarb needed)
+            # Generate text-based lip sync (near-instant)
             lip_sync_data = None
             if generate_lip_sync:
-                if use_rhubarb:
-                    # Use Rhubarb for accurate audio-based lip sync
-                    lip_sync_generator = get_lip_sync_generator()
-                    if lip_sync_generator.is_available():
-                        lip_sync_data = await lip_sync_generator.generate_lip_sync_async(
-                            str(wav_path),
-                            dialog_text=text
-                        )
-                        if lip_sync_data:
-                            lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-                else:
-                    # Use fast text-based lip sync
-                    audio_duration = get_wav_duration(str(wav_path))
-                    if audio_duration > 0:
-                        lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
-                        if lip_sync_data:
-                            lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+                audio_duration = get_wav_duration(str(wav_path))
+                if audio_duration > 0:
+                    lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
+                    if lip_sync_data:
+                        lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
 
             if convert_to_mp3:
                 mp3_start = time.perf_counter()

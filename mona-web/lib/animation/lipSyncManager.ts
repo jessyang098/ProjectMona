@@ -51,7 +51,7 @@ type PhonemeValues = {
 /**
  * Manages lip sync animation for VRM avatars.
  * Supports two modes:
- * 1. Phoneme-timed: Uses pre-computed timing data from Rhubarb for accurate word sync
+ * 1. Phoneme-timed: Uses pre-computed timing data from backend for accurate word sync
  * 2. Real-time audio analysis: Fallback using amplitude and spectral centroid
  */
 export class LipSyncManager {
@@ -100,7 +100,7 @@ export class LipSyncManager {
   }
 
   /**
-   * Set lip sync timing data from Rhubarb analysis.
+   * Set lip sync timing data from backend.
    * When set, the manager will use phoneme-timed animation instead of real-time audio analysis.
    */
   setLipSyncData(cues: LipSyncCue[] | null): void {

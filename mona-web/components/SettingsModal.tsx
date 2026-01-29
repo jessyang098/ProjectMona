@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 export type TtsEngine = "sovits" | "fishspeech";
-export type LipSyncMode = "textbased" | "rhubarb" | "realtime";
+export type LipSyncMode = "textbased" | "realtime";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -208,16 +208,6 @@ export default function SettingsModal({
               Text
             </button>
             <button
-              onClick={() => onLipSyncModeChange("rhubarb")}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                lipSyncMode === "rhubarb"
-                  ? "bg-pink-500 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-              }`}
-            >
-              Rhubarb
-            </button>
-            <button
               onClick={() => onLipSyncModeChange("realtime")}
               className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 lipSyncMode === "realtime"
@@ -231,8 +221,6 @@ export default function SettingsModal({
           <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
             {lipSyncMode === "textbased"
               ? "Text: Fast phoneme estimation from text (~0ms)"
-              : lipSyncMode === "rhubarb"
-              ? "Rhubarb: Audio analysis for accurate timing (~500ms)"
               : "Real-time: Frontend audio frequency analysis"}
           </p>
         </div>

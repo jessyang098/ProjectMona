@@ -419,7 +419,7 @@ export default function Live2DAvatar({
             const audioDuration = audioRef.current.duration;
 
             if (lipSyncRef.current && lipSyncRef.current.length > 0) {
-              // Rhubarb timed lip sync
+              // Timed lip sync from backend
               if (currentTime < audioDuration - 0.1) {
                 const cue = lipSyncRef.current.find(c => currentTime >= c.start && currentTime < c.end);
                 if (cue) {
@@ -560,8 +560,8 @@ export default function Live2DAvatar({
     audioRef.current = audio;
 
     // Set up Web Audio API analyser for real-time lip sync fallback
-    const hasRhubarbData = lipSyncRef.current && lipSyncRef.current.length > 0;
-    if (!hasRhubarbData) {
+    const hasLipSyncData = lipSyncRef.current && lipSyncRef.current.length > 0;
+    if (!hasLipSyncData) {
       try {
         if (!audioContextRef.current) {
           audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();

@@ -1,8 +1,6 @@
 """
 Fish Audio TTS Integration for Mona
-Uses Fish Audio's official API for high-quality voice cloning.
-
-Supports on-the-fly voice cloning with reference audio.
+Uses Fish Audio's official API for high-quality TTS.
 """
 
 import asyncio
@@ -15,7 +13,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 import aiohttp
 
-from lip_sync import get_lip_sync_generator
+from lip_sync import generate_lip_sync_from_text, get_wav_duration
 from tts_preprocess import clean_for_tts
 
 
@@ -25,43 +23,25 @@ class MonaTTSFishSpeech:
     def __init__(
         self,
         api_key: str = os.getenv("FISH_AUDIO_API_KEY", ""),
-        ref_audio_path: str = "/workspace/GPT-SoVITS/assets/mona_voice/main_sample.wav",
-        prompt_text: str = "This is a sample voice for you to get started with. It sounds kind of cute, but make sure there aren't long silences.",
+        model_id: str = os.getenv("FISH_MODEL_ID", "s1"),
         audio_dir: str = "assets/audio_cache",
-        speed_factor: float = 1.0,
     ):
         self.api_key = api_key
+        self.model_id = model_id
         self.api_url = "https://api.fish.audio/v1/tts"
-        self.ref_audio_path = ref_audio_path
-        self.prompt_text = prompt_text
-        self.speed_factor = speed_factor
 
         self.mock_mode = not api_key or api_key.lower() == "mock"
         if self.mock_mode:
             print("Fish Audio running in MOCK MODE (no API key)")
+        else:
+            print(f"Fish Audio initialized with model: {model_id}")
 
         self.audio_dir = Path(audio_dir)
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self._warmed_up = False
-        self._ref_audio_cache: Optional[bytes] = None
-
-    def _load_reference_audio(self) -> Optional[bytes]:
-        """Load and cache the reference audio file."""
-        if self._ref_audio_cache is not None:
-            return self._ref_audio_cache
-
-        ref_path = Path(self.ref_audio_path)
-        if not ref_path.exists():
-            print(f"Reference audio not found: {self.ref_audio_path}")
-            return None
-
-        with open(ref_path, "rb") as f:
-            self._ref_audio_cache = f.read()
-        print(f"Loaded reference audio: {len(self._ref_audio_cache)} bytes")
-        return self._ref_audio_cache
 
     async def warmup(self) -> bool:
-        """Pre-warm by loading reference audio."""
+        """Mark as warmed up (no pre-warming needed for API)."""
         if self._warmed_up:
             return True
 
@@ -69,23 +49,19 @@ class MonaTTSFishSpeech:
             self._warmed_up = True
             return True
 
-        print("Warming up Fish Audio TTS...")
-        ref_audio = self._load_reference_audio()
-        if ref_audio:
-            self._warmed_up = True
-            print("Fish Audio TTS ready!")
-            return True
-        return False
+        self._warmed_up = True
+        print("Fish Audio TTS ready!")
+        return True
 
     def _get_cache_path(self, text: str, format: str = "mp3") -> Path:
         text_hash = hashlib.md5(
-            f"{text}_{self.ref_audio_path}_{self.speed_factor}_fishspeech".encode()
+            f"{text}_{self.model_id}_fishspeech".encode()
         ).hexdigest()
         return self.audio_dir / f"{text_hash}.{format}"
 
     def _get_lip_sync_cache_path(self, text: str) -> Path:
         text_hash = hashlib.md5(
-            f"{text}_{self.ref_audio_path}_{self.speed_factor}_fishspeech".encode()
+            f"{text}_{self.model_id}_fishspeech".encode()
         ).hexdigest()
         return self.audio_dir / f"{text_hash}.lipsync.json"
 
@@ -109,7 +85,7 @@ class MonaTTSFishSpeech:
         if not text or not text.strip():
             return None, None
 
-        # Fish Audio returns MP3 by default, which is what we want
+        # Fish Audio returns MP3 by default
         output_format = "mp3"
         cache_path = self._get_cache_path(text, format=output_format)
         lip_sync_cache_path = self._get_lip_sync_cache_path(text)
@@ -129,44 +105,22 @@ class MonaTTSFishSpeech:
         if self.mock_mode:
             return None, None
 
-        # Load reference audio
-        ref_audio = self._load_reference_audio()
-        if not ref_audio:
-            print("Fish Audio: No reference audio available")
-            return None, None
-
         try:
-            # Prepare multipart form data for Fish Audio API
-            # Fish Audio uses msgpack but also supports multipart/form-data
-            import struct
-
-            # Build the request using aiohttp with multipart
             api_start = time.perf_counter()
-
-            # Create form data
-            form = aiohttp.FormData()
-            form.add_field('text', text)
-            form.add_field('format', 'mp3')
-            form.add_field('mp3_bitrate', '128')
-
-            # Add reference audio for voice cloning
-            form.add_field(
-                'reference_audio',
-                ref_audio,
-                filename='reference.wav',
-                content_type='audio/wav'
-            )
-            form.add_field('reference_text', self.prompt_text)
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "model": self.model_id,
             }
+
+            payload = {"text": text}
 
             timeout = aiohttp.ClientTimeout(total=60)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     self.api_url,
-                    data=form,
+                    json=payload,
                     headers=headers
                 ) as response:
                     api_ms = (time.perf_counter() - api_start) * 1000
@@ -186,20 +140,28 @@ class MonaTTSFishSpeech:
                     with open(cache_path, "wb") as f:
                         f.write(audio_content)
 
-            # Generate lip sync if needed
+            # Generate text-based lip sync
             lip_sync_data = None
-            lip_sync_generator = get_lip_sync_generator()
-
-            if generate_lip_sync and lip_sync_generator.is_available():
-                lip_start = time.perf_counter()
-                lip_sync_data = await lip_sync_generator.generate_lip_sync_async(
-                    str(cache_path),
-                    dialog_text=text
+            if generate_lip_sync:
+                # Convert MP3 to WAV temporarily to get duration
+                wav_path = cache_path.with_suffix('.wav')
+                convert_proc = await asyncio.create_subprocess_exec(
+                    'ffmpeg', '-y', '-i', str(cache_path), str(wav_path),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
                 )
-                if lip_sync_data:
-                    lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-                lip_ms = (time.perf_counter() - lip_start) * 1000
-                print(f"Fish Audio [Rhubarb] {lip_ms:.0f}ms")
+                await asyncio.wait_for(convert_proc.communicate(), timeout=30)
+
+                if convert_proc.returncode == 0:
+                    audio_duration = get_wav_duration(str(wav_path))
+                    if audio_duration > 0:
+                        lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
+                        if lip_sync_data:
+                            lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
+
+                    # Clean up WAV
+                    if wav_path.exists():
+                        wav_path.unlink()
 
             total_ms = (time.perf_counter() - tts_start) * 1000
             print(f"Fish Audio [TOTAL] {total_ms:.0f}ms ({total_ms/1000:.2f}s)")
