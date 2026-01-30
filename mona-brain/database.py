@@ -59,6 +59,24 @@ class GuestSession(Base):
     last_active: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class UserMemory(Base):
+    """Persisted memories extracted from conversations.
+
+    Stores facts, preferences, and important details about users
+    that Mona should remember across sessions.
+    """
+    __tablename__ = "user_memories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(50))  # fact, preference, event, feeling, other
+    importance: Mapped[int] = mapped_column(Integer, default=50)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User")
+
+
 # Async engine and session
 engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

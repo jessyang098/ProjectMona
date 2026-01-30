@@ -67,6 +67,7 @@ from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
 from tts_fishspeech import MonaTTSFishSpeech
 from text_utils import preprocess_tts_text
+from memory import save_memory_to_db, load_memories_from_db
 from openai import OpenAI
 
 # Initialize LLM and TTS (will be created on startup)
@@ -344,6 +345,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 await db.commit()
             print(f"👤 Guest session: {guest_session_id}, messages: {guest_session.message_count if guest_session else 0}")
 
+    # Use user.id for LLM state so it persists across devices/sessions
+    llm_user_id = user.id if user else client_id
+
     try:
         # Send auth status to client
         async with async_session() as db:
@@ -368,13 +372,18 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             }
             await manager.send_message(auth_status, client_id)
 
+            # Set user info for personalized LLM responses
+            if user and mona_llm:
+                mona_llm.set_user_info(llm_user_id, name=user.name, nickname=user.nickname)
+                print(f"👤 Set user info for LLM: {user.nickname or user.name} (id: {llm_user_id[:8]}...)")
+
             # Load chat history for authenticated users
             if user:
                 result = await db.execute(
                     select(ChatMessage)
                     .where(ChatMessage.user_id == user.id)
                     .order_by(ChatMessage.created_at.asc())
-                    .limit(50)  # Load last 50 messages
+                    .limit(25)  # Load last 25 messages for UI
                 )
                 history = result.scalars().all()
                 if history:
@@ -393,10 +402,22 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                     await manager.send_message(history_message, client_id)
                     print(f"📜 Sent {len(history)} messages from history to {user.email}")
 
+                    # Load past conversation into LLM so it remembers context
+                    if mona_llm:
+                        llm_history = [{"role": msg.role, "content": msg.content} for msg in history]
+                        mona_llm.load_conversation_history(llm_user_id, llm_history)
+
+                # Load persisted memories from database
+                if mona_llm:
+                    db_memories = await load_memories_from_db(db, user.id)
+                    if db_memories:
+                        mona_llm.load_memories(llm_user_id, db_memories)
+                        print(f"🧠 Loaded {len(db_memories)} memories for {user.email}")
+
         # Send welcome message
         if mona_llm:
             # Get initial emotion state
-            emotion_data = mona_llm.get_emotion_state(client_id)
+            emotion_data = mona_llm.get_emotion_state(llm_user_id)
             welcome_content = "Hi! I'm Mona! I'm so happy to meet you!"
         else:
             emotion_data = {}
@@ -551,7 +572,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             # Generate response using LLM or fallback to dummy
             if mona_llm:
                 try:
-                    async for event in mona_llm.stream_response(client_id, user_content, image_base64):
+                    async for event in mona_llm.stream_response(llm_user_id, user_content, image_base64):
                         if event["event"] == "chunk":
                             chunk_message = {
                                 "type": "message_chunk",
@@ -594,6 +615,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                     )
                                     db.add(chat_msg)
                                     await db.commit()
+
+                                    # Save any new memories extracted from user message
+                                    if mona_llm:
+                                        pending_memories = mona_llm.get_pending_memories(llm_user_id)
+                                        for mem in pending_memories:
+                                            await save_memory_to_db(db, user.id, mem)
+                                        if pending_memories:
+                                            print(f"🧠 Saved {len(pending_memories)} new memories for {user.email}")
 
                             # Generate TTS audio in background (non-blocking)
                             if event.get("content"):

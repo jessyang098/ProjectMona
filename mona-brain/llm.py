@@ -73,10 +73,47 @@ class MonaLLM:
         # Conversation history per user
         self.conversations: Dict[str, List[ConversationMessage]] = {}
 
+        # User info (name, etc.) per user
+        self.user_info: Dict[str, Dict[str, str]] = {}
+
         # Emotion engine per user
         self.emotion_engines: Dict[str, EmotionEngine] = {}
         self.memory_manager = MemoryManager()
         self.affection_engine = AffectionEngine()
+
+    def set_user_info(self, user_id: str, name: str | None = None, nickname: str | None = None):
+        """Set user info for personalized responses"""
+        self.user_info[user_id] = {
+            "name": nickname or name,  # Prefer nickname if set
+        }
+        # If conversation exists, update the system prompt with user info
+        if user_id in self.conversations:
+            self._update_system_prompt(user_id)
+
+    def load_conversation_history(self, user_id: str, messages: list[dict]):
+        """Load past conversation history from database for returning users.
+
+        Args:
+            user_id: The user's ID
+            messages: List of dicts with 'role' ('user' or 'assistant') and 'content'
+        """
+        # Initialize conversation with system prompt first
+        conversation = self._get_or_create_conversation(user_id)
+
+        # Add past messages (limit to last N to avoid context overflow)
+        recent_messages = messages[-self.max_history:] if len(messages) > self.max_history else messages
+        for msg in recent_messages:
+            conversation.append(ConversationMessage(
+                role=msg["role"],
+                content=msg["content"]
+            ))
+
+        print(f"📚 Loaded {len(recent_messages)} past messages for user {user_id}")
+
+    def _get_user_name(self, user_id: str) -> str | None:
+        """Get the user's name/nickname for this user_id"""
+        info = self.user_info.get(user_id)
+        return info.get("name") if info else None
 
     def _get_or_create_conversation(self, user_id: str) -> List[ConversationMessage]:
         """Get or create conversation history for a user"""
@@ -85,10 +122,12 @@ class MonaLLM:
             emotion_state = self._get_emotion_engine(user_id).get_current_emotion()
             memory_context = self.memory_manager.build_context_block(user_id)
             affection_state = self.affection_engine.describe_state(user_id)
+            user_name = self._get_user_name(user_id)
             system_prompt = self.personality.get_system_prompt(
                 emotion_state,
                 memory_context=memory_context,
                 affection_state=affection_state,
+                user_name=user_name,
             )
 
             self.conversations[user_id] = [
@@ -109,10 +148,12 @@ class MonaLLM:
         emotion_state = self._get_emotion_engine(user_id).get_current_emotion()
         memory_context = self.memory_manager.build_context_block(user_id)
         affection_state = self.affection_engine.describe_state(user_id)
+        user_name = self._get_user_name(user_id)
         new_system_prompt = self.personality.get_system_prompt(
             emotion_state,
             memory_context=memory_context,
             affection_state=affection_state,
+            user_name=user_name,
         )
 
         # Update the system message (always first in conversation)
@@ -307,3 +348,11 @@ Respond with ONLY the gesture name, nothing else."""
         """Get current emotion state for a user"""
         emotion_engine = self._get_emotion_engine(user_id)
         return emotion_engine.get_emotion_for_expression()
+
+    def get_pending_memories(self, user_id: str):
+        """Get memories that need to be saved to database."""
+        return self.memory_manager.get_pending_memories(user_id)
+
+    def load_memories(self, user_id: str, db_memories: list[dict]):
+        """Load memories from database records."""
+        self.memory_manager.load_from_db_records(user_id, db_memories)

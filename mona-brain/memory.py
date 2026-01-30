@@ -46,6 +46,7 @@ class MemoryManager:
     def __init__(self, max_memories_per_user: int = 40):
         self.max_memories_per_user = max_memories_per_user
         self._memories: Dict[str, List[MemoryItem]] = {}
+        self._pending_save: Dict[str, List[MemoryItem]] = {}  # Memories needing DB save
 
     def _get_user_memories(self, user_id: str) -> List[MemoryItem]:
         return self._memories.setdefault(user_id, [])
@@ -58,6 +59,7 @@ class MemoryManager:
         category: MemoryCategory = MemoryCategory.OTHER,
         importance: int = 50,
         tags: Optional[List[str]] = None,
+        from_db: bool = False,
     ) -> MemoryItem:
         """Persist a new memory item for the given user."""
 
@@ -70,11 +72,22 @@ class MemoryManager:
         memories = self._get_user_memories(user_id)
         memories.append(memory)
 
+        # Track new memories that need to be saved to DB
+        if not from_db:
+            if user_id not in self._pending_save:
+                self._pending_save[user_id] = []
+            self._pending_save[user_id].append(memory)
+
         # Keep the list bounded by trimming the least important/oldest.
         if len(memories) > self.max_memories_per_user:
             memories.sort(key=lambda item: (item.importance, item.timestamp))
             memories.pop(0)
         return memory
+
+    def get_pending_memories(self, user_id: str) -> List[MemoryItem]:
+        """Get memories that need to be saved to DB, and clear the pending list."""
+        pending = self._pending_save.pop(user_id, [])
+        return pending
 
     def process_user_message(self, user_id: str, message: str) -> List[MemoryItem]:
         """Extract potential memories from a raw user message."""
@@ -186,3 +199,54 @@ class MemoryManager:
         """Forget everything about a user (used when clearing history)."""
 
         self._memories.pop(user_id, None)
+
+    def load_from_db_records(self, user_id: str, db_memories: List[dict]):
+        """Load memories from database records into the in-memory cache."""
+        memories = self._get_user_memories(user_id)
+        for record in db_memories:
+            memory = MemoryItem(
+                content=record["content"],
+                category=MemoryCategory(record["category"]),
+                importance=record["importance"],
+                timestamp=record["created_at"],
+            )
+            memories.append(memory)
+
+
+# Database persistence functions (called from main.py)
+
+async def save_memory_to_db(db, user_id: str, memory: MemoryItem):
+    """Save a memory item to the database."""
+    from database import UserMemory
+
+    db_memory = UserMemory(
+        user_id=user_id,
+        content=memory.content,
+        category=memory.category.value,
+        importance=memory.importance,
+    )
+    db.add(db_memory)
+    await db.commit()
+
+
+async def load_memories_from_db(db, user_id: str, limit: int = 20) -> List[dict]:
+    """Load memories from database for a user."""
+    from sqlalchemy import select
+    from database import UserMemory
+
+    result = await db.execute(
+        select(UserMemory)
+        .where(UserMemory.user_id == user_id)
+        .order_by(UserMemory.importance.desc(), UserMemory.created_at.desc())
+        .limit(limit)
+    )
+    records = result.scalars().all()
+    return [
+        {
+            "content": r.content,
+            "category": r.category,
+            "importance": r.importance,
+            "created_at": r.created_at,
+        }
+        for r in records
+    ]
