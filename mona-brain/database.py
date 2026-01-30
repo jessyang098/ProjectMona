@@ -5,7 +5,7 @@ Uses SQLAlchemy with async SQLite support.
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey
+from sqlalchemy import String, Text, Integer, Float, DateTime, ForeignKey, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from config import DATABASE_URL
@@ -64,17 +64,35 @@ class UserMemory(Base):
 
     Stores facts, preferences, and important details about users
     that Mona should remember across sessions.
+
+    v1.5 adds: key-based deduplication, confidence scoring, TTL for ephemeral data.
     """
     __tablename__ = "user_memories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
-    content: Mapped[str] = mapped_column(Text)
+
+    # Core content
+    key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)  # e.g., "name", "favorite_food", "likes:pizza"
+    value: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # normalized value for deduplication
+    content: Mapped[str] = mapped_column(Text)  # original phrasing
+
+    # Classification
     category: Mapped[str] = mapped_column(String(50))  # fact, preference, event, feeling, other
     importance: Mapped[int] = mapped_column(Integer, default=50)
+    confidence: Mapped[float] = mapped_column(Float, default=0.7)  # 0.0-1.0, regex=0.7, LLM=0.85, user-confirmed=1.0
+
+    # Lifecycle
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active, deprecated
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # TTL for ephemeral memories
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User")
+
+    # Index for efficient deduplication queries
+    __table_args__ = (
+        Index("idx_user_key_status", "user_id", "key", "status"),
+    )
 
 
 # Async engine and session

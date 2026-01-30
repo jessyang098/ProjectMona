@@ -62,12 +62,12 @@ from llm import MonaLLM
 from database import init_db, get_db, User, ChatMessage, GuestSession, async_session
 from auth import router as auth_router, verify_token
 from config import GUEST_MESSAGE_LIMIT
-from personality_loader import load_personality_from_yaml
+from personality_loader import load_personality_from_yaml, list_available_personalities
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
 from tts_fishspeech import MonaTTSFishSpeech
 from text_utils import preprocess_tts_text
-from memory import save_memory_to_db, load_memories_from_db
+from memory import save_memory_to_db, load_memories_from_db, deprecate_memories_by_key
 from openai import OpenAI
 
 # Initialize LLM and TTS (will be created on startup)
@@ -304,6 +304,57 @@ async def health():
         "connections": len(manager.active_connections),
         "llm_enabled": mona_llm is not None
     }
+
+
+@app.get("/personalities")
+async def get_personalities():
+    """List available personality archetypes"""
+    return {
+        "personalities": list_available_personalities(),
+        "current": "girlfriend",  # Default, would be per-user in production
+    }
+
+
+class PersonalitySwitchRequest(BaseModel):
+    personality_id: str
+
+
+@app.post("/personalities/switch")
+async def switch_personality(request: PersonalitySwitchRequest):
+    """Switch to a different personality archetype.
+
+    Note: In production, this would persist to user preferences.
+    Currently it reloads the global LLM personality (affects all users).
+    """
+    global mona_llm
+
+    available = [p["id"] for p in list_available_personalities()]
+    if request.personality_id not in available:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Invalid personality. Available: {available}"}
+        )
+
+    try:
+        new_personality = load_personality_from_yaml(archetype=request.personality_id)
+        if mona_llm:
+            mona_llm.personality = new_personality
+            # Clear all conversation states to apply new personality
+            mona_llm.conversations.clear()
+            print(f"✓ Switched personality to: {request.personality_id}")
+
+        return {
+            "success": True,
+            "personality": request.personality_id,
+            "message": f"Switched to {request.personality_id} personality",
+        }
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 
 @app.websocket("/ws/{client_id}")
@@ -618,6 +669,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                                     # Save any new memories extracted from user message
                                     if mona_llm:
+                                        # Handle memory updates (deprecate old values)
+                                        pending_deprecations = mona_llm.get_pending_deprecations(llm_user_id)
+                                        if pending_deprecations:
+                                            await deprecate_memories_by_key(db, user.id, pending_deprecations)
+                                            print(f"🧠 Deprecated {len(pending_deprecations)} old memories for {user.email}")
+
+                                        # Save new memories
                                         pending_memories = mona_llm.get_pending_memories(llm_user_id)
                                         for mem in pending_memories:
                                             await save_memory_to_db(db, user.id, mem)

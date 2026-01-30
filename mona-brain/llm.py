@@ -353,6 +353,10 @@ Respond with ONLY the gesture name, nothing else."""
         """Get memories that need to be saved to database."""
         return self.memory_manager.get_pending_memories(user_id)
 
+    def get_pending_deprecations(self, user_id: str):
+        """Get memory keys that need to be deprecated in database."""
+        return self.memory_manager.get_pending_deprecations(user_id)
+
     def load_memories(self, user_id: str, db_memories: list[dict]):
         """Load memories from database records."""
         self.memory_manager.load_from_db_records(user_id, db_memories)
