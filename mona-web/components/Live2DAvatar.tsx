@@ -85,13 +85,22 @@ export default function Live2DAvatar({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const dimensionsRef = useRef({ width: 800, height: 600 });
 
-  // Get actual container dimensions
+  // Get actual container dimensions - only for initial size
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setDimensions({ width: rect.width, height: rect.height });
+        // Only update state if dimensions actually changed significantly
+        setDimensions(prev => {
+          if (Math.abs(prev.width - rect.width) > 1 || Math.abs(prev.height - rect.height) > 1) {
+            const newDims = { width: rect.width, height: rect.height };
+            dimensionsRef.current = newDims;
+            return newDims;
+          }
+          return prev;
+        });
       }
     };
 
@@ -101,6 +110,26 @@ export default function Live2DAvatar({
   }, []);
 
   const { width, height } = dimensions;
+
+  // Handle resize without destroying the entire app
+  useEffect(() => {
+    if (!appRef.current || !modelRef.current) return;
+
+    const app = appRef.current;
+    const model = modelRef.current;
+
+    // Resize the renderer
+    app.renderer.resize(width, height);
+
+    // Reposition and rescale the model
+    const modelAny = model as any;
+    const modelOriginalHeight = modelAny.height || 1200;
+    const scale = (height * 1.3) / modelOriginalHeight;
+    model.scale.set(scale);
+    model.x = width / 2;
+    model.y = height / 2 + height * 0.05;
+  }, [width, height]);
+
   const appRef = useRef<any>(null);
   const modelRef = useRef<Live2DModel | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -317,11 +346,15 @@ export default function Live2DAvatar({
 
         if (!mounted || !canvasRef.current) return;
 
+        // Get current dimensions from ref (fresher than closure)
+        const initWidth = dimensionsRef.current.width;
+        const initHeight = dimensionsRef.current.height;
+
         // Create PixiJS application (v6 API - synchronous constructor)
         const app = new PIXI.Application({
           view: canvasRef.current,
-          width,
-          height,
+          width: initWidth,
+          height: initHeight,
           backgroundAlpha: 0,
           antialias: true,
           resolution: window.devicePixelRatio || 1,
@@ -348,13 +381,13 @@ export default function Live2DAvatar({
         // Scale to fit canvas height (larger)
         const modelAny = model as any;
         const modelOriginalHeight = modelAny.height || 1200;
-        const scale = (height * 1.3) / modelOriginalHeight;
+        const scale = (initHeight * 1.3) / modelOriginalHeight;
         model.scale.set(scale);
 
         // Position model - anchor at center, shift down slightly
         model.anchor.set(0.5, 0.5);
-        model.x = width / 2;
-        model.y = height / 2 + height * 0.05; // Shift down 5%
+        model.x = initWidth / 2;
+        model.y = initHeight / 2 + initHeight * 0.05; // Shift down 5%
 
         // Enable dragging for position adjustment
         modelAny.interactive = true;
@@ -507,7 +540,7 @@ export default function Live2DAvatar({
         appRef.current = null;
       }
     };
-  }, [modelUrl, width, height, updateIdleAnimations, applyLipSync, hideWatermark]);
+  }, [modelUrl, updateIdleAnimations, applyLipSync, hideWatermark]);
 
   // Handle emotion changes
   useEffect(() => {
