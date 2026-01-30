@@ -11,7 +11,7 @@ import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./Avata
 import LoginPrompt from "./LoginPrompt";
 import UserMenu from "./UserMenu";
 import ProfileModal from "./ProfileModal";
-import SettingsModal, { TtsEngine, LipSyncMode } from "./SettingsModal";
+import SettingsModal, { TtsEngine, LipSyncMode, PersonalityType } from "./SettingsModal";
 import ShopModal from "./ShopModal";
 import { EmotionData, LipSyncCue } from "@/types/chat";
 import Image from "next/image";
@@ -39,6 +39,8 @@ export default function ChatInterface() {
   const [volume, setVolume] = useState(1);
   const [ttsEngine, setTtsEngine] = useState<TtsEngine>("sovits");
   const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>("textbased");
+  const [personality, setPersonality] = useState<PersonalityType>("girlfriend");
+  const [isPersonalitySwitching, setIsPersonalitySwitching] = useState(false);
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
     shirt: true,
     skirt: true,
@@ -265,6 +267,49 @@ export default function ChatInterface() {
     }
   };
 
+  // Handle personality switch
+  const handlePersonalityChange = async (newPersonality: PersonalityType) => {
+    if (newPersonality === personality || isPersonalitySwitching) return;
+
+    setIsPersonalitySwitching(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/personalities/switch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personality_id: newPersonality }),
+      });
+
+      if (response.ok) {
+        setPersonality(newPersonality);
+        // Store preference in localStorage
+        localStorage.setItem("mona_personality", newPersonality);
+      } else {
+        const error = await response.json();
+        console.error("Failed to switch personality:", error);
+        alert("Failed to switch personality. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error switching personality:", error);
+      alert("Failed to switch personality. Please try again.");
+    } finally {
+      setIsPersonalitySwitching(false);
+    }
+  };
+
+  // Load saved personality preference on mount
+  useEffect(() => {
+    const savedPersonality = localStorage.getItem("mona_personality") as PersonalityType | null;
+    if (savedPersonality && (savedPersonality === "girlfriend" || savedPersonality === "mommy")) {
+      setPersonality(savedPersonality);
+      // Sync with backend
+      fetch(`${BACKEND_URL}/personalities/switch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personality_id: savedPersonality }),
+      }).catch(console.error);
+    }
+  }, []);
+
   const emotionLabel = getEmotionLabel(latestEmotion);
 
   return (
@@ -306,6 +351,9 @@ export default function ChatInterface() {
         onTtsEngineChange={setTtsEngine}
         lipSyncMode={lipSyncMode}
         onLipSyncModeChange={setLipSyncMode}
+        personality={personality}
+        onPersonalityChange={handlePersonalityChange}
+        isPersonalitySwitching={isPersonalitySwitching}
       />
 
       {/* Shop modal */}

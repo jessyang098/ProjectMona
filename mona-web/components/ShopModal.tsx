@@ -112,18 +112,60 @@ const VOICES = [
   },
 ];
 
-const SUBSCRIPTION = {
-  name: "Mona Premium",
-  price: 9.99,
-  period: "month",
-  features: [
-    { text: "Unlimited messages", description: "Chat as much as you want" },
-    { text: "Memory", description: "Mona remembers your conversations" },
-    { text: "Priority voice", description: "Faster, higher quality responses" },
-    { text: "Early access", description: "Try new features first" },
-    { text: "Exclusive content", description: "Premium outfits and voices" },
-  ],
+type SubscriptionPlan = {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  period: string;
+  periodNote?: string;
+  badge?: string;
+  badgeColor?: string;
+  highlight?: boolean;
+  savings?: string;
 };
+
+const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    id: "founder",
+    name: "Founder's Special",
+    price: 12.99,
+    originalPrice: 19.99,
+    period: "month",
+    periodNote: "for your first 6 months",
+    badge: "Limited",
+    badgeColor: "from-amber-500 to-orange-500",
+    savings: "Save 35% for 6 months",
+  },
+  {
+    id: "monthly",
+    name: "Monthly",
+    price: 19.99,
+    period: "month",
+    highlight: true,
+    badge: "Popular",
+    badgeColor: "from-pink-500 to-purple-500",
+  },
+  {
+    id: "annual",
+    name: "Annual",
+    price: 149.99,
+    period: "year",
+    periodNote: "Just $12.50/month",
+    badge: "Best Value",
+    badgeColor: "from-emerald-500 to-teal-500",
+    savings: "Save 38%",
+  },
+];
+
+const SUBSCRIPTION_FEATURES = [
+  { text: "Unlimited messages", description: "Chat as much as you want" },
+  { text: "Memory", description: "Mona remembers your conversations" },
+  { text: "Voice responses", description: "Hear Mona's anime voice" },
+  { text: "3D Avatar", description: "Animated expressions & gestures" },
+  { text: "Early access", description: "Try new features first" },
+  { text: "Exclusive content", description: "Premium outfits and voices" },
+];
 
 export default function ShopModal({ isOpen, onClose, isAuthenticated = false, onOpenLogin }: ShopModalProps) {
   const [activeTab, setActiveTab] = useState<ShopTab>("characters");
@@ -508,8 +550,79 @@ function VoicesTab({ onPurchase }: { onPurchase: () => void }) {
 }
 
 function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
+  const [selectedPlan, setSelectedPlan] = useState<string>("monthly");
+
+  const currentPlan = SUBSCRIPTION_PLANS.find((p) => p.id === selectedPlan) || SUBSCRIPTION_PLANS[1];
+
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center space-y-6">
+      {/* Plan Selector */}
+      <div className="w-full max-w-md space-y-3">
+        {SUBSCRIPTION_PLANS.map((plan) => (
+          <button
+            key={plan.id}
+            onClick={() => setSelectedPlan(plan.id)}
+            className={`relative w-full rounded-2xl border-2 p-4 text-left transition-all ${
+              selectedPlan === plan.id
+                ? "border-pink-500 bg-pink-50 shadow-lg shadow-pink-500/10"
+                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md"
+            }`}
+          >
+            {/* Badge */}
+            {plan.badge && (
+              <div
+                className={`absolute -top-2.5 right-4 rounded-full bg-gradient-to-r ${plan.badgeColor} px-3 py-0.5 text-xs font-semibold text-white shadow-md`}
+              >
+                {plan.badge}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {/* Radio indicator */}
+                <div
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all ${
+                    selectedPlan === plan.id
+                      ? "border-pink-500 bg-pink-500"
+                      : "border-slate-300"
+                  }`}
+                >
+                  {selectedPlan === plan.id && (
+                    <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+
+                <div>
+                  <p className={`font-semibold ${selectedPlan === plan.id ? "text-pink-700" : "text-slate-900"}`}>
+                    {plan.name}
+                  </p>
+                  {plan.periodNote && (
+                    <p className="text-xs text-slate-500">{plan.periodNote}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <div className="flex items-baseline gap-1">
+                  {plan.originalPrice && (
+                    <span className="text-sm text-slate-400 line-through">${plan.originalPrice}</span>
+                  )}
+                  <span className={`text-xl font-bold ${selectedPlan === plan.id ? "text-pink-600" : "text-slate-900"}`}>
+                    ${plan.price}
+                  </span>
+                  <span className="text-sm text-slate-500">/{plan.period}</span>
+                </div>
+                {plan.savings && (
+                  <p className="text-xs font-medium text-emerald-600">{plan.savings}</p>
+                )}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
       {/* Premium Card */}
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl">
         {/* Header glow effect */}
@@ -523,15 +636,26 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
               </svg>
-              Premium
+              Mona Premium
             </div>
 
-            <h3 className="mt-4 text-2xl font-bold text-white">{SUBSCRIPTION.name}</h3>
+            <h3 className="mt-4 text-2xl font-bold text-white">{currentPlan.name}</h3>
 
             <div className="mt-3 flex items-baseline justify-center gap-1">
-              <span className="text-5xl font-bold text-white">${SUBSCRIPTION.price}</span>
-              <span className="text-lg text-slate-400">/{SUBSCRIPTION.period}</span>
+              {currentPlan.originalPrice && (
+                <span className="text-2xl text-slate-500 line-through">${currentPlan.originalPrice}</span>
+              )}
+              <span className="text-5xl font-bold text-white">${currentPlan.price}</span>
+              <span className="text-lg text-slate-400">/{currentPlan.period}</span>
             </div>
+            {currentPlan.periodNote && (
+              <p className="mt-1 text-sm text-pink-300">{currentPlan.periodNote}</p>
+            )}
+            {currentPlan.savings && (
+              <p className="mt-2 inline-block rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-medium text-emerald-400">
+                {currentPlan.savings}
+              </p>
+            )}
           </div>
         </div>
 
@@ -539,7 +663,7 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
         <div className="px-6 pb-8">
           <div className="rounded-2xl bg-white/5 p-4">
             <ul className="space-y-4">
-              {SUBSCRIPTION.features.map((feature, index) => (
+              {SUBSCRIPTION_FEATURES.map((feature, index) => (
                 <li key={index} className="flex items-start gap-3">
                   <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-500 shadow-lg shadow-pink-500/30">
                     <svg className="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -560,7 +684,7 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
             onClick={onPurchase}
             className="mt-6 w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-500 py-4 text-lg font-bold text-white shadow-xl shadow-pink-500/30 transition-all hover:shadow-2xl hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98]"
           >
-            Subscribe Now
+            {currentPlan.id === "annual" ? "Subscribe & Save 38%" : "Subscribe Now"}
           </button>
 
           <p className="mt-4 text-center text-sm text-slate-500">
