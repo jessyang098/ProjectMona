@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { EmotionData, Message, WebSocketMessage } from "@/types/chat";
+import { AudioSegment, EmotionData, Message, WebSocketMessage } from "@/types/chat";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -30,6 +30,8 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [latestEmotion, setLatestEmotion] = useState<EmotionData | null>(null);
   const [guestMessagesRemaining, setGuestMessagesRemaining] = useState<number | null>(null);
+  const [audioSegments, setAudioSegments] = useState<AudioSegment[]>([]);
+  const [totalAudioSegments, setTotalAudioSegments] = useState<number | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
 
@@ -93,6 +95,10 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           const chunkContent = data.content || "";
           setMessages((prev) => {
             if (prev.length === 0 || !prev[prev.length - 1].isStreaming) {
+              // New response starting - clear audio segments queue
+              setAudioSegments([]);
+              setTotalAudioSegments(null);
+
               return [
                 ...prev,
                 {
@@ -120,6 +126,11 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           // Stop audio generation indicator
           setIsGeneratingAudio(false);
 
+          // Store total segments count if provided (for legacy/fallback)
+          if (data.totalAudioSegments !== undefined) {
+            setTotalAudioSegments(data.totalAudioSegments);
+          }
+
           setMessages((prev) => {
             // Find the last message from Mona
             const lastMonaIndex = prev.length - 1 - [...prev].reverse().findIndex(m => m.sender === "mona");
@@ -137,6 +148,30 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
 
             return prev;
           });
+        } else if (data.type === "audio_segment" && data.audioUrl !== undefined) {
+          // Handle sentence-level audio segments (pipelined TTS)
+          const fullAudioUrl = `${BACKEND_URL}${data.audioUrl}`;
+          const segmentIndex = data.segmentIndex ?? 0;
+
+          // Add segment to queue (sorted by index)
+          setAudioSegments((prev) => {
+            const newSegment: AudioSegment = {
+              audioUrl: fullAudioUrl,
+              lipSync: data.lipSync,
+              segmentIndex: segmentIndex,
+              isPlaying: false,
+              isPlayed: false,
+            };
+
+            // Insert in correct position based on segmentIndex
+            const updated = [...prev, newSegment].sort((a, b) => a.segmentIndex - b.segmentIndex);
+            return updated;
+          });
+
+          // First segment received - stop showing "generating audio" indicator
+          if (segmentIndex === 0) {
+            setIsGeneratingAudio(false);
+          }
         } else if (data.type === "auth_status") {
           // Handle auth status from server
           setGuestMessagesRemaining(data.guestMessagesRemaining ?? null);
@@ -211,6 +246,39 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     }
   }, []);
 
+  // Mark a segment as currently playing
+  const markSegmentPlaying = useCallback((segmentIndex: number) => {
+    setAudioSegments((prev) =>
+      prev.map((seg) => ({
+        ...seg,
+        isPlaying: seg.segmentIndex === segmentIndex,
+      }))
+    );
+  }, []);
+
+  // Mark a segment as played (completed)
+  const markSegmentPlayed = useCallback((segmentIndex: number) => {
+    setAudioSegments((prev) =>
+      prev.map((seg) =>
+        seg.segmentIndex === segmentIndex
+          ? { ...seg, isPlaying: false, isPlayed: true }
+          : seg
+      )
+    );
+  }, []);
+
+  // Get the next segment to play (first unplayed segment)
+  const getNextSegment = useCallback((): AudioSegment | null => {
+    const unplayed = audioSegments.filter((seg) => !seg.isPlayed && !seg.isPlaying);
+    return unplayed.length > 0 ? unplayed[0] : null;
+  }, [audioSegments]);
+
+  // Clear all audio segments (for stopping playback)
+  const clearAudioSegments = useCallback(() => {
+    setAudioSegments([]);
+    setTotalAudioSegments(null);
+  }, []);
+
   return {
     messages,
     isConnected,
@@ -219,5 +287,12 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     latestEmotion,
     guestMessagesRemaining,
     sendMessage,
+    // Audio segment queue for sentence-level TTS
+    audioSegments,
+    totalAudioSegments,
+    markSegmentPlaying,
+    markSegmentPlayed,
+    getNextSegment,
+    clearAudioSegments,
   };
 }

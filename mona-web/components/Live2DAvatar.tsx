@@ -31,6 +31,7 @@ interface Live2DAvatarProps {
   emotion: EmotionData | null;
   audioUrl?: string | null;
   lipSync?: LipSyncCue[];
+  onAudioEnd?: () => void;
 }
 
 // Emotion to expression mapping for Live2D models
@@ -81,6 +82,7 @@ export default function Live2DAvatar({
   emotion,
   audioUrl,
   lipSync,
+  onAudioEnd,
 }: Live2DAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -625,6 +627,10 @@ export default function Live2DAvatar({
       if (modelRef.current) {
         applyLipSync(modelRef.current, { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
       }
+      // Call callback for queued audio playback
+      if (onAudioEnd) {
+        onAudioEnd();
+      }
     };
 
     audio.onerror = (e) => {
@@ -673,7 +679,7 @@ export default function Live2DAvatar({
         audioRef.current = null;
       }
     };
-  }, [audioUrl, applyLipSync]);
+  }, [audioUrl, applyLipSync, onAudioEnd]);
 
   return (
     <div

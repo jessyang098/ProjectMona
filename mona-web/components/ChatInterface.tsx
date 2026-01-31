@@ -72,21 +72,50 @@ export default function ChatInterface() {
     }
   }, [updateGuestStatus]);
 
-  const { messages, isConnected, isTyping, isGeneratingAudio, latestEmotion, guestMessagesRemaining, sendMessage } = useWebSocket(WEBSOCKET_URL, {
+  const {
+    messages,
+    isConnected,
+    isTyping,
+    isGeneratingAudio,
+    latestEmotion,
+    guestMessagesRemaining,
+    sendMessage,
+    audioSegments,
+    markSegmentPlaying,
+    markSegmentPlayed,
+    getNextSegment,
+  } = useWebSocket(WEBSOCKET_URL, {
     onGuestLimitReached: handleGuestLimitReached,
     onAuthStatus: handleAuthStatus,
   });
   const { initAudioContext } = useAudioContext();
   const { currentAnimation } = useAnimationState();
 
-  // Get the latest audio URL and lip sync data from Mona's messages
+  // Get the latest audio URL and lip sync data
+  // Priority: audio segments (sentence-level TTS) > message audio (legacy)
+  const currentSegment = getNextSegment();
+  const hasAudioSegments = audioSegments.length > 0;
+
+  // Fall back to message-level audio if no segments are queued
   const latestMonaMessageWithAudio = messages
     .slice()
     .reverse()
     .find((msg) => msg.sender === "mona" && msg.audioUrl);
 
-  const latestAudioUrl = latestMonaMessageWithAudio?.audioUrl;
-  const latestLipSync = latestMonaMessageWithAudio?.lipSync;
+  // Use segment audio if available, otherwise use message audio
+  const latestAudioUrl = hasAudioSegments && currentSegment
+    ? currentSegment.audioUrl
+    : latestMonaMessageWithAudio?.audioUrl;
+  const latestLipSync = hasAudioSegments && currentSegment
+    ? currentSegment.lipSync
+    : latestMonaMessageWithAudio?.lipSync;
+
+  // Handler for when audio segment finishes playing - advance to next segment
+  const handleAudioEnd = useCallback(() => {
+    if (currentSegment) {
+      markSegmentPlayed(currentSegment.segmentIndex);
+    }
+  }, [currentSegment, markSegmentPlayed]);
 
   // Enable audio on first user interaction
   const enableAudio = async () => {
@@ -385,7 +414,7 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled && lipSyncMode !== "realtime" ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} />
+        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled && lipSyncMode !== "realtime" ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} onAudioEnd={handleAudioEnd} />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>

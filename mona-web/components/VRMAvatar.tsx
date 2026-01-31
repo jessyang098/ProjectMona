@@ -114,6 +114,7 @@ interface VRMAvatarProps {
   audioUrl?: string | null;
   lipSync?: LipSyncCue[];
   outfitVisibility?: OutfitVisibility;
+  onAudioEnd?: () => void;
 }
 
 const DEFAULT_OUTFIT: OutfitVisibility = {
@@ -136,7 +137,7 @@ function getMaxMouthOpen(avatarUrl: string): number {
   return 0.4;
 }
 
-export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT }: VRMAvatarProps) {
+export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT, onAudioEnd }: VRMAvatarProps) {
   const groupRef = useRef<THREE.Group>(null);
   const hipsRef = useRef<THREE.Object3D | null>(null);
   const chestRef = useRef<THREE.Object3D | null>(null);
@@ -469,12 +470,14 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
       lipSyncRef.current.setupAudio(audioUrl);
       lipSyncRef.current.setLipSyncData(lipSync ?? null);
+      // Set callback for when audio ends (for queued playback)
+      lipSyncRef.current.setOnAudioEnded(onAudioEnd ?? null);
       lipSyncRef.current.play();
       currentAudioRef.current = audioUrl;
     } catch (error) {
       // Silently handle errors
     }
-  }, [audioUrl, lipSync, vrm]);
+  }, [audioUrl, lipSync, vrm, onAudioEnd]);
 
   useFrame((_, delta) => {
     if (!vrm) return;

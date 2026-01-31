@@ -61,6 +61,29 @@ class MonaTTSSoVITS:
         # Track if warmup has been done
         self._warmed_up = False
 
+        # Connection pooling - reuse TCP connections
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._timeout = aiohttp.ClientTimeout(total=30)
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create a shared aiohttp session for connection pooling."""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(
+                limit=10,  # Max concurrent connections
+                keepalive_timeout=30,  # Keep connections alive
+            )
+            self._session = aiohttp.ClientSession(
+                timeout=self._timeout,
+                connector=connector,
+            )
+        return self._session
+
+    async def close(self):
+        """Close the shared session. Call on shutdown."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
     async def warmup(self) -> bool:
         """
         Pre-warm the GPT-SoVITS model by generating a short test phrase.
@@ -94,18 +117,18 @@ class MonaTTSSoVITS:
                 "streaming_mode": 1,
             }
 
-            timeout = aiohttp.ClientTimeout(total=60)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(self.sovits_url, json=payload) as response:
-                    if response.status == 200:
-                        # Consume the response to trigger model loading
-                        await response.read()
-                        self._warmed_up = True
-                        print("✓ GPT-SoVITS model warmed up successfully!")
-                        return True
-                    else:
-                        print(f"✗ GPT-SoVITS warmup failed: {response.status}")
-                        return False
+            # Use longer timeout for warmup (model loading can be slow)
+            session = await self._get_session()
+            async with session.post(self.sovits_url, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as response:
+                if response.status == 200:
+                    # Consume the response to trigger model loading
+                    await response.read()
+                    self._warmed_up = True
+                    print("✓ GPT-SoVITS model warmed up successfully!")
+                    return True
+                else:
+                    print(f"✗ GPT-SoVITS warmup failed: {response.status}")
+                    return False
 
         except asyncio.TimeoutError:
             print("✗ GPT-SoVITS warmup timed out (model may still be loading)")
@@ -132,7 +155,6 @@ class MonaTTSSoVITS:
         self,
         text: str,
         use_cache: bool = True,
-        convert_to_mp3: bool = False,
         generate_lip_sync: bool = True,
         preprocess: bool = True
     ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
@@ -142,7 +164,6 @@ class MonaTTSSoVITS:
         Args:
             text: Text to convert to speech
             use_cache: Whether to use cached audio if available
-            convert_to_mp3: Whether to convert WAV to MP3 (for mobile compatibility)
             generate_lip_sync: Whether to generate lip sync timing data
             preprocess: Whether to clean text for TTS (remove markdown, emojis, etc.)
 
@@ -161,9 +182,8 @@ class MonaTTSSoVITS:
         if not text or not text.strip():
             return None, None
 
-        # Determine output format based on conversion flag
-        output_format = "mp3" if convert_to_mp3 else "wav"
-        cache_path = self._get_cache_path(text, format=output_format)
+        # Always use WAV format
+        cache_path = self._get_cache_path(text, format="wav")
         lip_sync_cache_path = self._get_lip_sync_cache_path(text)
 
         # Return cached file if it exists
@@ -195,82 +215,42 @@ class MonaTTSSoVITS:
                 "streaming_mode": 1,
             }
 
-            # Call GPT-SoVITS API (async with aiohttp)
+            # Call GPT-SoVITS API using shared session (connection pooling)
             api_start = time.perf_counter()
-            timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(self.sovits_url, json=payload) as response:
-                    api_ms = (time.perf_counter() - api_start) * 1000
+            session = await self._get_session()
+            async with session.post(self.sovits_url, json=payload) as response:
+                api_ms = (time.perf_counter() - api_start) * 1000
 
-                    if response.status != 200:
-                        print(f"⏱️  TTS [API ERROR] {api_ms:.0f}ms - Status: {response.status}")
-                        return None, None
+                if response.status != 200:
+                    print(f"⏱️  TTS [API ERROR] {api_ms:.0f}ms - Status: {response.status}")
+                    return None, None
 
-                    print(f"⏱️  TTS [GPT-SoVITS API] First byte in {api_ms:.0f}ms")
+                print(f"⏱️  TTS [GPT-SoVITS API] First byte in {api_ms:.0f}ms")
 
-                    # Download full audio (this is where the actual generation time is)
-                    download_start = time.perf_counter()
-                    audio_content = await response.read()
-                    download_ms = (time.perf_counter() - download_start) * 1000
-                    print(f"⏱️  TTS [Audio Generation + Download] {download_ms:.0f}ms ({download_ms/1000:.2f}s) - {len(audio_content)/1024:.1f}KB")
+                # Download full audio (this is where the actual generation time is)
+                download_start = time.perf_counter()
+                audio_content = await response.read()
+                download_ms = (time.perf_counter() - download_start) * 1000
+                print(f"⏱️  TTS [Audio Generation + Download] {download_ms:.0f}ms ({download_ms/1000:.2f}s) - {len(audio_content)/1024:.1f}KB")
 
-                    # Save to disk
-                    save_start = time.perf_counter()
-                    wav_path = self.audio_dir / f"{cache_path.stem}_temp.wav" if convert_to_mp3 else cache_path
-                    with open(wav_path, "wb") as f:
-                        f.write(audio_content)
-                    save_ms = (time.perf_counter() - save_start) * 1000
-                    print(f"⏱️  TTS [Save to Disk] {save_ms:.0f}ms")
+                # Save to disk
+                save_start = time.perf_counter()
+                with open(cache_path, "wb") as f:
+                    f.write(audio_content)
+                save_ms = (time.perf_counter() - save_start) * 1000
+                print(f"⏱️  TTS [Save to Disk] {save_ms:.0f}ms")
 
             # Generate text-based lip sync (near-instant)
             lip_sync_data = None
             if generate_lip_sync:
-                audio_duration = get_wav_duration(str(wav_path))
-                print(f"⏱️  TTS [WAV Duration] {audio_duration:.2f}s from {wav_path}")
+                audio_duration = get_wav_duration(str(cache_path))
+                print(f"⏱️  TTS [WAV Duration] {audio_duration:.2f}s from {cache_path}")
                 if audio_duration > 0:
                     lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
                     if lip_sync_data:
                         lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
                 else:
                     print(f"⚠️  TTS [Lip Sync] Skipped - audio duration is 0")
-
-            if convert_to_mp3:
-                mp3_start = time.perf_counter()
-                try:
-                    proc = await asyncio.create_subprocess_exec(
-                        "ffmpeg",
-                        "-i", str(wav_path),
-                        "-codec:a", "libmp3lame",
-                        "-b:a", "128k",
-                        "-ar", "44100",
-                        "-ac", "1",
-                        "-y",
-                        str(cache_path),
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
-                    await asyncio.wait_for(proc.communicate(), timeout=30)
-
-                    mp3_ms = (time.perf_counter() - mp3_start) * 1000
-                    if proc.returncode == 0:
-                        wav_path.unlink()
-                        print(f"⏱️  TTS [FFmpeg MP3] {mp3_ms:.0f}ms ({mp3_ms/1000:.2f}s)")
-                    else:
-                        print(f"⏱️  TTS [FFmpeg FAILED] {mp3_ms:.0f}ms")
-                        return None, None
-
-                except asyncio.TimeoutError:
-                    if wav_path.exists():
-                        wav_path.unlink()
-                    return None, None
-                except FileNotFoundError:
-                    if wav_path.exists():
-                        wav_path.unlink()
-                    return None, None
-                except Exception:
-                    if wav_path.exists():
-                        wav_path.unlink()
-                    return None, None
 
             total_ms = (time.perf_counter() - tts_start) * 1000
             print(f"⏱️  TTS [TOTAL] {total_ms:.0f}ms ({total_ms/1000:.2f}s)")
@@ -292,11 +272,10 @@ class MonaTTSSoVITS:
             Number of files deleted
         """
         count = 0
-        for file_path in self.audio_dir.glob("*.mp3"):
+        for file_path in self.audio_dir.glob("*.wav"):
             file_path.unlink()
             count += 1
-        # Also clear any remaining WAV files from old cache
-        for file_path in self.audio_dir.glob("*.wav"):
+        for file_path in self.audio_dir.glob("*.lipsync.json"):
             file_path.unlink()
             count += 1
         print(f"✓ Cleared {count} cached SoVITS audio files")
@@ -310,9 +289,6 @@ class MonaTTSSoVITS:
             Total cache size in bytes
         """
         total_size = sum(
-            file_path.stat().st_size for file_path in self.audio_dir.glob("*.mp3")
-        )
-        total_size += sum(
             file_path.stat().st_size for file_path in self.audio_dir.glob("*.wav")
         )
         return total_size

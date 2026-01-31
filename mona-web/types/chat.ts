@@ -37,8 +37,17 @@ export interface AudioChunk {
   chunkIndex: number;
 }
 
+// Audio segment for sentence-level TTS pipelining
+export interface AudioSegment {
+  audioUrl: string;
+  lipSync?: LipSyncCue[];
+  segmentIndex: number;
+  isPlaying?: boolean;
+  isPlayed?: boolean;
+}
+
 export interface WebSocketMessage {
-  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "audio_chunk" | "audio_complete" | "auth_status" | "chat_history" | "guest_limit_reached";
+  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "audio_chunk" | "audio_complete" | "audio_segment" | "auth_status" | "chat_history" | "guest_limit_reached";
   content?: string;
   sender?: "user" | "mona";
   timestamp?: string;
@@ -51,6 +60,8 @@ export interface WebSocketMessage {
   chunkIndex?: number;  // For audio chunks
   totalChunks?: number;  // Total expected audio chunks
   totalAudioChunks?: number;  // Total audio chunks in message
+  segmentIndex?: number;  // For sentence-level audio segments
+  totalAudioSegments?: number;  // Total expected audio segments
   // Auth-related fields
   isAuthenticated?: boolean;
   user?: {

@@ -75,6 +75,7 @@ interface AvatarStageProps {
   viewMode?: "portrait" | "full";
   outfitVisibility?: OutfitVisibility;
   avatarUrl?: string;
+  onAudioEnd?: () => void;
 }
 
 // Camera presets for different view modes
@@ -218,7 +219,7 @@ function Live2DLoadingIndicator() {
   );
 }
 
-export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl }: AvatarStageProps) {
+export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl, onAudioEnd }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
@@ -262,6 +263,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
             emotion={emotion}
             audioUrl={absoluteAudioUrl}
             lipSync={lipSync}
+            onAudioEnd={onAudioEnd}
           />
         </Suspense>
       </div>
@@ -281,7 +283,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
         <Suspense fallback={<LoadingIndicator />}>
-          <VRMAvatar key={modelUrl} url={modelUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} />
+          <VRMAvatar key={modelUrl} url={modelUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} onAudioEnd={onAudioEnd} />
         </Suspense>
         <CameraController viewMode={viewMode} />
       </Canvas>
