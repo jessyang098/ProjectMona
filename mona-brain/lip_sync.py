@@ -4,8 +4,8 @@ Generates mouth shape timing data for realistic lip sync animation.
 """
 
 import re
-import struct
 import time
+import wave
 from typing import Optional, List, Dict, Any
 
 
@@ -111,24 +111,14 @@ PAUSE_CHARS = {
 
 
 def get_wav_duration(wav_path: str) -> float:
-    """Get duration of a WAV file by reading its header. Returns seconds."""
+    """Get duration of a WAV file. Returns seconds."""
     try:
-        with open(wav_path, "rb") as f:
-            f.read(22)  # skip to num_channels
-            num_channels = struct.unpack("<H", f.read(2))[0]
-            sample_rate = struct.unpack("<I", f.read(4))[0]
-            f.read(6)  # skip byte_rate(4) + block_align(2)
-            bits_per_sample = struct.unpack("<H", f.read(2))[0]
-            # Find "data" chunk
-            while True:
-                chunk_id = f.read(4)
-                if not chunk_id:
-                    break
-                chunk_size = struct.unpack("<I", f.read(4))[0]
-                if chunk_id == b"data":
-                    bytes_per_sample = bits_per_sample // 8
-                    return chunk_size / (sample_rate * num_channels * bytes_per_sample)
-                f.seek(chunk_size, 1)  # skip non-data chunks
+        with wave.open(wav_path, 'rb') as wf:
+            frames = wf.getnframes()
+            rate = wf.getframerate()
+            if rate > 0:
+                duration = frames / float(rate)
+                return duration
     except Exception as e:
         print(f"⏱️  Lip Sync [WAV Duration ERROR] {e}")
     return 0.0

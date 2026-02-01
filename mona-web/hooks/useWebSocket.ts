@@ -32,6 +32,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const [guestMessagesRemaining, setGuestMessagesRemaining] = useState<number | null>(null);
   const [audioSegments, setAudioSegments] = useState<AudioSegment[]>([]);
   const [totalAudioSegments, setTotalAudioSegments] = useState<number | null>(null);
+  const [nextExpectedIndex, setNextExpectedIndex] = useState<number>(0);  // Track which segment to play next
   const websocketRef = useRef<WebSocket | null>(null);
   const pendingImageRef = useRef<string | null>(null);  // Store pending image for echo
 
@@ -98,6 +99,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
               // New response starting - clear audio segments queue
               setAudioSegments([]);
               setTotalAudioSegments(null);
+              setNextExpectedIndex(0);  // Reset expected index for new response
 
               return [
                 ...prev,
@@ -256,7 +258,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     );
   }, []);
 
-  // Mark a segment as played (completed)
+  // Mark a segment as played (completed) and advance to next expected
   const markSegmentPlayed = useCallback((segmentIndex: number) => {
     setAudioSegments((prev) =>
       prev.map((seg) =>
@@ -265,18 +267,23 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           : seg
       )
     );
+    // Advance to next expected segment
+    setNextExpectedIndex((prev) => prev + 1);
   }, []);
 
-  // Get the next segment to play (first unplayed segment)
+  // Get the next segment to play (only if it matches expected index - enforces strict ordering)
   const getNextSegment = useCallback((): AudioSegment | null => {
-    const unplayed = audioSegments.filter((seg) => !seg.isPlayed && !seg.isPlaying);
-    return unplayed.length > 0 ? unplayed[0] : null;
-  }, [audioSegments]);
+    const expectedSegment = audioSegments.find(
+      (seg) => seg.segmentIndex === nextExpectedIndex && !seg.isPlayed && !seg.isPlaying
+    );
+    return expectedSegment ?? null;
+  }, [audioSegments, nextExpectedIndex]);
 
   // Clear all audio segments (for stopping playback)
   const clearAudioSegments = useCallback(() => {
     setAudioSegments([]);
     setTotalAudioSegments(null);
+    setNextExpectedIndex(0);
   }, []);
 
   return {
