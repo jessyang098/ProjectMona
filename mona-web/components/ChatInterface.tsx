@@ -402,7 +402,7 @@ export default function ChatInterface() {
           className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
           onClick={enableAudio}
         >
-          <div className="rounded-3xl border border-white/30 bg-white/95 px-8 py-6 shadow-2xl text-center">
+          <div className="rounded-3xl border border-slate-200 bg-white/95 px-8 py-6 text-center">
             <svg className="mx-auto h-12 w-12 text-purple-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
             </svg>
@@ -420,8 +420,8 @@ export default function ChatInterface() {
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
         {/* Status */}
         <header className="px-4 pt-4 sm:px-8 flex items-center justify-between">
-          <div className="inline-flex items-center gap-3 rounded-2xl glass border border-slate-300 px-4 py-2.5 text-slate-800 shadow-lg pointer-events-auto animate-fadeIn dark:border-slate-500 dark:text-slate-100">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-glow-pink">
+          <div className="inline-flex items-center gap-3 rounded-2xl glass border border-slate-300 px-4 py-2.5 text-slate-800 pointer-events-auto animate-fadeIn dark:border-slate-500 dark:text-slate-100">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
               <span className="text-white text-lg font-bold">M</span>
             </div>
             <div>
@@ -456,7 +456,7 @@ export default function ChatInterface() {
         {/* Chat panel - extends up from the chat button */}
         {showChat && (
           <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-80 sm:w-96 pointer-events-auto animate-slideUp">
-            <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl glass border border-slate-300 p-4 shadow-xl dark:border-slate-500">
+            <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl glass border border-slate-300 p-4 dark:border-slate-500">
               <div className="flex-1 overflow-y-auto overscroll-contain pr-2 space-y-1">
                 {messages.length === 0 && isConnected && (
                   <div className="py-8 text-center">
@@ -500,7 +500,7 @@ export default function ChatInterface() {
         {/* Input */}
         <footer className="px-3 sm:px-8 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
-            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-2 rounded-2xl glass border border-slate-300 px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg transition-shadow focus-within:shadow-xl focus-within:border-purple-400 dark:border-slate-500 dark:focus-within:border-purple-500">
+            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-2 rounded-2xl glass border border-slate-300 px-3 sm:px-4 py-2.5 sm:py-3 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:border-slate-500 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
               {/* Image preview */}
               {selectedImage && (
                 <div className="relative inline-block animate-fadeInScale">
@@ -514,7 +514,7 @@ export default function ChatInterface() {
                   <button
                     type="button"
                     onClick={clearSelectedImage}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-700 transition-colors"
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -551,7 +551,7 @@ export default function ChatInterface() {
                   disabled={!isConnected || isProcessing}
                   className={`flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 ${
                     isRecording
-                      ? 'animate-pulse bg-red-500 text-white border border-red-500 shadow-md shadow-red-500/30'
+                      ? 'animate-pulse bg-red-500 text-white border border-red-500'
                       : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100'
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   title={isRecording ? 'Stop recording' : 'Start voice input'}
@@ -585,7 +585,7 @@ export default function ChatInterface() {
                 <button
                   type="submit"
                   disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
-                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition-all hover:shadow-lg hover:shadow-purple-500/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Send
                 </button>
@@ -595,7 +595,7 @@ export default function ChatInterface() {
             <button
               type="button"
               onClick={() => setViewMode((prev) => prev === "full" ? "portrait" : "full")}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 shadow-md transition-all hover:shadow-lg hover:border-slate-400 hover:text-slate-800 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
               title={viewMode === "full" ? "Switch to portrait view" : "Switch to full view"}
             >
               {viewMode === "full" ? (
@@ -617,7 +617,7 @@ export default function ChatInterface() {
               <button
                 type="button"
                 onClick={() => setShowOutfitMenu((prev) => !prev)}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 shadow-md transition-all hover:shadow-lg hover:border-slate-400 hover:text-slate-800 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
                 title="Outfit options"
               >
                 {/* Clothing/hanger icon */}
@@ -627,7 +627,7 @@ export default function ChatInterface() {
               </button>
               {/* Outfit menu dropdown */}
               {showOutfitMenu && (
-                <div className="absolute bottom-12 right-0 w-52 rounded-2xl glass border border-slate-300 p-3 shadow-xl animate-fadeInScale dark:border-slate-500">
+                <div className="absolute bottom-12 right-0 w-52 rounded-2xl glass border border-slate-300 p-3 animate-fadeInScale dark:border-slate-500">
                   <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Avatar</p>
                   {AVATAR_OPTIONS.map((avatar) => (
                     <label
@@ -704,7 +704,7 @@ export default function ChatInterface() {
                 if (!audioEnabled) enableAudio(); // Enable audio on first interaction
                 setShowChat((prev) => !prev);
               }}
-              className="flex-shrink-0 rounded-xl glass border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-md transition-all hover:shadow-lg hover:border-slate-400 active:scale-95 whitespace-nowrap dark:border-slate-500 dark:text-slate-200 dark:hover:border-slate-400"
+              className="flex-shrink-0 rounded-xl glass border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:border-slate-400 hover:bg-white/50 active:scale-95 whitespace-nowrap dark:border-slate-500 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800/50"
             >
               {showChat ? "Hide" : "Chat"}
             </button>

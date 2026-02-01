@@ -93,6 +93,14 @@ export default {
           "0%, 100%": { transform: "rotate(-2deg)" },
           "50%": { transform: "rotate(2deg)" },
         },
+        wave: {
+          "0%, 60%, 100%": { transform: "translateY(0)" },
+          "30%": { transform: "translateY(-4px)" },
+        },
+        scaleIn: {
+          "0%": { opacity: "0", transform: "scale(0.9)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
         shimmer: {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
@@ -114,6 +122,8 @@ export default {
         wiggle: "wiggle 0.3s ease-in-out",
         shimmer: "shimmer 1.5s infinite",
         spin: "spin 1s linear infinite",
+        wave: "wave 1.2s ease-in-out infinite",
+        scaleIn: "scaleIn 0.2s ease-out",
       },
       transitionTimingFunction: {
         "bounce-in": "cubic-bezier(0.34, 1.56, 0.64, 1)",

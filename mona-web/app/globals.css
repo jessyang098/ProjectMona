@@ -121,6 +121,12 @@ html {
     text-wrap: balance;
   }
 
+  /* Focus ring utility for accessibility */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-purple-500/50 focus-visible:ring-offset-2;
+  }
+
   /* Glass effect utility */
   .glass {
     background: var(--surface-glass);
@@ -171,11 +177,9 @@ html {
   .btn-primary {
     @apply btn text-white;
     background: var(--brand-gradient);
-    box-shadow: var(--shadow-glow-pink);
   }
 
   .btn-primary:hover:not(:disabled) {
-    box-shadow: var(--shadow-glow-purple);
     filter: brightness(1.05);
   }
 
@@ -220,12 +224,11 @@ html {
     @apply dark:hover:bg-slate-600 dark:hover:border-slate-400;
   }
 
-  /* Modern card */
+  /* Modern card - flat design */
   .card {
     background: var(--surface-primary);
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-2xl);
-    box-shadow: var(--shadow-lg);
   }
 
   .card-glass {

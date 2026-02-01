@@ -39,7 +39,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Settings button - always visible */}
         <button
           onClick={onOpenSettings}
-          className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+          className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white backdrop-blur-sm transition hover:bg-black/80"
           title="Settings"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Shop button - always visible */}
         <button
           onClick={onOpenShop}
-          className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+          className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white backdrop-blur-sm transition hover:bg-black/80"
           title="Shop"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,7 +63,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Sign in button */}
         <button
           onClick={onOpenLogin}
-          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-sm text-white backdrop-blur-sm transition hover:bg-black/80"
         >
           {guestMessagesRemaining !== null && (
             <span className={`text-xs ${guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/60"}`}>
@@ -81,7 +81,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
     <div ref={menuRef} className="relative pointer-events-auto">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full border border-white/20 bg-black/60 p-1.5 pr-3 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+        className="flex items-center gap-2 rounded-full border border-white/20 bg-black/60 p-1.5 pr-3 text-white backdrop-blur-sm transition hover:bg-black/80"
       >
         {/* User avatar */}
         {user?.avatarUrl ? (
@@ -110,7 +110,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-xl dark:border-slate-600 dark:bg-slate-800">
+        <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 dark:border-slate-600 dark:bg-slate-800">
           {/* User info */}
           <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
             <p className="font-medium text-slate-900 truncate dark:text-white">{user?.name || "User"}</p>

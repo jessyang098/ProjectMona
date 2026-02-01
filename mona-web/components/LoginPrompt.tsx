@@ -58,16 +58,16 @@ export default function LoginPrompt({
       onClick={isInitialPrompt ? undefined : onClose}
     >
       <div
-        className="relative mx-4 w-full max-w-md rounded-3xl bg-white/95 p-8 shadow-xl border border-white/50 animate-fadeInScale"
+        className="relative mx-4 w-full max-w-md rounded-3xl bg-white/95 p-8 border border-slate-200 animate-fadeInScale"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button - hidden on initial prompt */}
         {!isInitialPrompt && (
           <button
             onClick={onClose}
-            className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 transition-colors"
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -76,7 +76,7 @@ export default function LoginPrompt({
         {/* Content */}
         <div className="text-center">
           {/* Icon - Heart with gradient background */}
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg shadow-pink-500/25">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600">
             <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
@@ -115,7 +115,7 @@ export default function LoginPrompt({
           {/* Google Sign In Button */}
           <button
             onClick={login}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md hover:border-slate-300 active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 font-medium text-slate-700 transition-all hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]"
           >
             {/* Google Icon */}
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -142,7 +142,7 @@ export default function LoginPrompt({
           {/* Discord Sign In Button */}
           <button
             onClick={loginWithDiscord}
-            className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-4 py-3.5 font-medium text-white shadow-sm transition-all hover:bg-[#4752C4] hover:shadow-md active:scale-[0.98]"
+            className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-4 py-3.5 font-medium text-white transition-all hover:bg-[#4752C4] active:scale-[0.98]"
           >
             {/* Discord Icon */}
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
