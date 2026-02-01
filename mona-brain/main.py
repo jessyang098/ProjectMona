@@ -644,16 +644,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             # Generate response using LLM or fallback to dummy
             if mona_llm:
                 try:
-                    # Sentence-level TTS: accumulate text, detect sentences, start TTS immediately
+                    # Sentence-level TTS: Start first sentence while LLM streams, then sequential
                     text_buffer = ""
                     sentence_queue = []  # Sentences waiting for TTS
                     audio_segment_index = 0
-                    tts_tasks = []  # Track running TTS tasks
+                    first_tts_task = None  # Only first sentence runs in parallel with LLM
 
                     async def generate_sentence_audio(sentence: str, segment_idx: int):
                         """Generate TTS for a single sentence and send to client."""
-                        nonlocal audio_segment_index
-
                         tts_text = preprocess_tts_text(sentence)
                         if not tts_text.strip():
                             return
@@ -723,32 +721,51 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                 typing_indicator["isTyping"] = False
                                 await manager.send_message(typing_indicator, client_id)
 
-                            # Check for complete sentences and start TTS immediately
+                            # Check for complete sentences
                             sentences = split_into_sentences(text_buffer)
                             if len(sentences) > 1:
-                                # We have at least one complete sentence
-                                for sentence in sentences[:-1]:  # All but the last (incomplete) one
+                                for sentence in sentences[:-1]:
                                     if sentence.strip():
-                                        print(f"🎤 Starting TTS for sentence {audio_segment_index}: '{sentence[:50]}...'")
-                                        task = asyncio.create_task(
-                                            generate_sentence_audio(sentence, audio_segment_index)
-                                        )
-                                        tts_tasks.append(task)
+                                        if first_tts_task is None:
+                                            # Start FIRST sentence immediately (overlaps with LLM)
+                                            print(f"🎤 Starting TTS for sentence {audio_segment_index} (parallel): '{sentence[:50]}...'")
+                                            first_tts_task = asyncio.create_task(
+                                                generate_sentence_audio(sentence, audio_segment_index)
+                                            )
+                                        else:
+                                            # Queue remaining sentences (will run sequentially after LLM)
+                                            print(f"📝 Queuing sentence {audio_segment_index}: '{sentence[:50]}...'")
+                                            sentence_queue.append((sentence, audio_segment_index))
                                         audio_segment_index += 1
-                                # Keep the last incomplete sentence in buffer
                                 text_buffer = sentences[-1]
 
                         elif event["event"] in {"complete", "error"}:
                             timer.checkpoint("4_llm_complete")
 
-                            # Process any remaining text in buffer
+                            # Add remaining text to queue
                             if text_buffer.strip():
-                                print(f"🎤 Starting TTS for final segment {audio_segment_index}: '{text_buffer[:50]}...'")
-                                task = asyncio.create_task(
-                                    generate_sentence_audio(text_buffer, audio_segment_index)
-                                )
-                                tts_tasks.append(task)
+                                if first_tts_task is None:
+                                    # Single sentence response - start it now
+                                    print(f"🎤 Starting TTS for sentence {audio_segment_index}: '{text_buffer[:50]}...'")
+                                    first_tts_task = asyncio.create_task(
+                                        generate_sentence_audio(text_buffer, audio_segment_index)
+                                    )
+                                else:
+                                    print(f"📝 Queuing final sentence {audio_segment_index}: '{text_buffer[:50]}...'")
+                                    sentence_queue.append((text_buffer, audio_segment_index))
                                 audio_segment_index += 1
+
+                            # Wait for first TTS to complete (was running in parallel with LLM)
+                            if first_tts_task:
+                                await first_tts_task
+                                timer.checkpoint("5_first_tts_complete")
+
+                            # Process remaining sentences SEQUENTIALLY (no GPU contention)
+                            for sentence, seg_idx in sentence_queue:
+                                print(f"🎤 Processing queued sentence {seg_idx}: '{sentence[:50]}...'")
+                                await generate_sentence_audio(sentence, seg_idx)
+
+                            timer.checkpoint("6_all_tts_complete")
 
                             # Send complete message
                             mona_content = event.get("content", "")
@@ -791,14 +808,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                         if pending_memories:
                                             print(f"🧠 Saved {len(pending_memories)} new memories for {user.email}")
 
-                            # Log timing when all TTS tasks complete (in background)
-                            async def log_tts_complete():
-                                if tts_tasks:
-                                    await asyncio.gather(*tts_tasks, return_exceptions=True)
-                                    timer.checkpoint("9_all_tts_complete")
-                                    timer.log_summary()
-
-                            asyncio.create_task(log_tts_complete())
+                            # Log timing summary
+                            timer.log_summary()
                 except Exception as e:
                     print(f"LLM Error: {e}")
                     fallback_message = {
