@@ -1,5 +1,5 @@
 import { VRM } from "@pixiv/three-vrm";
-import { LipSyncCue } from "@/types/chat";
+import { LipSyncCue, LipSyncMode, FormantConfig } from "@/types/chat";
 
 /**
  * Configuration for lip sync behavior
@@ -19,6 +19,10 @@ export interface LipSyncConfig {
     ih: number; // ih sound
     oh: number; // oh sound
   };
+  /** Lip sync mode: 'timed', 'realtime', 'formant', or 'mobile' */
+  mode?: LipSyncMode;
+  /** Formant-based lip sync configuration (only used when mode='formant') */
+  formantConfig?: FormantConfig;
 }
 
 // Default max mouth open for avatars (Moe, Lily use higher value)
@@ -39,6 +43,49 @@ const DEFAULT_CONFIG: LipSyncConfig = {
 // Much faster smoothing for closing mouth on silence (between words)
 // Higher value = faster closing for clearer word separation
 const SILENCE_SMOOTHING_FACTOR = 0.65;
+
+// Default formant-based lip sync configuration
+const DEFAULT_FORMANT_CONFIG: FormantConfig = {
+  f1Weight: 0.6,
+  f2Weight: 0.8,
+  consonantSensitivity: 0.4,
+  useAsymmetricEasing: true,
+  attackMultiplier: 1.0,
+  releaseMultiplier: 1.0,
+  amplitudeModulation: true,
+  microMovementEnabled: true,
+  microMovementAmplitude: 0.02,
+};
+
+// Formant analysis result
+interface FormantAnalysis {
+  f1Energy: number;    // First formant energy (jaw open indicator)
+  f2Energy: number;    // Second formant energy (lip shape indicator)
+  f1Centroid: number;  // Weighted center of F1 region (0-1)
+  f2Centroid: number;  // Weighted center of F2 region (0-1)
+}
+
+// Asymmetric easing profile per phoneme
+interface AsymmetricEasing {
+  attackFactor: number;   // Speed of increase (higher = faster)
+  releaseFactor: number;  // Speed of decrease (lower = smoother)
+}
+
+// Easing profiles per phoneme type - fast attack, smooth release
+const PHONEME_EASING: Record<keyof PhonemeValues, AsymmetricEasing> = {
+  aa: { attackFactor: 0.35, releaseFactor: 0.12 }, // Jaw: fast open, slow close
+  ee: { attackFactor: 0.40, releaseFactor: 0.15 }, // Front vowel: quick
+  ih: { attackFactor: 0.30, releaseFactor: 0.10 }, // Mid vowel: moderate
+  oh: { attackFactor: 0.25, releaseFactor: 0.08 }, // Round vowel: slower
+  ou: { attackFactor: 0.30, releaseFactor: 0.10 }, // Pucker: moderate
+};
+
+// Micro-movement state for natural variation
+interface MicroMovementState {
+  phase: number;
+  frequency: number;
+  amplitude: number;
+}
 
 type PhonemeValues = {
   aa: number;
@@ -78,6 +125,13 @@ export class LipSyncManager {
 
   // Track if we're supposed to be playing (even if blocked by autoplay)
   private shouldBePlaying: boolean = false;
+
+  // Micro-movement state for formant mode (natural variation)
+  private microMovement: MicroMovementState = {
+    phase: 0,
+    frequency: 5 + Math.random() * 3, // 5-8 Hz
+    amplitude: 0.02,
+  };
 
   // Callback for when audio ends (for queued playback)
   private onAudioEndedCallback: (() => void) | null = null;
@@ -396,6 +450,7 @@ export class LipSyncManager {
   /**
    * Update lip sync animation based on current audio playback.
    * Call this every frame in your animation loop.
+   * Supports modes: 'formant' (new), 'timed', 'realtime', 'mobile'
    */
   update(): void {
     const expressionManager = this.vrm.expressionManager;
@@ -403,7 +458,13 @@ export class LipSyncManager {
       return;
     }
 
-    // Use phoneme-timed lip sync if available
+    // NEW: Formant mode - advanced frequency band analysis with layered animation
+    if (this.config.mode === 'formant' && this.analyser && this.timeDomainBuffer && this.frequencyBuffer) {
+      this.updateFormantLipSync(expressionManager);
+      return;
+    }
+
+    // Use phoneme-timed lip sync if available (mode='timed' or default when data exists)
     if (this.useTimedLipSync && this.lipSyncCues && this.audioElement) {
       this.updateTimedLipSync(expressionManager);
       return;
@@ -658,6 +719,287 @@ export class LipSyncManager {
 
       expressionManager.setValue(phoneme, smoothed);
     }
+  }
+
+  // ============================================
+  // FORMANT MODE - New lip sync implementation
+  // ============================================
+
+  /**
+   * Analyze frequency bands for formant-based vowel detection.
+   * Returns energy and centroid for F1 (jaw) and F2 (lip shape) regions.
+   */
+  private analyzeFrequencyBands(buffer: Uint8Array): FormantAnalysis {
+    const sampleRate = this.audioContext?.sampleRate ?? 44100;
+    const fftSize = this.analyser?.fftSize ?? 2048;
+    const binWidth = sampleRate / fftSize;
+
+    // Frequency band definitions (in Hz)
+    const F1_LOW = 200, F1_HIGH = 900;   // First formant (jaw opening)
+    const F2_LOW = 900, F2_HIGH = 2500;  // Second formant (lip shape)
+
+    // Convert to bin indices
+    const f1StartBin = Math.floor(F1_LOW / binWidth);
+    const f1EndBin = Math.min(buffer.length, Math.ceil(F1_HIGH / binWidth));
+    const f2StartBin = Math.floor(F2_LOW / binWidth);
+    const f2EndBin = Math.min(buffer.length, Math.ceil(F2_HIGH / binWidth));
+
+    // Calculate energy and weighted centroid for F1 region
+    let f1Energy = 0, f1WeightedSum = 0, f1MagnitudeSum = 0;
+    for (let i = f1StartBin; i < f1EndBin; i++) {
+      const magnitude = buffer[i] / 255;
+      f1Energy += magnitude * magnitude;
+      f1WeightedSum += i * magnitude;
+      f1MagnitudeSum += magnitude;
+    }
+
+    // Calculate energy and weighted centroid for F2 region
+    let f2Energy = 0, f2WeightedSum = 0, f2MagnitudeSum = 0;
+    for (let i = f2StartBin; i < f2EndBin; i++) {
+      const magnitude = buffer[i] / 255;
+      f2Energy += magnitude * magnitude;
+      f2WeightedSum += i * magnitude;
+      f2MagnitudeSum += magnitude;
+    }
+
+    const f1BinCount = f1EndBin - f1StartBin;
+    const f2BinCount = f2EndBin - f2StartBin;
+
+    return {
+      f1Energy: Math.sqrt(f1Energy / Math.max(1, f1BinCount)),
+      f2Energy: Math.sqrt(f2Energy / Math.max(1, f2BinCount)),
+      f1Centroid: f1MagnitudeSum > 0
+        ? (f1WeightedSum / f1MagnitudeSum - f1StartBin) / f1BinCount
+        : 0.5,
+      f2Centroid: f2MagnitudeSum > 0
+        ? (f2WeightedSum / f2MagnitudeSum - f2StartBin) / f2BinCount
+        : 0.5,
+    };
+  }
+
+  /**
+   * Detect consonant presence from high-frequency energy.
+   * Returns 0-1 indicating sibilant/fricative strength.
+   */
+  private detectConsonants(buffer: Uint8Array): number {
+    const sampleRate = this.audioContext?.sampleRate ?? 44100;
+    const fftSize = this.analyser?.fftSize ?? 2048;
+    const binWidth = sampleRate / fftSize;
+
+    // Sibilant frequency range: 4000-10000 Hz
+    const sibilantStartBin = Math.floor(4000 / binWidth);
+    const sibilantEndBin = Math.min(buffer.length, Math.ceil(10000 / binWidth));
+
+    // Calculate RMS energy in sibilant band
+    let sibilantEnergy = 0;
+    for (let i = sibilantStartBin; i < sibilantEndBin; i++) {
+      const magnitude = buffer[i] / 255;
+      sibilantEnergy += magnitude * magnitude;
+    }
+    sibilantEnergy = Math.sqrt(sibilantEnergy / Math.max(1, sibilantEndBin - sibilantStartBin));
+
+    // Calculate total energy for comparison
+    let totalEnergy = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      const magnitude = buffer[i] / 255;
+      totalEnergy += magnitude * magnitude;
+    }
+    totalEnergy = Math.sqrt(totalEnergy / buffer.length);
+
+    // Return ratio clamped to 0-1
+    if (totalEnergy < 0.01) return 0;
+    return Math.min(1, (sibilantEnergy / totalEnergy) * 2);
+  }
+
+  /**
+   * Estimate phonemes using layered formant analysis.
+   * Layer 1: Jaw opening based on F1 energy + amplitude
+   * Layer 2: Lip shape based on F2 centroid position
+   */
+  private estimatePhonemesFormant(
+    amplitude: number,
+    formants: FormantAnalysis,
+    consonantLevel: number
+  ): PhonemeValues {
+    const { amplitudeThreshold, amplitudeScale, maxMouthOpen } = this.config;
+    const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
+    const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
+
+    if (amplitude < amplitudeThreshold) {
+      return phonemes;
+    }
+
+    // === LAYER 1: Jaw Opening ===
+    // Combine amplitude with F1 energy for natural jaw movement
+    const rawJawLevel = (amplitude - amplitudeThreshold) * amplitudeScale;
+    const f1Contribution = formants.f1Energy * formantConfig.f1Weight;
+    const jawLevel = Math.min(maxMouthOpen, rawJawLevel * (0.6 + f1Contribution));
+    phonemes.aa = jawLevel;
+
+    // === LAYER 2: Lip Shape ===
+    // Use F2 centroid to determine vowel quality
+    // Low F2 = back vowels (oh, ou), High F2 = front vowels (ee, ih)
+    const f2Position = formants.f2Centroid; // 0 = low, 1 = high
+
+    // Also consider F1 for open vs closed vowels
+    // High F1 = open vowels (aa, oh), Low F1 = closed vowels (ee, ou)
+    const f1Position = formants.f1Centroid;
+
+    // Vowel quadrant classification with lip intensity
+    const lipIntensity = jawLevel * formantConfig.f2Weight;
+
+    if (f2Position > 0.6) {
+      // Front vowels (high F2)
+      if (f1Position < 0.4) {
+        phonemes.ee = lipIntensity;  // High front: /i/ as in "beet"
+      } else {
+        phonemes.ih = lipIntensity;  // Mid front: /e/ as in "bet"
+      }
+    } else if (f2Position < 0.4) {
+      // Back vowels (low F2)
+      if (f1Position < 0.4) {
+        phonemes.ou = lipIntensity;  // High back: /u/ as in "boot"
+      } else {
+        phonemes.oh = lipIntensity;  // Mid back: /o/ as in "boat"
+      }
+    } else {
+      // Central vowels - blend based on position
+      const frontWeight = (f2Position - 0.4) / 0.2;
+      phonemes.ih = lipIntensity * frontWeight;
+      phonemes.oh = lipIntensity * (1 - frontWeight);
+    }
+
+    // === CONSONANT OVERLAY ===
+    // High frequencies indicate sibilants - reduce mouth opening, add lip tension
+    if (consonantLevel > formantConfig.consonantSensitivity) {
+      const consonantFactor = (consonantLevel - formantConfig.consonantSensitivity) /
+                               (1 - formantConfig.consonantSensitivity);
+      // Sibilants (s, sh, f, th) have minimal jaw opening
+      phonemes.aa *= (1 - consonantFactor * 0.6);
+      // Add slight lip tension for sibilants
+      phonemes.ih = Math.max(phonemes.ih, consonantFactor * 0.25);
+    }
+
+    return phonemes;
+  }
+
+  /**
+   * Apply asymmetric smoothing - fast attack, smooth release.
+   * Makes consonants snappy and vowels natural.
+   */
+  private applyAsymmetricSmoothing(
+    targetValues: PhonemeValues,
+    expressionManager: NonNullable<VRM["expressionManager"]>,
+    useFastDecay: boolean = false
+  ): void {
+    const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
+
+    for (const phoneme of Object.keys(targetValues) as (keyof PhonemeValues)[]) {
+      const target = targetValues[phoneme];
+      const previous = this.previousPhonemeValues[phoneme];
+      const easing = PHONEME_EASING[phoneme];
+
+      // Choose factor based on direction
+      let factor: number;
+      if (target > previous) {
+        // Attacking (opening) - use faster factor
+        factor = easing.attackFactor * formantConfig.attackMultiplier;
+      } else if (useFastDecay) {
+        // Silence - use fastest decay
+        factor = SILENCE_SMOOTHING_FACTOR;
+      } else {
+        // Releasing (closing) - use smoother factor
+        factor = easing.releaseFactor * formantConfig.releaseMultiplier;
+      }
+
+      // Apply exponential smoothing
+      const smoothed = previous + factor * (target - previous);
+      this.previousPhonemeValues[phoneme] = smoothed;
+      expressionManager.setValue(phoneme, smoothed);
+    }
+  }
+
+  /**
+   * Add micro-movement variation to phoneme values.
+   * Simulates natural muscle tremor and breathing for realistic animation.
+   */
+  private addMicroMovement(values: PhonemeValues, deltaTime: number = 0.016): PhonemeValues {
+    const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
+
+    // Update phase
+    this.microMovement.phase += deltaTime * this.microMovement.frequency * Math.PI * 2;
+
+    // Wrap phase to prevent floating point issues over time
+    if (this.microMovement.phase > Math.PI * 20) {
+      this.microMovement.phase -= Math.PI * 20;
+    }
+
+    const variation = Math.sin(this.microMovement.phase) * formantConfig.microMovementAmplitude;
+
+    return {
+      aa: Math.max(0, values.aa + variation * 0.8),
+      ee: Math.max(0, values.ee + variation * 0.5),
+      ih: Math.max(0, values.ih + variation * 0.5),
+      oh: Math.max(0, values.oh + variation * 0.6),
+      ou: Math.max(0, values.ou + variation * 0.4),
+    };
+  }
+
+  /**
+   * Main update method for formant-based lip sync.
+   * Uses frequency band analysis, layered animation, and asymmetric easing.
+   */
+  private updateFormantLipSync(
+    expressionManager: NonNullable<VRM["expressionManager"]>
+  ): void {
+    if (!this.analyser || !this.frequencyBuffer || !this.timeDomainBuffer) return;
+
+    const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
+
+    // Get audio data
+    this.analyser.getByteTimeDomainData(this.timeDomainBuffer);
+    this.analyser.getByteFrequencyData(this.frequencyBuffer);
+
+    // Calculate amplitude
+    const amplitude = this.calculateRMSAmplitude(this.timeDomainBuffer);
+
+    // Formant analysis
+    const formants = this.analyzeFrequencyBands(this.frequencyBuffer);
+    const consonantLevel = this.detectConsonants(this.frequencyBuffer);
+
+    // Layered phoneme estimation
+    let phonemeValues = this.estimatePhonemesFormant(amplitude, formants, consonantLevel);
+
+    // Amplitude modulation from timed data (if available and enabled)
+    if (formantConfig.amplitudeModulation && this.lipSyncCues && this.audioElement) {
+      const currentTime = this.audioElement.currentTime;
+      const currentCue = this.lipSyncCues.find(
+        cue => currentTime >= cue.start && currentTime < cue.end
+      );
+
+      if (currentCue) {
+        // Blend formant detection with timed phoneme hints
+        const timedValues = currentCue.phonemes;
+        const blendFactor = 0.3; // 30% influence from timed data
+
+        phonemeValues = {
+          aa: phonemeValues.aa * (1 - blendFactor) + (timedValues.aa ?? 0) * blendFactor * amplitude * 2,
+          ee: phonemeValues.ee * (1 - blendFactor) + (timedValues.ee ?? 0) * blendFactor * amplitude * 2,
+          ih: phonemeValues.ih * (1 - blendFactor) + (timedValues.ih ?? 0) * blendFactor * amplitude * 2,
+          oh: phonemeValues.oh * (1 - blendFactor) + (timedValues.oh ?? 0) * blendFactor * amplitude * 2,
+          ou: phonemeValues.ou * (1 - blendFactor) + (timedValues.ou ?? 0) * blendFactor * amplitude * 2,
+        };
+      }
+    }
+
+    // Micro-movement for natural variation
+    if (formantConfig.microMovementEnabled) {
+      phonemeValues = this.addMicroMovement(phonemeValues);
+    }
+
+    // Apply with asymmetric easing (fast attack, smooth release)
+    const isSilence = amplitude < this.config.amplitudeThreshold;
+    this.applyAsymmetricSmoothing(phonemeValues, expressionManager, isSilence);
   }
 
   /**

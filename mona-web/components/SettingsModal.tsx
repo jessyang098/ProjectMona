@@ -157,12 +157,12 @@ export default function SettingsModal({
             </label>
             <button
               onClick={() => onDarkModeChange(!isDarkMode)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                isDarkMode ? "bg-pink-500" : "bg-slate-200"
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors border ${
+                isDarkMode ? "bg-pink-500 border-pink-500" : "bg-slate-200 border-slate-300"
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
                   isDarkMode ? "translate-x-6" : "translate-x-1"
                 }`}
               />
@@ -189,10 +189,10 @@ export default function SettingsModal({
                 key={option.id}
                 onClick={() => onPersonalityChange(option.id)}
                 disabled={isPersonalitySwitching}
-                className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors border ${
                   personality === option.id
-                    ? "bg-pink-500 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                    ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                    : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
                 } ${isPersonalitySwitching ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {isPersonalitySwitching && personality !== option.id ? (
@@ -226,20 +226,20 @@ export default function SettingsModal({
           <div className="flex gap-2">
             <button
               onClick={() => onTtsEngineChange("sovits")}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors border ${
                 ttsEngine === "sovits"
-                  ? "bg-pink-500 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                  : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
               }`}
             >
               GPT-SoVITS
             </button>
             <button
               onClick={() => onTtsEngineChange("fishspeech")}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors border ${
                 ttsEngine === "fishspeech"
-                  ? "bg-pink-500 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                  : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
               }`}
             >
               Fish Speech
@@ -265,20 +265,20 @@ export default function SettingsModal({
           <div className="flex gap-2">
             <button
               onClick={() => onLipSyncModeChange("textbased")}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors border ${
                 lipSyncMode === "textbased"
-                  ? "bg-pink-500 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                  : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
               }`}
             >
               Text
             </button>
             <button
               onClick={() => onLipSyncModeChange("realtime")}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors border ${
                 lipSyncMode === "realtime"
-                  ? "bg-pink-500 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                  : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
               }`}
             >
               Real-time

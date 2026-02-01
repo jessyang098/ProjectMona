@@ -5,6 +5,22 @@ export interface EmotionData {
   gesture?: string;  // Optional gesture animation to play (e.g., "wave", "clapping", "thinking")
 }
 
+// Lip sync modes
+export type LipSyncMode = 'timed' | 'realtime' | 'formant' | 'mobile';
+
+// Formant-based lip sync configuration
+export interface FormantConfig {
+  f1Weight: number;           // Weight of F1 in jaw calculation (0-1)
+  f2Weight: number;           // Weight of F2 in lip shape (0-1)
+  consonantSensitivity: number; // Sibilant detection threshold (0-1)
+  useAsymmetricEasing: boolean; // Enable fast attack/slow release
+  attackMultiplier: number;   // Multiply attack speed (1.0 = default)
+  releaseMultiplier: number;  // Multiply release speed (1.0 = default)
+  amplitudeModulation: boolean; // Modulate with real-time amplitude
+  microMovementEnabled: boolean; // Add subtle variation
+  microMovementAmplitude: number; // Micro-movement intensity (0.01-0.05)
+}
+
 // Lip sync cue - timing data for mouth shapes
 export interface LipSyncCue {
   start: number;  // Start time in seconds
