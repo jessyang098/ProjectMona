@@ -31,7 +31,7 @@ export default function LoginPrompt({
 
   // Determine the title and description based on context
   const getTitle = () => {
-    if (isInitialPrompt) return "Welcome to Mona!";
+    if (isInitialPrompt) return "Welcome to Mona";
     if (messagesUsed !== undefined && messageLimit !== undefined) return "Want to keep chatting?";
     return "Sign In to Continue";
   };
@@ -44,8 +44,8 @@ export default function LoginPrompt({
       return (
         <>
           You&apos;ve enjoyed <span className="font-semibold">{messageLimit}</span> messages with Mona!
-          Sign in so she can <span className="font-semibold text-pink-500">remember you</span> and
-          your conversations — pick up right where you left off, anytime.
+          Sign in so she can <span className="font-semibold text-gradient">remember you</span> and
+          your conversations.
         </>
       );
     }
@@ -54,20 +54,20 @@ export default function LoginPrompt({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md"
       onClick={isInitialPrompt ? undefined : onClose}
     >
       <div
-        className="relative mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+        className="relative mx-4 w-full max-w-md rounded-3xl bg-white/95 p-8 shadow-xl border border-white/50 animate-fadeInScale"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button - hidden on initial prompt */}
         {!isInitialPrompt && (
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+            className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 transition-colors"
           >
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -75,35 +75,39 @@ export default function LoginPrompt({
 
         {/* Content */}
         <div className="text-center">
-          {/* Icon - Heart with sparkles */}
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100">
-            <svg className="h-8 w-8 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+          {/* Icon - Heart with gradient background */}
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg shadow-pink-500/25">
+            <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
           </div>
 
           {/* Title */}
-          <h2 className="mb-2 text-xl font-bold text-slate-900">
+          <h2 className="mb-2 text-2xl font-bold text-slate-900 tracking-tight">
             {getTitle()}
           </h2>
 
           {/* Description */}
-          <p className="mb-6 text-slate-600">
+          <p className="mb-6 text-slate-500 text-[15px] leading-relaxed max-w-sm mx-auto">
             {getDescription()}
           </p>
 
           {/* Benefits */}
-          <div className="mb-6 flex justify-center gap-4 text-xs text-slate-500">
-            <div className="flex items-center gap-1">
-              <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+          <div className="mb-6 flex justify-center gap-6 text-sm text-slate-600">
+            <div className="flex items-center gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100">
+                <svg className="h-3 w-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
               <span>Unlimited messages</span>
             </div>
-            <div className="flex items-center gap-1">
-              <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+            <div className="flex items-center gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100">
+                <svg className="h-3 w-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
               <span>She remembers you</span>
             </div>
           </div>
@@ -111,7 +115,7 @@ export default function LoginPrompt({
           {/* Google Sign In Button */}
           <button
             onClick={login}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:shadow"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md hover:border-slate-300 active:scale-[0.98]"
           >
             {/* Google Icon */}
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -138,7 +142,7 @@ export default function LoginPrompt({
           {/* Discord Sign In Button */}
           <button
             onClick={loginWithDiscord}
-            className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-4 py-3 font-medium text-white shadow-sm transition hover:bg-[#4752C4] hover:shadow"
+            className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-4 py-3.5 font-medium text-white shadow-sm transition-all hover:bg-[#4752C4] hover:shadow-md active:scale-[0.98]"
           >
             {/* Discord Icon */}
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -150,14 +154,14 @@ export default function LoginPrompt({
           {/* Try for free button - only shown on initial prompt */}
           {isInitialPrompt && onTryForFree && (
             <>
-              <div className="my-4 flex items-center gap-3">
+              <div className="my-5 flex items-center gap-4">
                 <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs text-slate-400">or</span>
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">or</span>
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
               <button
                 onClick={onTryForFree}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium text-slate-600 transition hover:bg-slate-100"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 font-medium text-slate-600 transition-all hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98]"
               >
                 Try for free
                 <span className="ml-2 text-xs text-slate-400">(10 messages)</span>
@@ -166,7 +170,7 @@ export default function LoginPrompt({
           )}
 
           {/* Privacy note */}
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-5 text-xs text-slate-400">
             By signing in, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>

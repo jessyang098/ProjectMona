@@ -419,22 +419,24 @@ export default function ChatInterface() {
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
         {/* Status */}
-        <header className="px-6 pt-4 sm:px-10 flex items-center justify-between">
-          <div className="inline-flex items-center gap-3 rounded-full border border-black/60 bg-black/80 px-4 py-2 text-white shadow-2xl pointer-events-auto">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 text-center text-lg font-semibold leading-[40px]">
-              M
+        <header className="px-4 pt-4 sm:px-8 flex items-center justify-between">
+          <div className="inline-flex items-center gap-3 rounded-2xl glass border border-white/20 px-4 py-2.5 text-slate-800 shadow-lg pointer-events-auto animate-fadeIn">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-glow-pink">
+              <span className="text-white text-lg font-bold">M</span>
             </div>
             <div>
-              <p className="text-sm font-semibold">Mona</p>
-              <p className="text-xs text-white/80">
+              <p className="text-sm font-semibold tracking-tight">Mona</p>
+              <p className="text-xs text-slate-500">
                 {isConnected ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-300">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                    Linked · {emotionLabel}{currentAnimation ? ` · ${formatAnimationName(currentAnimation)}` : ""}
+                  <span className="inline-flex items-center gap-1.5 text-emerald-600">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    <span className="font-medium">Linked</span>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500">{emotionLabel}</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-red-300">
-                    <span className="h-2 w-2 rounded-full bg-red-400" />
+                  <span className="inline-flex items-center gap-1.5 text-amber-600">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
                     Connecting…
                   </span>
                 )}
@@ -453,12 +455,18 @@ export default function ChatInterface() {
 
         {/* Chat panel - extends up from the chat button */}
         {showChat && (
-          <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-80 sm:w-96 pointer-events-auto">
-            <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl border border-white/20 bg-white/20 p-3 sm:p-4 shadow-xl backdrop-blur-sm">
-              <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
+          <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-80 sm:w-96 pointer-events-auto animate-slideUp">
+            <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl glass border border-white/30 p-4 shadow-xl">
+              <div className="flex-1 overflow-y-auto overscroll-contain pr-2 space-y-1">
                 {messages.length === 0 && isConnected && (
-                  <div className="py-4 text-center text-slate-500">
-                    <p className="text-sm font-medium">Say hi to Mona</p>
+                  <div className="py-8 text-center">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100 mb-3">
+                      <svg className="h-6 w-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-slate-600">Say hi to Mona</p>
+                    <p className="text-xs text-slate-400 mt-1">Start a conversation</p>
                   </div>
                 )}
 
@@ -469,9 +477,9 @@ export default function ChatInterface() {
                 {isTyping && <TypingIndicator />}
 
                 {isGeneratingAudio && !isTyping && (
-                  <div className="flex mb-2 justify-start">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-100 text-purple-700 text-xs">
-                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <div className="flex mb-2 justify-start animate-fadeIn">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 border border-purple-100 text-purple-600 text-xs font-medium">
+                      <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -490,25 +498,25 @@ export default function ChatInterface() {
         <div className="flex-1" />
 
         {/* Input */}
-        <footer className="px-3 sm:px-10 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
+        <footer className="px-3 sm:px-8 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
-            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-2 rounded-3xl border border-slate-200 bg-white/90 px-3 sm:px-4 py-2 sm:py-3 shadow-xl">
+            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-2 rounded-2xl glass border border-white/30 px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg transition-shadow focus-within:shadow-xl focus-within:border-purple-200/50">
               {/* Image preview */}
               {selectedImage && (
-                <div className="relative inline-block">
+                <div className="relative inline-block animate-fadeInScale">
                   <Image
                     src={selectedImage.preview}
                     alt="Selected image"
-                    width={120}
-                    height={120}
-                    className="rounded-lg object-cover"
+                    width={100}
+                    height={100}
+                    className="rounded-xl object-cover border border-slate-200/50"
                   />
                   <button
                     type="button"
                     onClick={clearSelectedImage}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md hover:bg-red-600"
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-700 transition-colors"
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -529,11 +537,11 @@ export default function ChatInterface() {
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={!isConnected || isRecording}
-                  className="flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100/80 text-slate-500 transition-all hover:bg-slate-200/80 hover:text-slate-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                   title="Upload image"
                 >
-                  <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </button>
                 {/* Voice recording button */}
@@ -541,21 +549,21 @@ export default function ChatInterface() {
                   type="button"
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={!isConnected || isProcessing}
-                  className={`flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full transition ${
+                  className={`flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 ${
                     isRecording
-                      ? 'animate-pulse bg-red-500 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'animate-pulse bg-red-500 text-white shadow-md shadow-red-500/30'
+                      : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200/80 hover:text-slate-700'
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   title={isRecording ? 'Stop recording' : 'Start voice input'}
                 >
                   {isProcessing ? (
-                    <svg className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                   ) : (
-                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
                   )}
                 </button>
@@ -572,12 +580,12 @@ export default function ChatInterface() {
                   }}
                   placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
                   disabled={!isConnected || isRecording}
-                  className="min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
+                  className="min-w-0 flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 text-[15px]"
                 />
                 <button
                   type="submit"
                   disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
-                  className="flex-shrink-0 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-2.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-pink-500/30 transition disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-pink-500/25 transition-all hover:shadow-lg hover:shadow-purple-500/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                 >
                   Send
                 </button>
@@ -587,20 +595,20 @@ export default function ChatInterface() {
             <button
               type="button"
               onClick={() => setViewMode((prev) => prev === "full" ? "portrait" : "full")}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-white/30 text-slate-600 shadow-md transition-all hover:shadow-lg hover:text-slate-800 active:scale-95"
               title={viewMode === "full" ? "Switch to portrait view" : "Switch to full view"}
             >
               {viewMode === "full" ? (
                 // Portrait icon (face/bust)
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="8" r="4" strokeWidth={2} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
+                  <circle cx="12" cy="8" r="4" strokeWidth={1.5} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
                 </svg>
               ) : (
                 // Full body icon
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="5" r="2.5" strokeWidth={2} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 7.5v5m0 0l-3 4m3-4l3 4m-6-7h6" />
+                  <circle cx="12" cy="5" r="2.5" strokeWidth={1.5} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 7.5v5m0 0l-3 4m3-4l3 4m-6-7h6" />
                 </svg>
               )}
             </button>
@@ -609,39 +617,39 @@ export default function ChatInterface() {
               <button
                 type="button"
                 onClick={() => setShowOutfitMenu((prev) => !prev)}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-white/30 text-slate-600 shadow-md transition-all hover:shadow-lg hover:text-slate-800 active:scale-95"
                 title="Outfit options"
               >
                 {/* Clothing/hanger icon */}
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l-1 1m1-1l1 1m-1-1v3m0 0l-7 4v10a1 1 0 001 1h12a1 1 0 001-1V10l-7-4z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2l-1 1m1-1l1 1m-1-1v3m0 0l-7 4v10a1 1 0 001 1h12a1 1 0 001-1V10l-7-4z" />
                 </svg>
               </button>
               {/* Outfit menu dropdown */}
               {showOutfitMenu && (
-                <div className="absolute bottom-12 right-0 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Avatar</p>
+                <div className="absolute bottom-12 right-0 w-52 rounded-2xl glass border border-white/30 p-3 shadow-xl animate-fadeInScale">
+                  <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avatar</p>
                   {AVATAR_OPTIONS.map((avatar) => (
                     <label
                       key={avatar.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-100/60 transition-colors"
                     >
                       <input
                         type="radio"
                         name="avatar"
                         checked={selectedAvatar === avatar.id}
                         onChange={() => setSelectedAvatar(avatar.id)}
-                        className="h-4 w-4 border-slate-300 text-purple-500 focus:ring-purple-500"
+                        className="h-4 w-4 border-slate-300 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
                       />
-                      <span className="text-sm text-slate-700">{avatar.label}</span>
+                      <span className="text-sm text-slate-700 font-medium">{avatar.label}</span>
                     </label>
                   ))}
-                  <hr className="my-2 border-slate-200" />
-                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Outfit</p>
+                  <hr className="my-2 border-slate-200/60" />
+                  <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Outfit</p>
                   {(["shirt", "skirt", "socks", "shoes"] as const).map((item) => (
                     <label
                       key={item}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-100/60 transition-colors"
                     >
                       <input
                         type="checkbox"
@@ -652,14 +660,14 @@ export default function ChatInterface() {
                             [item]: e.target.checked,
                           }))
                         }
-                        className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500"
+                        className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
                       />
-                      <span className="text-sm capitalize text-slate-700">{item}</span>
+                      <span className="text-sm capitalize text-slate-700 font-medium">{item}</span>
                     </label>
                   ))}
-                  <hr className="my-2 border-slate-200" />
-                  <p className="px-2 py-1 text-xs font-semibold text-slate-500">Style</p>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
+                  <hr className="my-2 border-slate-200/60" />
+                  <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Style</p>
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-100/60 transition-colors">
                     <input
                       type="checkbox"
                       checked={outfitVisibility.colorVariant}
@@ -669,11 +677,11 @@ export default function ChatInterface() {
                           colorVariant: e.target.checked,
                         }))
                       }
-                      className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500"
+                      className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
                     />
-                    <span className="text-sm text-slate-700">Alternate Color</span>
+                    <span className="text-sm text-slate-700 font-medium">Alternate Color</span>
                   </label>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-100/60 transition-colors">
                     <input
                       type="checkbox"
                       checked={outfitVisibility.lingerie}
@@ -683,9 +691,9 @@ export default function ChatInterface() {
                           lingerie: e.target.checked,
                         }))
                       }
-                      className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500"
+                      className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
                     />
-                    <span className="text-sm text-slate-700">Lingerie</span>
+                    <span className="text-sm text-slate-700 font-medium">Lingerie</span>
                   </label>
                 </div>
               )}
@@ -696,7 +704,7 @@ export default function ChatInterface() {
                 if (!audioEnabled) enableAudio(); // Enable audio on first interaction
                 setShowChat((prev) => !prev);
               }}
-              className="flex-shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm sm:px-4 font-semibold text-slate-700 shadow whitespace-nowrap"
+              className="flex-shrink-0 rounded-xl glass border border-white/30 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-md transition-all hover:shadow-lg active:scale-95 whitespace-nowrap"
             >
               {showChat ? "Hide" : "Chat"}
             </button>

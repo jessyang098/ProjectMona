@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { AudioSegment, EmotionData, Message, WebSocketMessage } from "@/types/chat";
+import { AudioSegment, EmotionData, LipSyncCue, Message, WebSocketMessage } from "@/types/chat";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 

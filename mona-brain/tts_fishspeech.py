@@ -13,8 +13,22 @@ from typing import Optional, List, Dict, Any, Tuple
 
 import aiohttp
 
-from lip_sync import generate_lip_sync_from_text, get_wav_duration
+from lip_sync import generate_lip_sync_from_text
 from tts_preprocess import clean_for_tts
+
+# Average speech rate: ~150 words/min = 2.5 words/sec
+# Average word length ~5 chars, so ~12-13 chars/sec
+# Fish Audio tends to be slightly faster
+CHARS_PER_SECOND = 14.0
+
+
+def estimate_duration_from_text(text: str) -> float:
+    """Estimate audio duration from text length (avoids ffmpeg conversion)."""
+    # Count characters, excluding extra whitespace
+    char_count = len(" ".join(text.split()))
+    # Add small buffer for natural pauses
+    estimated = char_count / CHARS_PER_SECOND + 0.3
+    return max(0.5, estimated)  # Minimum 0.5s
 
 
 class MonaTTSFishSpeech:
@@ -39,6 +53,29 @@ class MonaTTSFishSpeech:
         self.audio_dir = Path(audio_dir)
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self._warmed_up = False
+
+        # Connection pooling - reuse TCP connections for lower latency
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._timeout = aiohttp.ClientTimeout(total=60)
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create a shared aiohttp session for connection pooling."""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(
+                limit=10,  # Max concurrent connections
+                keepalive_timeout=30,  # Keep connections alive
+            )
+            self._session = aiohttp.ClientSession(
+                timeout=self._timeout,
+                connector=connector,
+            )
+        return self._session
+
+    async def close(self):
+        """Close the shared session. Call on shutdown."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     async def warmup(self) -> bool:
         """Mark as warmed up (no pre-warming needed for API)."""
@@ -116,52 +153,37 @@ class MonaTTSFishSpeech:
 
             payload = {"text": text}
 
-            timeout = aiohttp.ClientTimeout(total=60)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(
-                    self.api_url,
-                    json=payload,
-                    headers=headers
-                ) as response:
-                    api_ms = (time.perf_counter() - api_start) * 1000
+            # Use pooled session for faster connection reuse
+            session = await self._get_session()
+            async with session.post(
+                self.api_url,
+                json=payload,
+                headers=headers
+            ) as response:
+                api_ms = (time.perf_counter() - api_start) * 1000
 
-                    if response.status != 200:
-                        error_text = await response.text()
-                        print(f"Fish Audio [API ERROR] {api_ms:.0f}ms - {response.status}: {error_text}")
-                        return None, None
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"Fish Audio [API ERROR] {api_ms:.0f}ms - {response.status}: {error_text}")
+                    return None, None
 
-                    print(f"Fish Audio [API] {api_ms:.0f}ms ({api_ms/1000:.2f}s)")
+                print(f"Fish Audio [API] {api_ms:.0f}ms ({api_ms/1000:.2f}s)")
 
-                    # Read the audio response
-                    audio_content = await response.read()
-                    print(f"Fish Audio [Audio Size] {len(audio_content)/1024:.1f}KB")
+                # Read the audio response
+                audio_content = await response.read()
+                print(f"Fish Audio [Audio Size] {len(audio_content)/1024:.1f}KB")
 
-                    # Save directly as MP3
-                    with open(cache_path, "wb") as f:
-                        f.write(audio_content)
+                # Save directly as MP3
+                with open(cache_path, "wb") as f:
+                    f.write(audio_content)
 
-            # Generate text-based lip sync
+            # Generate text-based lip sync using estimated duration (no ffmpeg needed)
             lip_sync_data = None
             if generate_lip_sync:
-                # Convert MP3 to WAV temporarily to get duration
-                wav_path = cache_path.with_suffix('.wav')
-                convert_proc = await asyncio.create_subprocess_exec(
-                    'ffmpeg', '-y', '-i', str(cache_path), str(wav_path),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                await asyncio.wait_for(convert_proc.communicate(), timeout=30)
-
-                if convert_proc.returncode == 0:
-                    audio_duration = get_wav_duration(str(wav_path))
-                    if audio_duration > 0:
-                        lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
-                        if lip_sync_data:
-                            lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
-
-                    # Clean up WAV
-                    if wav_path.exists():
-                        wav_path.unlink()
+                audio_duration = estimate_duration_from_text(text)
+                lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
+                if lip_sync_data:
+                    lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
 
             total_ms = (time.perf_counter() - tts_start) * 1000
             print(f"Fish Audio [TOTAL] {total_ms:.0f}ms ({total_ms/1000:.2f}s)")

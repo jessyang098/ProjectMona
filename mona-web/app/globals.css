@@ -3,18 +3,216 @@
 @tailwind utilities;
 
 :root {
+  /* Background & Foreground */
   --background: #fffdf8;
-  --foreground: #111119;
+  --foreground: #0f172a;
+  --foreground-muted: #64748b;
+
+  /* Brand Colors - Pink/Purple Gradient System */
+  --brand-pink: #ec4899;
+  --brand-purple: #a855f7;
+  --brand-indigo: #6366f1;
+  --brand-gradient: linear-gradient(135deg, var(--brand-pink), var(--brand-purple), var(--brand-indigo));
+
+  /* Accent Colors */
+  --accent-rose: #fb7185;
+  --accent-violet: #8b5cf6;
+  --accent-sky: #38bdf8;
+  --accent-emerald: #34d399;
+
+  /* Surface Colors (cards, modals) */
+  --surface-primary: rgba(255, 255, 255, 0.95);
+  --surface-secondary: rgba(255, 255, 255, 0.8);
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --surface-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Border Colors */
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.15);
+
+  /* Shadows - Layered for depth */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.06);
+  --shadow-glow-pink: 0 4px 24px rgba(236, 72, 153, 0.25);
+  --shadow-glow-purple: 0 4px 24px rgba(168, 85, 247, 0.25);
+
+  /* Border Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Dark mode tokens */
+.dark {
+  --background: #0c0a14;
+  --foreground: #f8fafc;
+  --foreground-muted: #94a3b8;
+
+  --surface-primary: rgba(30, 27, 45, 0.95);
+  --surface-secondary: rgba(30, 27, 45, 0.8);
+  --surface-glass: rgba(30, 27, 45, 0.7);
+  --surface-overlay: rgba(0, 0, 0, 0.7);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.4), 0 8px 16px rgba(0, 0, 0, 0.25);
 }
 
 body {
   color: var(--foreground);
-  background: #fffdf8;
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--background);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
+
+/* Selection color */
+::selection {
+  background: rgba(168, 85, 247, 0.3);
+  color: var(--foreground);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Glass effect utility */
+  .glass {
+    background: var(--surface-glass);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+
+  /* Brand gradient text */
+  .text-gradient {
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Subtle shimmer animation for loading states */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}
+
+@layer components {
+  /* Modern button base */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium transition-all;
+    @apply rounded-xl px-4 py-2.5;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    transition: var(--transition-base);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .btn-primary {
+    @apply btn text-white;
+    background: var(--brand-gradient);
+    box-shadow: var(--shadow-glow-pink);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: var(--shadow-glow-purple);
+    filter: brightness(1.05);
+  }
+
+  .btn-secondary {
+    @apply btn bg-white/90 text-slate-700 border border-slate-200;
+    @apply hover:bg-white hover:border-slate-300;
+    @apply dark:bg-slate-800/90 dark:text-slate-200 dark:border-slate-700;
+    @apply dark:hover:bg-slate-800 dark:hover:border-slate-600;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-600;
+    @apply hover:bg-slate-100;
+    @apply dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  /* Modern card */
+  .card {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .card-glass {
+    @apply card glass;
+    border: 1px solid var(--border-default);
+  }
+
+  /* Modern input */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl;
+    @apply bg-white/80 border border-slate-200;
+    @apply text-slate-900 placeholder:text-slate-400;
+    @apply focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400;
+    @apply dark:bg-slate-800/80 dark:border-slate-700 dark:text-white;
+    @apply dark:placeholder:text-slate-500 dark:focus:border-purple-500;
+    transition: var(--transition-base);
   }
 }

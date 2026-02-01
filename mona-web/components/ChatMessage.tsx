@@ -10,7 +10,7 @@ interface ChatMessageProps {
 export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.sender === "user";
   const timestamp = message.isStreaming
-    ? "Streaming..."
+    ? "Thinking..."
     : new Date(message.timestamp).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -21,27 +21,27 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <div
-      className={`flex mb-4 ${isUser ? "justify-end" : "justify-start"} animate-fadeIn`}
+      className={`flex mb-3 ${isUser ? "justify-end" : "justify-start"} animate-fadeIn`}
     >
-      <div className={`flex max-w-[80%] ${isUser ? "flex-row-reverse" : "flex-row"} gap-3`}>
+      <div className={`flex max-w-[85%] ${isUser ? "flex-row-reverse" : "flex-row"} gap-2.5`}>
         {/* Avatar */}
         <div
-          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+          className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-sm font-semibold shadow-sm ${
             isUser
-              ? "bg-blue-600 text-white"
-              : "bg-gradient-to-br from-pink-400 to-purple-500 text-white"
+              ? "bg-slate-700 text-white"
+              : "bg-gradient-to-br from-pink-500 to-purple-600 text-white"
           }`}
         >
-          {isUser ? "You" : "M"}
+          {isUser ? "Y" : "M"}
         </div>
 
         {/* Message bubble */}
         <div className="flex flex-col">
           <div
-            className={`px-4 py-2 rounded-2xl ${
+            className={`px-3.5 py-2.5 ${
               isUser
-                ? "bg-blue-600 text-white rounded-tr-none"
-                : "bg-gray-800 text-gray-100 rounded-tl-none"
+                ? "bg-slate-700 text-white rounded-2xl rounded-tr-md"
+                : "bg-white/90 text-slate-800 rounded-2xl rounded-tl-md border border-slate-100/80 shadow-sm"
             } ${message.isStreaming ? "animate-pulseGlow" : ""}`}
           >
             {/* Display image if present */}
@@ -50,27 +50,27 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                 <Image
                   src={message.imageUrl!}
                   alt="Uploaded image"
-                  width={200}
-                  height={200}
-                  className="rounded-lg object-cover max-w-full"
+                  width={180}
+                  height={180}
+                  className="rounded-xl object-cover max-w-full"
                   unoptimized // Required for base64 images
                 />
               </div>
             )}
             {/* Display text content */}
             {hasContent && (
-              <p className="text-sm leading-relaxed">{message.content}</p>
+              <p className="text-[13px] leading-relaxed">{message.content}</p>
             )}
             {/* If no content and no image, show placeholder */}
             {!hasContent && !hasImage && (
-              <p className="text-sm leading-relaxed italic opacity-70">...</p>
+              <p className="text-[13px] leading-relaxed italic opacity-60">...</p>
             )}
           </div>
-          <div className={`mt-1 flex flex-wrap items-center gap-2 text-xs ${isUser ? "justify-end" : "justify-start"}`}>
-            <span className="text-gray-500">{timestamp}</span>
+          <div className={`mt-1.5 flex flex-wrap items-center gap-2 text-[10px] ${isUser ? "justify-end pr-1" : "justify-start pl-1"}`}>
+            <span className="text-slate-400">{timestamp}</span>
             {!isUser && message.emotion && message.emotion.emotion && message.emotion.intensity && (
-              <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-purple-200">
-                {`${capitalize(message.emotion.emotion)} · ${capitalize(message.emotion.intensity)}`}
+              <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-600 font-medium">
+                {`${capitalize(message.emotion.emotion)}`}
               </span>
             )}
           </div>
