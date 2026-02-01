@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 export type TtsEngine = "sovits" | "fishspeech";
-export type LipSyncMode = "textbased" | "realtime";
+export type LipSyncMode = "textbased" | "realtime" | "formant";
 export type PersonalityType = "girlfriend" | "mommy";
 
 export interface PersonalityOption {
@@ -283,11 +283,23 @@ export default function SettingsModal({
             >
               Real-time
             </button>
+            <button
+              onClick={() => onLipSyncModeChange("formant")}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors border ${
+                lipSyncMode === "formant"
+                  ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                  : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
+              }`}
+            >
+              Formant
+            </button>
           </div>
           <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
             {lipSyncMode === "textbased"
               ? "Text: Fast phoneme estimation from text (~0ms)"
-              : "Real-time: Frontend audio frequency analysis"}
+              : lipSyncMode === "realtime"
+              ? "Real-time: Basic audio frequency analysis"
+              : "Formant: Advanced F1/F2 analysis with layered animation"}
           </p>
         </div>
 

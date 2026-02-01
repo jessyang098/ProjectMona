@@ -108,6 +108,9 @@ export interface OutfitVisibility {
   lingerie: boolean;
 }
 
+// Settings lip sync mode type (from SettingsModal)
+export type SettingsLipSyncMode = "textbased" | "realtime" | "formant";
+
 interface VRMAvatarProps {
   url: string;
   emotion: EmotionData | null;
@@ -115,6 +118,7 @@ interface VRMAvatarProps {
   lipSync?: LipSyncCue[];
   outfitVisibility?: OutfitVisibility;
   onAudioEnd?: () => void;
+  lipSyncMode?: SettingsLipSyncMode;
 }
 
 const DEFAULT_OUTFIT: OutfitVisibility = {
@@ -137,7 +141,7 @@ function getMaxMouthOpen(avatarUrl: string): number {
   return 0.4;
 }
 
-export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT, onAudioEnd }: VRMAvatarProps) {
+export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT, onAudioEnd, lipSyncMode = "textbased" }: VRMAvatarProps) {
   const groupRef = useRef<THREE.Group>(null);
   const hipsRef = useRef<THREE.Object3D | null>(null);
   const chestRef = useRef<THREE.Object3D | null>(null);
@@ -422,7 +426,11 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
           amplitudeScale: 12.0,
           amplitudeThreshold: 0.0005,
           maxMouthOpen,
+          mode: lipSyncMode === "formant" ? "formant" : undefined,
         });
+      } else if (lipSyncMode === "formant") {
+        // Update mode if it changed
+        lipSyncRef.current.updateConfig({ mode: "formant" });
       }
 
       lipSyncRef.current.stop();
@@ -441,7 +449,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     });
 
     return cleanup;
-  }, [vrm, url]);
+  }, [vrm, url, lipSyncMode]);
 
   // Handle audio playback with lip sync
   useEffect(() => {
@@ -465,6 +473,12 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
           amplitudeScale: 12.0,
           amplitudeThreshold: 0.0005,
           maxMouthOpen,
+          mode: lipSyncMode === "formant" ? "formant" : undefined,
+        });
+      } else {
+        // Update mode if it changed
+        lipSyncRef.current.updateConfig({
+          mode: lipSyncMode === "formant" ? "formant" : undefined
         });
       }
 
@@ -477,7 +491,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     } catch (error) {
       // Silently handle errors
     }
-  }, [audioUrl, lipSync, vrm, onAudioEnd]);
+  }, [audioUrl, lipSync, vrm, onAudioEnd, lipSyncMode, url]);
 
   useFrame((_, delta) => {
     if (!vrm) return;
