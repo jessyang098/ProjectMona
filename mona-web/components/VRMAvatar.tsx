@@ -24,8 +24,8 @@ const ANIMATION_CONFIG = {
   // Head movement ranges and timing (idle vs talking)
   head: {
     nodRange: 0.2,
-    turnRange: 0.13,
-    tiltRange: 0.15,
+    turnRange: 0.06,      // Reduced from 0.13 - keeps gaze more toward user
+    tiltRange: 0.10,      // Reduced slightly for more stable head
     // Idle: slower, less frequent movements
     idleFrequency: 1.8,
     idleSmoothing: 0.02,
@@ -562,8 +562,11 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     // Procedural head movement
     anim.head.timer += delta;
     if (anim.head.timer > headFreq) {
-      anim.head.targetRotation.x = randomInRange(-cfg.head.nodRange, cfg.head.nodRange);
-      anim.head.targetRotation.y = randomInRange(-cfg.head.turnRange, cfg.head.turnRange);
+      // Bias upward: range from -nodRange (look up) to only slight downward nod
+      anim.head.targetRotation.x = randomInRange(-cfg.head.nodRange, cfg.head.nodRange * 0.25);
+      // Center-biased turn: average of two randoms creates bell curve toward 0 (looking at user)
+      const turnBias = ((Math.random() + Math.random()) / 2 - 0.5) * 2; // -1 to 1, biased toward 0
+      anim.head.targetRotation.y = turnBias * cfg.head.turnRange;
       anim.head.targetRotation.z = randomInRange(-cfg.head.tiltRange, cfg.head.tiltRange);
       anim.head.timer = 0;
     }
