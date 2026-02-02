@@ -500,7 +500,7 @@ export default function ChatInterface() {
         {/* Input */}
         <footer className="px-3 sm:px-8 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
-            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-2 rounded-2xl glass border border-slate-300 px-3 sm:px-4 py-2.5 sm:py-3 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:border-slate-500 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
+            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-1.5 rounded-xl glass border border-slate-300 px-2 sm:px-3 py-1 sm:py-1.5 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:border-slate-500 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
               {/* Image preview */}
               {selectedImage && (
                 <div className="relative inline-block animate-fadeInScale">
@@ -537,10 +537,10 @@ export default function ChatInterface() {
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={!isConnected || isRecording}
-                  className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-300 transition-all hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100"
+                  className="flex h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 border border-slate-300 transition-all hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100"
                   title="Upload image"
                 >
-                  <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </button>
@@ -549,7 +549,7 @@ export default function ChatInterface() {
                   type="button"
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={!isConnected || isProcessing}
-                  className={`flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 ${
+                  className={`flex h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 ${
                     isRecording
                       ? 'animate-pulse bg-red-500 text-white border border-red-500'
                       : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100'
@@ -557,12 +557,12 @@ export default function ChatInterface() {
                   title={isRecording ? 'Stop recording' : 'Start voice input'}
                 >
                   {isProcessing ? (
-                    <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px] animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                   ) : (
-                    <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
                   )}
@@ -580,12 +580,12 @@ export default function ChatInterface() {
                   }}
                   placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
                   disabled={!isConnected || isRecording}
-                  className="min-w-0 flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 text-[15px] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="min-w-0 flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 text-sm dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
                 <button
                   type="submit"
                   disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
-                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-shrink-0 rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Send
                 </button>
