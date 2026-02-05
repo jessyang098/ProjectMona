@@ -620,9 +620,9 @@ export default function ChatInterface() {
                 className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
                 title="Outfit options"
               >
-                {/* Clothing/hanger icon */}
+                {/* Hanger icon */}
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2l-1 1m1-1l1 1m-1-1v3m0 0l-7 4v10a1 1 0 001 1h12a1 1 0 001-1V10l-7-4z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6a2 2 0 100-4 2 2 0 000 4zm0 0l8 8H4l8-8z" />
                 </svg>
               </button>
               {/* Outfit menu dropdown */}

@@ -112,59 +112,74 @@ const VOICES = [
   },
 ];
 
-type SubscriptionPlan = {
+type SubscriptionTier = {
   id: string;
   name: string;
-  price: number;
+  price: number | null;
   originalPrice?: number;
-  period: string;
+  period?: string;
   periodNote?: string;
   badge?: string;
   badgeColor?: string;
   highlight?: boolean;
   savings?: string;
+  features: { text: string; included: boolean }[];
 };
 
-const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
-    id: "founder",
-    name: "Founder's Special",
-    price: 12.99,
-    originalPrice: 19.99,
-    period: "month",
-    periodNote: "for your first 6 months",
-    badge: "Limited",
-    badgeColor: "from-amber-500 to-orange-500",
-    savings: "Save 35% for 6 months",
+    id: "trial",
+    name: "3-Day Trial",
+    price: null,
+    badge: "Try Free",
+    badgeColor: "from-slate-500 to-slate-600",
+    features: [
+      { text: "Unlimited messages", included: true },
+      { text: "Voice responses", included: true },
+      { text: "3D animated avatar", included: true },
+      { text: "Memory & context", included: true },
+      { text: "Expressions & gestures", included: true },
+      { text: "Full experience for 3 days", included: true },
+      { text: "No credit card required", included: true },
+    ],
   },
   {
     id: "monthly",
-    name: "Monthly",
+    name: "Premium",
     price: 19.99,
     period: "month",
     highlight: true,
     badge: "Popular",
     badgeColor: "from-pink-500 to-purple-500",
+    features: [
+      { text: "Unlimited messages", included: true },
+      { text: "Voice responses", included: true },
+      { text: "3D animated avatar", included: true },
+      { text: "Memory & context", included: true },
+      { text: "Expressions & gestures", included: true },
+      { text: "Early access features", included: true },
+      { text: "Priority support", included: true },
+    ],
   },
   {
     id: "annual",
-    name: "Annual",
-    price: 149.99,
+    name: "Premium Annual",
+    price: 119.99,
     period: "year",
-    periodNote: "Just $12.50/month",
+    periodNote: "Just $10/month",
     badge: "Best Value",
     badgeColor: "from-emerald-500 to-teal-500",
-    savings: "Save 38%",
+    savings: "Save 50%",
+    features: [
+      { text: "Unlimited messages", included: true },
+      { text: "Voice responses", included: true },
+      { text: "3D animated avatar", included: true },
+      { text: "Memory & context", included: true },
+      { text: "Expressions & gestures", included: true },
+      { text: "Early access features", included: true },
+      { text: "Priority support", included: true },
+    ],
   },
-];
-
-const SUBSCRIPTION_FEATURES = [
-  { text: "Unlimited messages", description: "Chat as much as you want" },
-  { text: "Memory", description: "Mona remembers your conversations" },
-  { text: "Voice responses", description: "Hear Mona's anime voice" },
-  { text: "3D Avatar", description: "Animated expressions & gestures" },
-  { text: "Early access", description: "Try new features first" },
-  { text: "Exclusive content", description: "Premium outfits and voices" },
 ];
 
 export default function ShopModal({ isOpen, onClose, isAuthenticated = false, onOpenLogin }: ShopModalProps) {
@@ -550,148 +565,109 @@ function VoicesTab({ onPurchase }: { onPurchase: () => void }) {
 }
 
 function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
-  const [selectedPlan, setSelectedPlan] = useState<string>("monthly");
-
-  const currentPlan = SUBSCRIPTION_PLANS.find((p) => p.id === selectedPlan) || SUBSCRIPTION_PLANS[1];
-
   return (
-    <div className="flex flex-col items-center space-y-6">
-      {/* Plan Selector */}
-      <div className="w-full max-w-md space-y-3">
-        {SUBSCRIPTION_PLANS.map((plan) => (
-          <button
-            key={plan.id}
-            onClick={() => setSelectedPlan(plan.id)}
-            className={`relative w-full rounded-2xl border-2 p-4 text-left transition-all ${
-              selectedPlan === plan.id
-                ? "border-pink-500 bg-pink-50"
+    <div className="space-y-4">
+      {/* Side-by-side tier cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {SUBSCRIPTION_TIERS.map((tier) => (
+          <div
+            key={tier.id}
+            className={`relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all ${
+              tier.highlight
+                ? "border-pink-400 bg-gradient-to-b from-pink-50 to-white"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
             {/* Badge */}
-            {plan.badge && (
+            {tier.badge && (
               <div
-                className={`absolute -top-2.5 right-4 rounded-full bg-gradient-to-r ${plan.badgeColor} px-3 py-0.5 text-xs font-semibold text-white`}
+                className={`absolute -top-0 left-0 right-0 bg-gradient-to-r ${tier.badgeColor} py-1 text-center text-xs font-semibold text-white`}
               >
-                {plan.badge}
+                {tier.badge}
               </div>
             )}
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {/* Radio indicator */}
-                <div
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all ${
-                    selectedPlan === plan.id
-                      ? "border-pink-500 bg-pink-500"
-                      : "border-slate-300"
-                  }`}
-                >
-                  {selectedPlan === plan.id && (
-                    <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
+            {/* Content */}
+            <div className={`flex flex-1 flex-col p-4 ${tier.badge ? "pt-8" : ""}`}>
+              {/* Tier name */}
+              <h3 className="text-lg font-bold text-slate-900">{tier.name}</h3>
 
-                <div>
-                  <p className={`font-semibold ${selectedPlan === plan.id ? "text-pink-700" : "text-slate-900"}`}>
-                    {plan.name}
-                  </p>
-                  {plan.periodNote && (
-                    <p className="text-xs text-slate-500">{plan.periodNote}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="flex items-baseline gap-1">
-                  {plan.originalPrice && (
-                    <span className="text-sm text-slate-400 line-through">${plan.originalPrice}</span>
-                  )}
-                  <span className={`text-xl font-bold ${selectedPlan === plan.id ? "text-pink-600" : "text-slate-900"}`}>
-                    ${plan.price}
-                  </span>
-                  <span className="text-sm text-slate-500">/{plan.period}</span>
-                </div>
-                {plan.savings && (
-                  <p className="text-xs font-medium text-emerald-600">{plan.savings}</p>
+              {/* Price */}
+              <div className="mt-2">
+                {tier.price === null ? (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-slate-900">Free</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-baseline gap-1">
+                      {tier.originalPrice && (
+                        <span className="text-sm text-slate-400 line-through">${tier.originalPrice}</span>
+                      )}
+                      <span className="text-3xl font-bold text-slate-900">${tier.price}</span>
+                    </div>
+                    <p className="text-sm text-slate-500">per {tier.period}</p>
+                  </>
+                )}
+                {tier.periodNote && (
+                  <p className="mt-1 text-xs text-pink-600 font-medium">{tier.periodNote}</p>
                 )}
               </div>
+
+              {/* Savings badge */}
+              {tier.savings && (
+                <div className="mt-2">
+                  <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    {tier.savings}
+                  </span>
+                </div>
+              )}
+
+              {/* Features list */}
+              <ul className="mt-4 flex-1 space-y-2">
+                {tier.features.map((feature, index) => (
+                  <li key={index} className="flex items-center gap-2 text-sm">
+                    {feature.included ? (
+                      <svg className="h-4 w-4 flex-shrink-0 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4 flex-shrink-0 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    <span className={feature.included ? "text-slate-700" : "text-slate-400"}>
+                      {feature.text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Action button */}
+              <button
+                onClick={onPurchase}
+                className={`mt-4 w-full rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                  tier.highlight
+                    ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:brightness-110"
+                    : tier.id === "trial"
+                    ? "bg-slate-900 text-white hover:bg-slate-800"
+                    : "bg-slate-900 text-white hover:bg-slate-800"
+                }`}
+              >
+                {tier.id === "trial"
+                  ? "Start Free Trial"
+                  : tier.id === "annual"
+                  ? "Save 50%"
+                  : "Subscribe"}
+              </button>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
-      {/* Premium Card */}
-      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-gradient-to-b from-slate-900 to-slate-800 border border-slate-700">
-        {/* Header glow effect */}
-        <div className="relative px-6 pt-8 pb-6">
-          <div className="absolute inset-0 bg-gradient-to-b from-pink-500/20 to-transparent" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-32 w-32 rounded-full bg-pink-500/30 blur-3xl" />
-
-          <div className="relative text-center">
-            {/* Premium badge */}
-            <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-1.5 text-sm font-semibold text-white">
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
-              Mona Premium
-            </div>
-
-            <h3 className="mt-4 text-2xl font-bold text-white">{currentPlan.name}</h3>
-
-            <div className="mt-3 flex items-baseline justify-center gap-1">
-              {currentPlan.originalPrice && (
-                <span className="text-2xl text-slate-500 line-through">${currentPlan.originalPrice}</span>
-              )}
-              <span className="text-5xl font-bold text-white">${currentPlan.price}</span>
-              <span className="text-lg text-slate-400">/{currentPlan.period}</span>
-            </div>
-            {currentPlan.periodNote && (
-              <p className="mt-1 text-sm text-pink-300">{currentPlan.periodNote}</p>
-            )}
-            {currentPlan.savings && (
-              <p className="mt-2 inline-block rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-medium text-emerald-400">
-                {currentPlan.savings}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Features */}
-        <div className="px-6 pb-8">
-          <div className="rounded-2xl bg-white/5 p-4">
-            <ul className="space-y-4">
-              {SUBSCRIPTION_FEATURES.map((feature, index) => (
-                <li key={index} className="flex items-start gap-3">
-                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-500">
-                    <svg className="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">{feature.text}</p>
-                    <p className="text-sm text-slate-400">{feature.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Subscribe button */}
-          <button
-            onClick={onPurchase}
-            className="mt-6 w-full rounded-2xl bg-gradient-to-r from-pink-500 to-purple-500 py-4 text-lg font-bold text-white transition-all hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {currentPlan.id === "annual" ? "Subscribe & Save 38%" : "Subscribe Now"}
-          </button>
-
-          <p className="mt-4 text-center text-sm text-slate-500">
-            Cancel anytime. No commitment required.
-          </p>
-        </div>
-      </div>
+      <p className="text-center text-xs text-slate-400">
+        Cancel anytime. No commitment required.
+      </p>
     </div>
   );
 }
