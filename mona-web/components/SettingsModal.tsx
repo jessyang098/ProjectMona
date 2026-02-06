@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-export type TtsEngine = "sovits" | "fishspeech";
+export type TtsEngine = "sovits" | "fishspeech" | "cartesia";
 export type LipSyncMode = "textbased" | "realtime" | "formant";
 export type PersonalityType = "girlfriend" | "mommy";
 
@@ -226,7 +226,7 @@ export default function SettingsModal({
           <div className="flex gap-2">
             <button
               onClick={() => onTtsEngineChange("sovits")}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors border ${
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors border ${
                 ttsEngine === "sovits"
                   ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
                   : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
@@ -236,7 +236,7 @@ export default function SettingsModal({
             </button>
             <button
               onClick={() => onTtsEngineChange("fishspeech")}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors border ${
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors border ${
                 ttsEngine === "fishspeech"
                   ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
                   : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
@@ -244,11 +244,23 @@ export default function SettingsModal({
             >
               Fish Speech
             </button>
+            <button
+              onClick={() => onTtsEngineChange("cartesia")}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors border ${
+                ttsEngine === "cartesia"
+                  ? "bg-pink-500 text-white border-pink-500 dark:bg-pink-600 dark:border-pink-600"
+                  : "bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400"
+              }`}
+            >
+              Cartesia
+            </button>
           </div>
           <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
             {ttsEngine === "sovits"
               ? "GPT-SoVITS: Fine-tuned Mona voice"
-              : "Fish Speech: Zero-shot voice cloning via API"}
+              : ttsEngine === "fishspeech"
+              ? "Fish Speech: Zero-shot voice cloning via API"
+              : "Cartesia Sonic: Low-latency streaming TTS"}
           </p>
         </div>
 

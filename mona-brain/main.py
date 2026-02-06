@@ -66,6 +66,7 @@ from personality_loader import load_personality_from_yaml, list_available_person
 from tts import MonaTTS
 from tts_sovits import MonaTTSSoVITS
 from tts_fishspeech import MonaTTSFishSpeech
+from tts_cartesia import MonaTTSCartesia
 from text_utils import preprocess_tts_text
 from memory import save_memory_to_db, load_memories_from_db, deprecate_memories_by_key
 from openai import OpenAI
@@ -75,13 +76,14 @@ mona_llm: Optional[MonaLLM] = None
 mona_tts: Optional[MonaTTS] = None
 mona_tts_sovits: Optional[MonaTTSSoVITS] = None
 mona_tts_fishspeech: Optional[MonaTTSFishSpeech] = None
+mona_tts_cartesia: Optional[MonaTTSCartesia] = None
 openai_client: Optional[OpenAI] = None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Initialize LLM, TTS, and database on startup"""
-    global mona_llm, mona_tts, mona_tts_sovits, mona_tts_fishspeech, openai_client
+    global mona_llm, mona_tts, mona_tts_sovits, mona_tts_fishspeech, mona_tts_cartesia, openai_client
 
     # Initialize database
     await init_db()
@@ -130,6 +132,17 @@ async def lifespan(_app: FastAPI):
     except Exception as e:
         print(f"⚠ Warning: Could not initialize Fish Speech - {e}")
         mona_tts_fishspeech = None
+
+    # Initialize Cartesia TTS
+    try:
+        mona_tts_cartesia = MonaTTSCartesia()
+        if not mona_tts_cartesia.mock_mode:
+            print(f"✓ Mona Cartesia TTS initialized")
+        else:
+            print(f"⚠ Cartesia: No API key set (CARTESIA_API_KEY)")
+    except Exception as e:
+        print(f"⚠ Warning: Could not initialize Cartesia - {e}")
+        mona_tts_cartesia = None
 
     # Initialize OpenAI TTS (fallback)
     try:
@@ -195,6 +208,12 @@ async def lifespan(_app: FastAPI):
     if mona_tts_sovits:
         await mona_tts_sovits.close()
         print("✓ GPT-SoVITS session closed")
+    if mona_tts_fishspeech:
+        await mona_tts_fishspeech.close()
+        print("✓ Fish Speech session closed")
+    if mona_tts_cartesia:
+        await mona_tts_cartesia.close()
+        print("✓ Cartesia session closed")
 
 
 app = FastAPI(title="Mona Brain API", lifespan=lifespan)
@@ -680,6 +699,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                 if tts_engine == "fishspeech" and mona_tts_fishspeech and not mona_tts_fishspeech.mock_mode:
                                     audio_path, lip_sync_data = await mona_tts_fishspeech.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
                                     used_engine = "fishspeech"
+                                    if audio_path:
+                                        audio_url = f"/audio/{Path(audio_path).name}"
+
+                                elif tts_engine == "cartesia" and mona_tts_cartesia and not mona_tts_cartesia.mock_mode:
+                                    audio_path, lip_sync_data = await mona_tts_cartesia.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
+                                    used_engine = "cartesia"
                                     if audio_path:
                                         audio_url = f"/audio/{Path(audio_path).name}"
 
