@@ -2,10 +2,40 @@ import asyncio
 import random
 import os
 import time
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 from contextlib import asynccontextmanager
+
+from logging_config import setup_logging
+from analytics import analytics, Analytics
+
+# Setup structured logging
+setup_logging()
+
+
+class RateLimiter:
+    """Simple in-memory rate limiting."""
+
+    def __init__(self, max_requests: int = 100, window_seconds: int = 3600):
+        self.requests: Dict[str, list] = defaultdict(list)
+        self.max_requests = max_requests
+        self.window = window_seconds
+
+    def is_allowed(self, user_id: str) -> bool:
+        """Check if user is within rate limit."""
+        now = time.time()
+        # Clean old requests
+        self.requests[user_id] = [t for t in self.requests[user_id] if now - t < self.window]
+        if len(self.requests[user_id]) >= self.max_requests:
+            return False
+        self.requests[user_id].append(now)
+        return True
+
+
+# Global rate limiter (100 messages per hour)
+rate_limiter = RateLimiter(max_requests=100, window_seconds=3600)
 
 
 class PipelineTimer:
@@ -70,6 +100,7 @@ from tts_cartesia import MonaTTSCartesia
 from text_utils import preprocess_tts_text
 from memory import save_memory_to_db, load_memories_from_db, deprecate_memories_by_key
 from openai import OpenAI
+from proactive import proactive_messenger
 
 # Initialize LLM and TTS (will be created on startup)
 mona_llm: Optional[MonaLLM] = None
@@ -166,6 +197,13 @@ async def lifespan(_app: FastAPI):
         print(f"⚠ Warning: Could not initialize Whisper - {e}")
         openai_client = None
 
+    # Initialize proactive messaging system
+    if mona_llm:
+        proactive_messenger.set_llm(mona_llm)
+        proactive_messenger.set_connection_manager(manager)
+        await proactive_messenger.start()
+        print("✓ Proactive messaging system started")
+
     # Pre-warm models in background to speed up first user experience
     async def startup_warmup():
         """Warm up GPT-SoVITS and pre-cache the welcome greeting."""
@@ -205,6 +243,9 @@ async def lifespan(_app: FastAPI):
     yield
 
     # Cleanup on shutdown
+    await proactive_messenger.stop()
+    print("✓ Proactive messaging stopped")
+
     if mona_tts_sovits:
         await mona_tts_sovits.close()
         print("✓ GPT-SoVITS session closed")
@@ -505,6 +546,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                         mona_llm.load_memories(llm_user_id, db_memories)
                         print(f"🧠 Loaded {len(db_memories)} memories for {user.email}")
 
+                # Deliver any pending proactive messages
+                try:
+                    delivered = await proactive_messenger.deliver_pending_messages(db, user.id)
+                    if delivered:
+                        print(f"📬 Delivered pending proactive message to {user.email}")
+                except Exception as e:
+                    print(f"⚠ Failed to deliver pending messages: {e}")
+
         # Send welcome message
         if mona_llm:
             # Get initial emotion state
@@ -607,6 +656,16 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             use_lip_sync = lip_sync_mode == "textbased"
             print(f"Lip sync mode: {lip_sync_mode} (enabled={use_lip_sync})")
 
+            # Rate limiting check
+            rate_limit_id = user.id if user else guest_session_id
+            if not rate_limiter.is_allowed(rate_limit_id):
+                rate_limit_message = {
+                    "type": "error",
+                    "message": "You're sending messages too quickly. Please slow down.",
+                }
+                await manager.send_message(rate_limit_message, client_id)
+                continue
+
             # Check guest message limit
             if is_guest:
                 async with async_session() as db:
@@ -626,6 +685,22 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                     if guest_session:
                         guest_session.message_count += 1
                         guest_session.last_active = datetime.now()
+                        await db.commit()
+
+            # Track message_sent event
+            analytics.track(
+                Analytics.EVENT_MESSAGE_SENT,
+                user.id if user else None,
+                {"has_image": has_image, "guest_session_id": guest_session_id if is_guest else None}
+            )
+
+            # Update user's last_message_at for proactive messaging
+            if user:
+                async with async_session() as db:
+                    result = await db.execute(select(User).where(User.id == user.id))
+                    db_user = result.scalar_one_or_none()
+                    if db_user:
+                        db_user.last_message_at = datetime.utcnow()
                         await db.commit()
 
             timer.checkpoint("2_validation_complete")
@@ -731,6 +806,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                             lip_sync_data = openai_lip_sync
 
                             timer.checkpoint("5_tts_complete")
+
+                            # Track voice_used if audio was generated
+                            if audio_url and used_engine:
+                                analytics.track(
+                                    Analytics.EVENT_VOICE_USED,
+                                    user.id if user else None,
+                                    {"engine": used_engine, "guest_session_id": guest_session_id if is_guest else None}
+                                )
 
                             # Send complete message
                             response_message = {

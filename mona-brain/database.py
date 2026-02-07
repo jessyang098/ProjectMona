@@ -29,6 +29,14 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Proactive messaging
+    last_message_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Last user message
+    proactive_enabled: Mapped[bool] = mapped_column(Integer, default=1)  # SQLite stores as int
+    last_proactive_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Last proactive msg from Mona
+
+    # Notification preferences
+    email_notifications: Mapped[bool] = mapped_column(Integer, default=1)  # Email when offline
+
     # Relationships
     messages: Mapped[List["ChatMessage"]] = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
 
@@ -93,6 +101,39 @@ class UserMemory(Base):
     __table_args__ = (
         Index("idx_user_key_status", "user_id", "key", "status"),
     )
+
+
+class ProactiveMessage(Base):
+    """Pending proactive messages for offline users."""
+    __tablename__ = "proactive_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    emotion: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    trigger_type: Mapped[str] = mapped_column(String(50))  # inactivity, milestone, affection, etc.
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, delivered, expired
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)  # Don't deliver stale messages
+
+    user: Mapped["User"] = relationship("User")
+
+
+class APIUsage(Base):
+    """Track API costs per user for unit economics."""
+    __tablename__ = "api_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    guest_session_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    service: Mapped[str] = mapped_column(String(50))  # openai_chat, openai_tts, whisper, fish, cartesia
+    model: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    characters: Mapped[int] = mapped_column(Integer, default=0)  # for TTS
+    estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
 # Async engine and session

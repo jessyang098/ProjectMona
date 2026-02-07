@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from openai import AsyncOpenAI
 
 from lip_sync import generate_lip_sync_from_text, get_wav_duration
+from analytics import analytics, calculate_tts_cost
 
 
 class MonaTTS:
@@ -102,6 +103,15 @@ class MonaTTS:
             cache_path.write_bytes(response.content)
             tts_ms = (time.perf_counter() - tts_start) * 1000
             print(f"✓ OpenAI TTS complete ({tts_ms:.0f}ms)")
+
+            # Track TTS cost
+            cost = calculate_tts_cost(len(text), "tts-1")
+            await analytics.track_api_cost(
+                service="openai_tts",
+                model=self.model,
+                characters=len(text),
+                estimated_cost=cost,
+            )
 
             lip_sync_data = None
             if generate_lip_sync:

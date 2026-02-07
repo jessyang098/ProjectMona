@@ -15,6 +15,7 @@ import aiohttp
 
 from lip_sync import generate_lip_sync_from_text
 from tts_preprocess import clean_for_tts
+from analytics import analytics, calculate_tts_cost
 
 # Average speech rate: ~150 words/min = 2.5 words/sec
 # Average word length ~5 chars, so ~12-13 chars/sec
@@ -176,6 +177,15 @@ class MonaTTSFishSpeech:
                 # Save directly as MP3
                 with open(cache_path, "wb") as f:
                     f.write(audio_content)
+
+                # Track TTS cost
+                cost = calculate_tts_cost(len(text), "fish")
+                await analytics.track_api_cost(
+                    service="fish",
+                    model=self.model_id,
+                    characters=len(text),
+                    estimated_cost=cost,
+                )
 
             # Generate text-based lip sync using estimated duration (no ffmpeg needed)
             lip_sync_data = None

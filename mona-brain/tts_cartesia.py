@@ -14,6 +14,7 @@ import aiohttp
 
 from lip_sync import generate_lip_sync_from_text, get_wav_duration
 from tts_preprocess import clean_for_tts
+from analytics import analytics, calculate_tts_cost
 
 
 class MonaTTSCartesia:
@@ -170,6 +171,15 @@ class MonaTTSCartesia:
 
                 with open(cache_path, "wb") as f:
                     f.write(audio_content)
+
+                # Track TTS cost
+                cost = calculate_tts_cost(len(text), "cartesia")
+                await analytics.track_api_cost(
+                    service="cartesia",
+                    model=self.model_id,
+                    characters=len(text),
+                    estimated_cost=cost,
+                )
 
             # Generate lip sync using actual WAV duration (more accurate than text estimation)
             lip_sync_data = None

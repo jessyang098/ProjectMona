@@ -15,6 +15,7 @@ from personality import MonaPersonality, default_mona
 from emotion import EmotionEngine, GestureType
 from memory import MemoryManager
 from affection import AffectionEngine
+from analytics import analytics, calculate_llm_cost
 
 
 # Available gestures for LLM selection
@@ -164,10 +165,73 @@ class MonaLLM:
         user_id: str,
         user_message: str,
         image_base64: Optional[str] = None,
+        system_override: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, object], None]:
-        """Stream Mona's response chunks and final metadata."""
+        """Stream Mona's response chunks and final metadata.
+
+        Args:
+            user_id: User identifier
+            user_message: The user's message
+            image_base64: Optional base64 image for vision
+            system_override: Optional custom system prompt (for proactive messaging)
+        """
 
         conversation = self._get_or_create_conversation(user_id)
+
+        # If system_override provided, use temporary conversation with custom prompt
+        if system_override:
+            messages = [
+                {"role": "system", "content": system_override},
+                {"role": "user", "content": user_message},
+            ]
+            # Skip normal conversation flow, just generate
+            assistant_message = ""
+            usage_data = None
+
+            try:
+                stream = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.9,
+                    max_tokens=100,  # Shorter for proactive messages
+                    presence_penalty=0.6,
+                    frequency_penalty=0.3,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                )
+
+                async for chunk in stream:
+                    if hasattr(chunk, 'usage') and chunk.usage:
+                        usage_data = chunk.usage
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if not delta or not delta.content:
+                        continue
+                    assistant_message += delta.content
+                    yield {"event": "chunk", "content": delta.content}
+
+                # Track API cost
+                if usage_data:
+                    cost = calculate_llm_cost(
+                        usage_data.prompt_tokens, usage_data.completion_tokens, self.model
+                    )
+                    await analytics.track_api_cost(
+                        service="openai_chat",
+                        model=self.model,
+                        user_id=user_id.replace("proactive_", ""),  # Clean up ID
+                        input_tokens=usage_data.prompt_tokens,
+                        output_tokens=usage_data.completion_tokens,
+                        estimated_cost=cost,
+                    )
+
+                yield {"event": "complete", "content": assistant_message, "emotion": {}}
+                return
+
+            except Exception as e:
+                print(f"Error in proactive message generation: {e}")
+                yield {"event": "error", "content": "", "emotion": {}}
+                return
 
         emotion_engine = self._get_emotion_engine(user_id)
         emotion_engine.update_emotion(user_message)
@@ -204,6 +268,7 @@ class MonaLLM:
                 messages.append({"role": msg.role, "content": msg.content})
 
         assistant_message = ""
+        usage_data = None
 
         try:
             stream = await self.client.chat.completions.create(
@@ -214,9 +279,13 @@ class MonaLLM:
                 presence_penalty=0.6,
                 frequency_penalty=0.3,
                 stream=True,
+                stream_options={"include_usage": True},
             )
 
             async for chunk in stream:
+                # Capture usage from final chunk
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    usage_data = chunk.usage
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
@@ -226,6 +295,20 @@ class MonaLLM:
                 yield {"event": "chunk", "content": delta.content}
 
             conversation.append(ConversationMessage(role="assistant", content=assistant_message))
+
+            # Track API cost
+            if usage_data:
+                input_tokens = usage_data.prompt_tokens
+                output_tokens = usage_data.completion_tokens
+                cost = calculate_llm_cost(input_tokens, output_tokens, self.model)
+                await analytics.track_api_cost(
+                    service="openai_chat",
+                    model=self.model,
+                    user_id=user_id,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    estimated_cost=cost,
+                )
             emotion_data = emotion_engine.get_emotion_for_expression()
 
             # Check for direct gesture test command (test:wave, test:clapping, etc.)
@@ -301,6 +384,21 @@ Respond with ONLY the gesture name, nothing else."""
                 temperature=0.3,
                 max_tokens=20,
             )
+
+            # Track gesture selection cost
+            if response.usage:
+                cost = calculate_llm_cost(
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                    "gpt-4o-mini"
+                )
+                await analytics.track_api_cost(
+                    service="openai_chat",
+                    model="gpt-4o-mini",
+                    input_tokens=response.usage.prompt_tokens,
+                    output_tokens=response.usage.completion_tokens,
+                    estimated_cost=cost,
+                )
 
             gesture = response.choices[0].message.content.strip().lower()
 

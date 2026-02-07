@@ -14,6 +14,7 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 
 from database import get_db, User, GuestSession
+from analytics import analytics, Analytics
 from config import (
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
@@ -182,6 +183,7 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.google_id == google_id))
     user = result.scalar_one_or_none()
 
+    is_new_user = False
     if user:
         # Update existing user
         user.last_login = datetime.utcnow()
@@ -189,6 +191,7 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
         user.avatar_url = avatar_url
     else:
         # Create new user
+        is_new_user = True
         user = User(
             google_id=google_id,
             email=email,
@@ -199,6 +202,13 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     await db.refresh(user)
+
+    # Track analytics
+    if is_new_user:
+        analytics.track(Analytics.EVENT_SIGNUP, user.id, {"provider": "google"})
+        analytics.identify(user.id, {"email": user.email, "name": user.name})
+    else:
+        analytics.track(Analytics.EVENT_LOGIN, user.id, {"provider": "google"})
 
     # Create JWT token
     token = create_access_token(user.id, user.email)
@@ -310,6 +320,7 @@ async def discord_callback(code: str, db: AsyncSession = Depends(get_db)):
     )
     user = result.scalar_one_or_none()
 
+    is_new_user = False
     if user:
         # Update existing user
         user.last_login = datetime.utcnow()
@@ -319,6 +330,7 @@ async def discord_callback(code: str, db: AsyncSession = Depends(get_db)):
             user.discord_id = discord_id  # Link Discord to existing account
     else:
         # Create new user
+        is_new_user = True
         user = User(
             discord_id=discord_id,
             email=email,
@@ -329,6 +341,13 @@ async def discord_callback(code: str, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     await db.refresh(user)
+
+    # Track analytics
+    if is_new_user:
+        analytics.track(Analytics.EVENT_SIGNUP, user.id, {"provider": "discord"})
+        analytics.identify(user.id, {"email": user.email, "name": user.name})
+    else:
+        analytics.track(Analytics.EVENT_LOGIN, user.id, {"provider": "discord"})
 
     # Create JWT token
     token = create_access_token(user.id, user.email)
