@@ -383,36 +383,7 @@ export default function ChatInterface() {
           />
         </header>
 
-        {/* Connection error banner */}
-        {connectionError && (
-          <div className="mx-4 sm:mx-8 mt-2 pointer-events-auto animate-slideDown">
-            <div className={`flex items-center gap-3 rounded-xl glass border px-4 py-3 text-sm ${
-              connectionError.includes("refresh")
-                ? "border-red-300 text-red-700 dark:border-red-700 dark:text-red-300"
-                : "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300"
-            }`}>
-              {connectionError.includes("refresh") ? (
-                <>
-                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <span className="flex-1">Connection lost. Please refresh the page.</span>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="flex-shrink-0 rounded-lg bg-red-500 px-3 py-1 text-xs font-semibold text-white hover:bg-red-600 active:scale-95 transition-all"
-                  >
-                    Refresh
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500 flex-shrink-0" />
-                  <span>Mona is reconnecting...</span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Connection error — shown inline in header status */}
 
         {/* Floating chat bubbles */}
         <FloatingBubbles
@@ -449,8 +420,22 @@ export default function ChatInterface() {
               />
               {/* Outfit menu (opened from context menu) */}
               {showOutfitMenu && (
-                <div className="absolute bottom-14 left-0 w-52 rounded-2xl glass border border-slate-300 p-3 animate-fadeInScale dark:border-slate-500 z-20">
-                  <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Avatar</p>
+                <>
+                  {/* Backdrop to close on outside click */}
+                  <div className="fixed inset-0 z-10" onClick={() => setShowOutfitMenu(false)} />
+                  <div className="absolute bottom-14 left-0 w-52 rounded-2xl glass border border-slate-300 p-3 animate-fadeInScale dark:border-slate-500 z-20">
+                    {/* Close button */}
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Avatar</p>
+                      <button
+                        onClick={() => setShowOutfitMenu(false)}
+                        className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100/60 transition-colors dark:hover:text-slate-200 dark:hover:bg-slate-700/60"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   {AVATAR_OPTIONS.map((avatar) => (
                     <label
                       key={avatar.id}
@@ -507,7 +492,8 @@ export default function ChatInterface() {
                     />
                     <span className="text-sm text-slate-700 font-medium dark:text-slate-200">Lingerie</span>
                   </label>
-                </div>
+                  </div>
+                </>
               )}
             </div>
 

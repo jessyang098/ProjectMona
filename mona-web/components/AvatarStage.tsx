@@ -138,7 +138,6 @@ const getPresetKey = (viewMode: "portrait" | "full"): keyof typeof VIEW_PRESETS 
 function CameraController({ viewMode, affectionLevel = "distant" }: { viewMode: "portrait" | "full"; affectionLevel?: string }) {
   const { camera } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const lastLogTime = useRef(0);
 
   // Get the appropriate preset based on device and view mode
   const presetKey = getPresetKey(viewMode);
@@ -181,29 +180,6 @@ function CameraController({ viewMode, affectionLevel = "distant" }: { viewMode: 
     animate();
   }, [presetKey, camera, fovOffset]);
 
-  // Log camera position on change (throttled to avoid spam)
-  const handleCameraChange = () => {
-    const now = Date.now();
-    if (now - lastLogTime.current < 500) return; // Throttle to every 500ms
-    lastLogTime.current = now;
-
-    const perspCamera = camera as THREE.PerspectiveCamera;
-    const target = controlsRef.current?.target;
-    console.log("📷 Camera position:", {
-      position: {
-        x: camera.position.x.toFixed(3),
-        y: camera.position.y.toFixed(3),
-        z: camera.position.z.toFixed(3),
-      },
-      target: target ? {
-        x: target.x.toFixed(3),
-        y: target.y.toFixed(3),
-        z: target.z.toFixed(3),
-      } : null,
-      fov: perspCamera.fov.toFixed(1),
-    });
-  };
-
   return (
     <OrbitControls
       ref={controlsRef}
@@ -218,7 +194,6 @@ function CameraController({ viewMode, affectionLevel = "distant" }: { viewMode: 
       maxPolarAngle={Math.PI / 1.5}
       enableDamping={true}
       dampingFactor={0.05}
-      onChange={handleCameraChange}
     />
   );
 }

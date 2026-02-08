@@ -236,20 +236,20 @@ export default function ShopModal({ isOpen, onClose, isAuthenticated = false, on
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] rounded-3xl bg-white border border-slate-200 flex flex-col overflow-hidden animate-fadeIn"
+        className="relative w-full max-w-2xl max-h-[90vh] rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 flex flex-col overflow-hidden animate-fadeIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="relative px-6 pt-6 pb-4">
-          <div className="absolute inset-0 bg-gradient-to-b from-pink-50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-pink-50 to-transparent dark:from-pink-950/20" />
           <div className="relative flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Shop</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Customize your experience</p>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Shop</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Customize your experience</p>
             </div>
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600 dark:hover:text-slate-300"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -258,7 +258,7 @@ export default function ShopModal({ isOpen, onClose, isAuthenticated = false, on
           </div>
 
           {/* Tabs */}
-          <div className="relative mt-6 flex gap-1 rounded-2xl bg-slate-100 p-1">
+          <div className="relative mt-6 flex gap-1 rounded-2xl bg-slate-100 dark:bg-slate-700 p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -266,7 +266,7 @@ export default function ShopModal({ isOpen, onClose, isAuthenticated = false, on
                 className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                   activeTab === tab.id
                     ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white"
-                    : "text-slate-500 hover:text-slate-700"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
                 <span>{tab.icon}</span>
@@ -287,13 +287,13 @@ export default function ShopModal({ isOpen, onClose, isAuthenticated = false, on
         {/* Login Prompt Overlay */}
         {showLoginPrompt && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-black/60 backdrop-blur-sm">
-            <div className="mx-4 max-w-sm rounded-2xl bg-white p-6 text-center border border-slate-200">
+            <div className="mx-4 max-w-sm rounded-2xl bg-white dark:bg-slate-800 p-6 text-center border border-slate-200 dark:border-slate-600">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100">
                 <svg className="h-8 w-8 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Sign in to Purchase</h3>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Sign in to Purchase</h3>
               <p className="mt-2 text-sm text-slate-500">
                 Create an account or sign in to purchase items and unlock premium features.
               </p>
@@ -328,7 +328,7 @@ function CharactersTab({ onPurchase }: { onPurchase: () => void }) {
           className={`group relative overflow-hidden rounded-2xl border-2 transition-all ${
             character.owned
               ? "border-pink-200 bg-pink-50/50"
-              : "border-slate-200 bg-white hover:border-slate-300"
+              : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-slate-500"
           }`}
         >
           <div className="flex gap-4 p-4">
@@ -354,7 +354,7 @@ function CharactersTab({ onPurchase }: { onPurchase: () => void }) {
             {/* Info */}
             <div className="flex flex-1 flex-col justify-center">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-slate-900">{character.name}</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{character.name}</h3>
                 {character.owned && (
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                     Active
@@ -404,7 +404,7 @@ function OutfitsTab({ onPurchase }: { onPurchase: () => void }) {
           className={`group relative overflow-hidden rounded-2xl border-2 transition-all ${
             outfit.owned
               ? "border-pink-200 bg-pink-50/50"
-              : "border-slate-200 bg-white hover:border-slate-300"
+              : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-slate-500"
           }`}
         >
           {/* Outfit Preview */}
@@ -474,7 +474,7 @@ function VoicesTab({ onPurchase }: { onPurchase: () => void }) {
           className={`group relative overflow-hidden rounded-2xl border-2 transition-all ${
             voice.owned
               ? "border-pink-200 bg-pink-50"
-              : "border-slate-200 bg-white hover:border-slate-300"
+              : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-slate-500"
           }`}
         >
           <div className="flex items-center gap-4 p-4">
@@ -565,7 +565,7 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
                   ? "border-transparent"
                   : tier.highlight
                   ? "border-pink-400 bg-gradient-to-b from-pink-50 to-white"
-                  : "border-slate-200 bg-white hover:border-slate-300"
+                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-slate-500"
               }`}
             >
               {/* Badge */}
@@ -580,7 +580,7 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
               {/* Content */}
               <div className={`flex flex-1 flex-col p-5 ${tier.badge ? "pt-8" : ""}`}>
                 {/* Tier name */}
-                <h3 className="text-lg font-bold text-slate-900">{tier.name}</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{tier.name}</h3>
 
                 {/* Price */}
                 <div className="mt-2">
@@ -594,7 +594,7 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
                         {tier.originalPrice && (
                           <span className="text-sm text-slate-400 line-through">${tier.originalPrice}</span>
                         )}
-                        <span className="text-3xl font-bold text-slate-900">${tier.price}</span>
+                        <span className="text-3xl font-bold text-slate-900 dark:text-white">${tier.price}</span>
                       </div>
                       <p className="text-sm text-slate-500">per {tier.period}</p>
                     </>
@@ -626,7 +626,7 @@ function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       )}
-                      <span className={feature.included ? "text-slate-700" : "text-slate-400"}>
+                      <span className={feature.included ? "text-slate-700 dark:text-slate-200" : "text-slate-400 dark:text-slate-500"}>
                         {feature.text}
                       </span>
                     </li>

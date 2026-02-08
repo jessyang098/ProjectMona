@@ -63,12 +63,12 @@ export default function LoginPrompt({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Inner white card */}
-        <div className="relative w-full rounded-3xl bg-white/95 p-8">
+        <div className="relative w-full rounded-3xl bg-white/95 dark:bg-slate-800/95 p-8">
           {/* Close button - hidden on initial prompt */}
           {!isInitialPrompt && (
             <button
               onClick={onClose}
-              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600 dark:hover:text-slate-300"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -86,19 +86,19 @@ export default function LoginPrompt({
             </div>
 
             {/* Title */}
-            <h2 className="mb-2 text-2xl font-bold text-slate-900 tracking-tight">
+            <h2 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               {getTitle()}
             </h2>
 
             {/* Description */}
-            <p className="mb-6 text-slate-500 text-[15px] leading-relaxed max-w-sm mx-auto">
+            <p className="mb-6 text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed max-w-sm mx-auto">
               {getDescription()}
             </p>
 
             {/* Benefits - vertical stack with 4 items */}
-            <div className="mb-6 flex flex-col gap-3 text-sm text-slate-600">
+            <div className="mb-6 flex flex-col gap-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                   {/* Infinity icon */}
                   <svg className="h-3 w-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z" />
@@ -107,7 +107,7 @@ export default function LoginPrompt({
                 <span>Unlimited messages</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                   {/* Brain icon */}
                   <svg className="h-3 w-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9.5 2a3.5 3.5 0 0 0-3.21 2.1A3.5 3.5 0 0 0 4 7.5c0 .98.4 1.86 1.05 2.5A3.5 3.5 0 0 0 4 12.5a3.5 3.5 0 0 0 2.29 3.4A3.5 3.5 0 0 0 9.5 19h0a3.5 3.5 0 0 0 2.5-1.05" />
@@ -118,7 +118,7 @@ export default function LoginPrompt({
                 <span>She remembers you</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                   {/* Speaker / volume icon */}
                   <svg className="h-3 w-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 5L6 9H2v6h4l5 4V5z" />
@@ -128,7 +128,7 @@ export default function LoginPrompt({
                 <span>Voice responses</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                   {/* Heart / grows closer icon */}
                   <svg className="h-3 w-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -141,7 +141,7 @@ export default function LoginPrompt({
             {/* Google Sign In Button */}
             <button
               onClick={login}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 font-medium text-slate-700 transition-all hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 font-medium text-slate-700 transition-all hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-600 dark:hover:border-slate-500"
             >
               {/* Google Icon */}
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -181,13 +181,13 @@ export default function LoginPrompt({
             {isInitialPrompt && onTryForFree && (
               <>
                 <div className="my-5 flex items-center gap-4">
-                  <div className="h-px flex-1 bg-slate-200" />
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-600" />
                   <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">or</span>
-                  <div className="h-px flex-1 bg-slate-200" />
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-600" />
                 </div>
                 <button
                   onClick={onTryForFree}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 font-medium text-slate-600 transition-all hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98]"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 font-medium text-slate-600 transition-all hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98] dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600"
                 >
                   Try for free
                   <span className="ml-2 text-xs text-slate-400">(10 free messages)</span>

@@ -39,7 +39,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Settings button - always visible */}
         <button
           onClick={onOpenSettings}
-          className="flex h-10 w-10 items-center justify-center rounded-xl glass border border-slate-300/50 text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95 dark:border-slate-500/50 dark:text-slate-100"
+          className="flex h-10 w-10 items-center justify-center rounded-xl glass border border-slate-300 text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
           title="Settings"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Shop button - always visible */}
         <button
           onClick={onOpenShop}
-          className="flex h-10 w-10 items-center justify-center rounded-xl glass border border-slate-300/50 text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95 dark:border-slate-500/50 dark:text-slate-100"
+          className="flex h-10 w-10 items-center justify-center rounded-xl glass border border-slate-300 text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
           title="Shop"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,10 +62,10 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Sign in button */}
         <button
           onClick={onOpenLogin}
-          className="inline-flex items-center gap-2 rounded-xl glass border border-slate-300/50 px-3 py-2.5 text-sm text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95 dark:border-slate-500/50 dark:text-slate-100"
+          className="inline-flex items-center gap-2 rounded-xl glass border border-slate-300 px-3 py-2.5 text-sm text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
         >
           {guestMessagesRemaining !== null && (
-            <span className={`text-xs ${guestMessagesRemaining <= 3 ? "text-amber-300" : "text-white/60"}`}>
+            <span className={`text-xs ${guestMessagesRemaining <= 3 ? "text-amber-600 dark:text-amber-300" : "text-slate-400 dark:text-slate-500"}`}>
               {guestMessagesRemaining} left
             </span>
           )}
@@ -80,7 +80,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
     <div ref={menuRef} className="relative pointer-events-auto">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-xl glass border border-slate-300/50 p-1.5 pr-3 text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:scale-95 dark:border-slate-500/50 dark:text-slate-100"
+        className="flex items-center gap-2 rounded-xl glass border border-slate-300 p-1.5 pr-3 text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
       >
         {/* User avatar */}
         {user?.avatarUrl ? (
