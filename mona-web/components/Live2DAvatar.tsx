@@ -306,7 +306,7 @@ export default function Live2DAvatar({
     // Subtle body sway
     const bodyX = Math.sin(state.headTimer * 0.2) * 2;
     setParam(model, IDLE_PARAMS.bodyAngleX, bodyX);
-  }, [setParam]);
+  }, [setParam, hideWatermark]);
 
   // Initialize PixiJS and Live2D
   useEffect(() => {
@@ -542,7 +542,7 @@ export default function Live2DAvatar({
         appRef.current = null;
       }
     };
-  }, [modelUrl, updateIdleAnimations, applyLipSync, hideWatermark]);
+  }, [modelUrl, updateIdleAnimations, applyLipSync, hideWatermark, findParam]);
 
   // Handle emotion changes
   useEffect(() => {

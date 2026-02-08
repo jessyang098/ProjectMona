@@ -1,8 +1,9 @@
 "use client";
 
+import React from "react";
 import { useToast, ToastType } from "@/contexts/ToastContext";
 
-const config: Record<ToastType, { border: string; iconColor: string; icon: JSX.Element }> = {
+const config: Record<ToastType, { border: string; iconColor: string; icon: React.ReactNode }> = {
   error: {
     border: "border-l-red-500",
     iconColor: "text-red-500",

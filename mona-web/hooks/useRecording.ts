@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { TtsEngine, LipSyncMode } from "@/components/SettingsModal";
+import { ToastType } from "@/contexts/ToastContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -11,7 +12,7 @@ interface UseRecordingDeps {
   ttsEngine: TtsEngine;
   lipSyncMode: LipSyncMode;
   enableAudio: () => Promise<void>;
-  showToast?: (msg: string, type?: string) => void;
+  showToast?: (msg: string, type?: ToastType) => void;
 }
 
 export function useRecording({ isConnected, sendMessage, ttsEngine, lipSyncMode, enableAudio, showToast }: UseRecordingDeps) {

@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { TtsEngine, LipSyncMode, PersonalityType } from "@/components/SettingsModal";
+import { ToastType } from "@/contexts/ToastContext";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-export function useTTSSettings(showToast?: (msg: string, type?: string) => void) {
+export function useTTSSettings(showToast?: (msg: string, type?: ToastType) => void) {
   const [ttsEngine, setTtsEngine] = useState<TtsEngine>("sovits");
   const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>("textbased");
   const [personality, setPersonality] = useState<PersonalityType>("girlfriend");

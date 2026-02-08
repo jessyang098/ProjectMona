@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { ToastType } from "@/contexts/ToastContext";
 
 interface SelectedImage {
   file: File;
@@ -8,7 +9,7 @@ interface SelectedImage {
   base64: string;
 }
 
-export function useImageUpload(showToast?: (msg: string, type?: string) => void) {
+export function useImageUpload(showToast?: (msg: string, type?: ToastType) => void) {
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
