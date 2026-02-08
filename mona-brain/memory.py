@@ -18,6 +18,8 @@ from typing import Dict, List, Optional
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
+from semantic_memory import SemanticMemoryStore
+
 
 class MemoryCategory(str, Enum):
     """Types of memories Mona can store."""
@@ -111,6 +113,7 @@ class MemoryManager:
         self._memories: Dict[str, List[MemoryItem]] = {}
         self._pending_save: Dict[str, List[MemoryItem]] = {}  # Memories needing DB save
         self._pending_deprecate: Dict[str, List[str]] = {}  # Keys to deprecate in DB
+        self.semantic = SemanticMemoryStore()
 
     def _get_user_memories(self, user_id: str) -> List[MemoryItem]:
         return self._memories.setdefault(user_id, [])
@@ -183,6 +186,9 @@ class MemoryManager:
         )
         memories = self._get_user_memories(user_id)
         memories.append(memory)
+
+        # Index in semantic search
+        self.semantic.index_memory(user_id, memory.content, key=memory.key)
 
         # Track new memories that need to be saved to DB
         if not from_db:
@@ -457,8 +463,32 @@ class MemoryManager:
 
         return [m for _, m in scored[:limit]]
 
-    def build_context_block(self, user_id: str, limit: int = 5) -> str:
-        """Create a bullet list suitable for LLM system prompts."""
+    def build_context_block(
+        self, user_id: str, limit: int = 5, *, query: Optional[str] = None
+    ) -> str:
+        """Create a bullet list suitable for LLM system prompts.
+
+        If *query* is provided and a semantic index exists, retrieves the most
+        relevant memories for the query.  Otherwise falls back to recent memories.
+        """
+        if query and self.semantic.has_index(user_id):
+            relevant_texts = self.semantic.search(user_id, query, top_k=limit)
+            if relevant_texts:
+                # Match texts back to MemoryItems for formatting
+                active = [
+                    m for m in self._memories.get(user_id, [])
+                    if m.status == "active" and not m.is_expired()
+                ]
+                text_to_mem = {m.content: m for m in active}
+                bullets = []
+                for text in relevant_texts:
+                    mem = text_to_mem.get(text)
+                    if mem:
+                        bullets.append(mem.to_bullet())
+                    else:
+                        bullets.append(f"- {text}")
+                return "\n".join(bullets)
+
         memories = self.get_recent_memories(user_id, limit)
         if not memories:
             return ""
@@ -472,10 +502,12 @@ class MemoryManager:
             if mem.key == key and mem.status == "active":
                 mem.status = "deprecated"
                 break
+        self.semantic.remove_memory(user_id, key)
 
     def clear(self, user_id: str):
         """Forget everything about a user (used when clearing history)."""
         self._memories.pop(user_id, None)
+        self.semantic.clear(user_id)
 
     def load_from_db_records(self, user_id: str, db_memories: List[dict]):
         """Load memories from database records into the in-memory cache."""

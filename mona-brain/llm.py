@@ -131,10 +131,12 @@ class MonaLLM:
         user_msg_count = sum(1 for m in conversation if m.role == "user")
         return user_msg_count < 3
 
-    def _build_system_prompt(self, user_id: str) -> str:
+    def _build_system_prompt(self, user_id: str, *, current_query: str | None = None) -> str:
         """Build the full system prompt including onboarding context if needed."""
         emotion_state = self._get_emotion_engine(user_id).get_current_emotion()
-        memory_context = self.memory_manager.build_context_block(user_id)
+        memory_context = self.memory_manager.build_context_block(
+            user_id, query=current_query
+        )
         affection_state = self.affection_engine.describe_state(user_id)
         user_name = self._get_user_name(user_id)
 
@@ -170,11 +172,12 @@ let your personality unfold over the first few messages. Make them want to come 
             self.emotion_engines[user_id] = EmotionEngine()
         return self.emotion_engines[user_id]
 
-    def _update_system_prompt(self, user_id: str):
+    def _update_system_prompt(self, user_id: str, *, current_query: str | None = None):
         """Update system prompt based on current state"""
         conversation = self.conversations[user_id]
         conversation[0] = ConversationMessage(
-            role="system", content=self._build_system_prompt(user_id)
+            role="system",
+            content=self._build_system_prompt(user_id, current_query=current_query),
         )
 
     async def _summarize_trimmed(
@@ -300,7 +303,7 @@ let your personality unfold over the first few messages. Make them want to come 
         self.affection_engine.update_affection(user_id, user_message)
         self.memory_manager.process_user_message(user_id, user_message)
 
-        self._update_system_prompt(user_id)
+        self._update_system_prompt(user_id, current_query=user_message)
 
         # Add user message with optional image
         conversation.append(ConversationMessage(
