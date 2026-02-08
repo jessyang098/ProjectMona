@@ -63,7 +63,7 @@ export interface AudioSegment {
 }
 
 export interface WebSocketMessage {
-  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "audio_chunk" | "audio_complete" | "audio_segment" | "auth_status" | "chat_history" | "guest_limit_reached";
+  type: "message" | "message_chunk" | "typing" | "error" | "audio_ready" | "audio_chunk" | "audio_complete" | "audio_segment" | "auth_status" | "chat_history" | "guest_limit_reached" | "affection_update" | "pong";
   content?: string;
   sender?: "user" | "mona";
   timestamp?: string;
@@ -91,4 +91,8 @@ export interface WebSocketMessage {
   messages?: Array<{ content: string; sender: string; timestamp: string; emotion?: EmotionData }>;
   messagesUsed?: number;
   messageLimit?: number;
+  // Affection fields
+  affection?: { score: number; level: string };
+  level?: string;   // For affection_update messages
+  score?: number;   // For affection_update messages
 }

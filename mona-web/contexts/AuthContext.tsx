@@ -23,7 +23,7 @@ interface AuthContextType {
   login: () => void;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
-  updateGuestStatus: (remaining: number) => void;
+  updateGuestStatus: (remaining: number, limit?: number) => void;
   setGuestLimitReached: (reached: boolean) => void;
   resetGuestSession: () => string;
 }
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
   const [guestMessagesRemaining, setGuestMessagesRemaining] = useState<number | null>(null);
-  const [guestMessageLimit] = useState(10);
+  const [guestMessageLimit, setGuestMessageLimit] = useState(25);
   const [isGuestLimitReached, setIsGuestLimitReached] = useState(false);
 
   // Check authentication status on mount
@@ -148,8 +148,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser);
   }, []);
 
-  const updateGuestStatus = useCallback((remaining: number) => {
+  const updateGuestStatus = useCallback((remaining: number, limit?: number) => {
     setGuestMessagesRemaining(remaining);
+    if (limit !== undefined) {
+      setGuestMessageLimit(limit);
+    }
     if (remaining <= 0) {
       setIsGuestLimitReached(true);
     }
@@ -160,10 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newSessionId = `guest-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     localStorage.setItem("mona_guest_session_id", newSessionId);
     setGuestSessionId(newSessionId);
-    setGuestMessagesRemaining(10);
+    setGuestMessagesRemaining(guestMessageLimit);
     setIsGuestLimitReached(false);
     return newSessionId;
-  }, []);
+  }, [guestMessageLimit]);
 
   return (
     <AuthContext.Provider

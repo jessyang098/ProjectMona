@@ -6,7 +6,9 @@ LLM Integration for Mona
 Handles OpenAI GPT API calls and conversation management.
 """
 
+import asyncio
 import os
+from datetime import datetime
 from typing import List, Dict, Optional, AsyncGenerator
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -116,21 +118,46 @@ class MonaLLM:
         info = self.user_info.get(user_id)
         return info.get("name") if info else None
 
+    def _is_first_meeting(self, user_id: str) -> bool:
+        """Check if this is the first interaction with this user.
+
+        True when: no memories exist and fewer than 3 user messages in conversation.
+        """
+        has_memories = bool(self.memory_manager.get_recent_memories(user_id, limit=1))
+        if has_memories:
+            return False
+
+        conversation = self.conversations.get(user_id, [])
+        user_msg_count = sum(1 for m in conversation if m.role == "user")
+        return user_msg_count < 3
+
+    def _build_system_prompt(self, user_id: str) -> str:
+        """Build the full system prompt including onboarding context if needed."""
+        emotion_state = self._get_emotion_engine(user_id).get_current_emotion()
+        memory_context = self.memory_manager.build_context_block(user_id)
+        affection_state = self.affection_engine.describe_state(user_id)
+        user_name = self._get_user_name(user_id)
+
+        system_prompt = self.personality.get_system_prompt(
+            emotion_state,
+            memory_context=memory_context,
+            affection_state=affection_state,
+            user_name=user_name,
+        )
+
+        if self._is_first_meeting(user_id):
+            system_prompt += """
+
+FIRST MEETING: You're meeting this person for the first time. Introduce yourself naturally.
+Ask what they'd like you to call them. Be curious about who they are. Don't overwhelm -
+let your personality unfold over the first few messages. Make them want to come back."""
+
+        return system_prompt
+
     def _get_or_create_conversation(self, user_id: str) -> List[ConversationMessage]:
         """Get or create conversation history for a user"""
         if user_id not in self.conversations:
-            # Initialize with system prompt
-            emotion_state = self._get_emotion_engine(user_id).get_current_emotion()
-            memory_context = self.memory_manager.build_context_block(user_id)
-            affection_state = self.affection_engine.describe_state(user_id)
-            user_name = self._get_user_name(user_id)
-            system_prompt = self.personality.get_system_prompt(
-                emotion_state,
-                memory_context=memory_context,
-                affection_state=affection_state,
-                user_name=user_name,
-            )
-
+            system_prompt = self._build_system_prompt(user_id)
             self.conversations[user_id] = [
                 ConversationMessage(role="system", content=system_prompt)
             ]
@@ -144,21 +171,55 @@ class MonaLLM:
         return self.emotion_engines[user_id]
 
     def _update_system_prompt(self, user_id: str):
-        """Update system prompt based on current emotion"""
+        """Update system prompt based on current state"""
         conversation = self.conversations[user_id]
-        emotion_state = self._get_emotion_engine(user_id).get_current_emotion()
-        memory_context = self.memory_manager.build_context_block(user_id)
-        affection_state = self.affection_engine.describe_state(user_id)
-        user_name = self._get_user_name(user_id)
-        new_system_prompt = self.personality.get_system_prompt(
-            emotion_state,
-            memory_context=memory_context,
-            affection_state=affection_state,
-            user_name=user_name,
+        conversation[0] = ConversationMessage(
+            role="system", content=self._build_system_prompt(user_id)
         )
 
-        # Update the system message (always first in conversation)
-        conversation[0] = ConversationMessage(role="system", content=new_system_prompt)
+    async def _summarize_trimmed(
+        self, user_id: str, trimmed: List[ConversationMessage]
+    ):
+        """Summarize trimmed conversation messages and store as memory."""
+        try:
+            transcript = "\n".join(
+                f"{msg.role}: {msg.content}" for msg in trimmed if msg.content
+            )
+            if not transcript.strip():
+                return
+
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Summarize this conversation excerpt in 2-3 sentences. "
+                        "Focus on key topics discussed, decisions made, and emotional moments. "
+                        "Write from a third-person perspective.",
+                    },
+                    {"role": "user", "content": transcript},
+                ],
+                temperature=0.3,
+                max_tokens=150,
+            )
+
+            summary = response.choices[0].message.content
+            if summary:
+                from memory import MemoryCategory
+
+                self.memory_manager.remember(
+                    user_id,
+                    f"Earlier conversation: {summary}",
+                    category=MemoryCategory.FACT,
+                    importance=40,
+                    confidence=0.8,
+                    key=f"conversation_summary_{int(datetime.now().timestamp())}",
+                    value=summary,
+                )
+                print(f"📝 Stored conversation summary for {user_id[:8]}...")
+
+        except Exception as e:
+            print(f"⚠ Failed to summarize trimmed messages: {e}")
 
     async def stream_response(
         self,
@@ -249,8 +310,16 @@ class MonaLLM:
         ))
 
         if len(conversation) > self.max_history:
+            # Capture messages being trimmed (skip system prompt at index 0)
+            trim_count = len(conversation) - self.max_history
+            trimmed = conversation[1:1 + trim_count]
+
             conversation = [conversation[0]] + conversation[-(self.max_history - 1):]
             self.conversations[user_id] = conversation
+
+            # Summarize trimmed messages in background
+            if trimmed:
+                asyncio.create_task(self._summarize_trimmed(user_id, trimmed))
 
         # Build messages for API - handle vision format for images
         messages = []
@@ -274,10 +343,10 @@ class MonaLLM:
             stream = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.9,
-                max_tokens=200,
-                presence_penalty=0.6,
-                frequency_penalty=0.3,
+                temperature=0.75,
+                max_tokens=150,
+                presence_penalty=0.5,
+                frequency_penalty=0.4,
                 stream=True,
                 stream_options={"include_usage": True},
             )
@@ -310,6 +379,25 @@ class MonaLLM:
                     estimated_cost=cost,
                 )
             emotion_data = emotion_engine.get_emotion_for_expression()
+
+            # After streaming completes, run LLM-based analysis in background
+            # This refines emotion/affection/memory for the NEXT response
+            _client = self.client
+            _affection = self.affection_engine
+            _memory = self.memory_manager
+            _user_msg = user_message
+            _assistant_msg = assistant_message
+            _uid = user_id
+
+            async def _post_response_analysis():
+                try:
+                    await emotion_engine.analyze_message_llm(_client, _user_msg, _assistant_msg)
+                    await _affection.update_affection_llm(_client, _uid, _user_msg, _assistant_msg)
+                    await _memory.extract_memories_llm(_client, _uid, _user_msg)
+                except Exception as e:
+                    print(f"⚠ Background analysis failed: {e}")
+
+            asyncio.create_task(_post_response_analysis())
 
             # Check for direct gesture test command (test:wave, test:clapping, etc.)
             forced_gesture = self._check_gesture_test_command(user_message)
@@ -455,6 +543,21 @@ Respond with ONLY the gesture name, nothing else."""
         """Get memory keys that need to be deprecated in database."""
         return self.memory_manager.get_pending_deprecations(user_id)
 
+    def deprecate_memory(self, user_id: str, key: str):
+        """Deprecate a memory in the in-memory cache."""
+        self.memory_manager.deprecate_by_key(user_id, key)
+
     def load_memories(self, user_id: str, db_memories: list[dict]):
         """Load memories from database records."""
         self.memory_manager.load_from_db_records(user_id, db_memories)
+
+    def load_affection(self, user_id: str, score: int, level: str):
+        """Initialize affection state from persisted database values."""
+        self.affection_engine.load_from_db(user_id, score, level)
+
+    def get_affection_for_save(self, user_id: str) -> tuple[int, str] | None:
+        """Get current affection state for database persistence."""
+        state = self.affection_engine.get_state(user_id)
+        if state:
+            return (state.score, state.level.value)
+        return None

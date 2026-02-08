@@ -5,7 +5,7 @@ Uses SQLAlchemy with async SQLite support.
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Text, Integer, Float, DateTime, ForeignKey, Index
+from sqlalchemy import String, Text, Integer, Float, DateTime, ForeignKey, Index, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from config import DATABASE_URL
@@ -33,6 +33,10 @@ class User(Base):
     last_message_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Last user message
     proactive_enabled: Mapped[bool] = mapped_column(Integer, default=1)  # SQLite stores as int
     last_proactive_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Last proactive msg from Mona
+
+    # Affection persistence
+    affection_score: Mapped[int] = mapped_column(Integer, default=35)
+    affection_level: Mapped[str] = mapped_column(String(20), default="distant")
 
     # Notification preferences
     email_notifications: Mapped[bool] = mapped_column(Integer, default=1)  # Email when offline
@@ -152,3 +156,22 @@ async def get_db() -> AsyncSession:
     """Get database session."""
     async with async_session() as session:
         yield session
+
+
+async def load_affection_from_db(db: AsyncSession, user_id: str) -> tuple[int, str] | None:
+    """Load affection score and level for a user."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user and user.affection_score is not None:
+        return (user.affection_score, user.affection_level)
+    return None
+
+
+async def save_affection_to_db(db: AsyncSession, user_id: str, score: int, level: str):
+    """Persist affection state to User record."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user:
+        user.affection_score = score
+        user.affection_level = level
+        await db.commit()

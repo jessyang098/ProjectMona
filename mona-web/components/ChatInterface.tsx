@@ -5,70 +5,64 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAudioContext } from "@/hooks/useAudioContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { useAvatarConfig } from "@/hooks/useAvatarConfig";
+import { useTTSSettings } from "@/hooks/useTTSSettings";
+import { useRecording } from "@/hooks/useRecording";
+import { useChatUI } from "@/hooks/useChatUI";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
-import AvatarStage, { OutfitVisibility, AVATAR_OPTIONS, AvatarId } from "./AvatarStage";
+import AvatarStage, { AVATAR_OPTIONS } from "./AvatarStage";
 import LoginPrompt from "./LoginPrompt";
 import UserMenu from "./UserMenu";
 import ProfileModal from "./ProfileModal";
-import SettingsModal, { TtsEngine, LipSyncMode, PersonalityType } from "./SettingsModal";
+import SettingsModal from "./SettingsModal";
 import ShopModal from "./ShopModal";
-import { EmotionData, LipSyncCue } from "@/types/chat";
+import { EmotionData } from "@/types/chat";
 import Image from "next/image";
 import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions, triggerTestSpeak } from "@/lib/poseCommands";
 import { useAnimationState } from "@/hooks/useAnimationState";
+import { useToast } from "@/contexts/ToastContext";
+import ToastContainer from "./Toast";
 
 const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws";
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export default function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
-  const [showChat, setShowChat] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [viewMode, setViewMode] = useState<"portrait" | "full">("full");
-  const [selectedImage, setSelectedImage] = useState<{ file: File; preview: string; base64: string } | null>(null);
-  const [showOutfitMenu, setShowOutfitMenu] = useState(false);
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showShopModal, setShowShopModal] = useState(false);
-  const [isInitialPrompt, setIsInitialPrompt] = useState(false);
   const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
   const [volume, setVolume] = useState(1);
-  const [ttsEngine, setTtsEngine] = useState<TtsEngine>("sovits");
-  const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>("textbased");
-  const [personality, setPersonality] = useState<PersonalityType>("girlfriend");
-  const [isPersonalitySwitching, setIsPersonalitySwitching] = useState(false);
-  const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>({
-    shirt: true,
-    skirt: true,
-    socks: true,
-    shoes: true,
-    colorVariant: false,
-    lingerie: false,
-  });
-  const [selectedAvatar, setSelectedAvatar] = useState<AvatarId>("moe");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
-  const { isAuthenticated, isLoading: isAuthLoading, updateGuestStatus, setGuestLimitReached, resetGuestSession } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading, guestSessionId, updateGuestStatus, setGuestLimitReached, resetGuestSession } = useAuth();
   const { isDarkMode, setDarkMode } = useTheme();
+  const { show: showToast } = useToast();
+
+  // Custom hooks
+  const { selectedImage, imageInputRef, handleImageSelect, clearSelectedImage } = useImageUpload(showToast);
+  const { selectedAvatar, setSelectedAvatar, outfitVisibility, setOutfitVisibility, showOutfitMenu, setShowOutfitMenu } = useAvatarConfig();
+  const { ttsEngine, setTtsEngine, lipSyncMode, setLipSyncMode, personality, isPersonalitySwitching, handlePersonalityChange } = useTTSSettings(showToast);
+  const {
+    showChat, setShowChat,
+    showLoginPrompt, setShowLoginPrompt,
+    showProfileModal, setShowProfileModal,
+    showSettingsModal, setShowSettingsModal,
+    showShopModal, setShowShopModal,
+    isInitialPrompt, setIsInitialPrompt,
+  } = useChatUI({ isAuthLoading, isAuthenticated });
 
   // WebSocket callbacks
   const handleGuestLimitReached = useCallback((messagesUsed: number, messageLimit: number) => {
     setGuestLimitInfo({ messagesUsed, messageLimit });
     setShowLoginPrompt(true);
     setGuestLimitReached(true);
-  }, [setGuestLimitReached]);
+  }, [setGuestLimitReached, setShowLoginPrompt]);
 
-  const handleAuthStatus = useCallback((status: { guestMessagesRemaining: number | null }) => {
+  const handleAuthStatus = useCallback((status: { guestMessagesRemaining: number | null; guestMessageLimit: number | null }) => {
     if (status.guestMessagesRemaining !== null) {
-      updateGuestStatus(status.guestMessagesRemaining);
+      updateGuestStatus(status.guestMessagesRemaining, status.guestMessageLimit ?? undefined);
     }
   }, [updateGuestStatus]);
 
@@ -79,6 +73,8 @@ export default function ChatInterface() {
     isGeneratingAudio,
     latestEmotion,
     guestMessagesRemaining,
+    connectionError,
+    affectionLevel,
     sendMessage,
     audioSegments,
     markSegmentPlaying,
@@ -87,9 +83,29 @@ export default function ChatInterface() {
   } = useWebSocket(WEBSOCKET_URL, {
     onGuestLimitReached: handleGuestLimitReached,
     onAuthStatus: handleAuthStatus,
-  });
+  }, user?.id || guestSessionId || undefined);
   const { initAudioContext } = useAudioContext();
   const { currentAnimation } = useAnimationState();
+
+  // Enable audio on first user interaction
+  const enableAudio = useCallback(async () => {
+    try {
+      await initAudioContext();
+      setAudioEnabled(true);
+    } catch {
+      // Audio init failed silently
+    }
+  }, [initAudioContext]);
+
+  // Recording hook (depends on enableAudio, sendMessage, etc.)
+  const { isRecording, isProcessing, startRecording, stopRecording } = useRecording({
+    isConnected,
+    sendMessage,
+    ttsEngine,
+    lipSyncMode,
+    enableAudio,
+    showToast,
+  });
 
   // Get the latest audio URL and lip sync data
   // Priority: audio segments (sentence-level TTS) > message audio (legacy)
@@ -117,16 +133,6 @@ export default function ChatInterface() {
     }
   }, [currentSegment, markSegmentPlayed]);
 
-  // Enable audio on first user interaction
-  const enableAudio = async () => {
-    try {
-      await initAudioContext();
-      setAudioEnabled(true);
-    } catch {
-      // Audio init failed silently
-    }
-  };
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -134,52 +140,6 @@ export default function ChatInterface() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
-
-  // Show login prompt on initial load for non-authenticated users (after auth check completes)
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      setShowLoginPrompt(true);
-      setIsInitialPrompt(true);
-    }
-  }, [isAuthLoading, isAuthenticated]);
-
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Image must be less than 10MB');
-      return;
-    }
-
-    // Create preview URL
-    const preview = URL.createObjectURL(file);
-
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setSelectedImage({ file, preview, base64 });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const clearSelectedImage = () => {
-    if (selectedImage?.preview) {
-      URL.revokeObjectURL(selectedImage.preview);
-    }
-    setSelectedImage(null);
-    if (imageInputRef.current) {
-      imageInputRef.current.value = '';
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,122 +182,6 @@ export default function ChatInterface() {
       inputRef.current?.blur();
     }
   };
-
-  const startRecording = async () => {
-    if (!audioEnabled) enableAudio(); // Enable audio on first interaction
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await transcribeAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (error) {
-      // Microphone access denied
-      alert('Microphone access denied. Please allow microphone access to use voice input.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const transcribeAudio = async (audioBlob: Blob) => {
-    setIsProcessing(true);
-    try {
-      // Create FormData to send audio to backend
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-
-      // Send to backend for transcription
-      const response = await fetch(`${BACKEND_URL}/transcribe`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Transcription failed');
-      }
-
-      const data = await response.json();
-      const transcribedText = data.text;
-
-      if (transcribedText && transcribedText.trim()) {
-        // Set the text in the input field
-        setInputValue(transcribedText);
-
-        // Automatically send the message
-        if (isConnected) {
-          sendMessage(transcribedText.trim(), undefined, ttsEngine, lipSyncMode);
-          setInputValue(''); // Clear after sending
-        }
-      }
-    } catch (error) {
-      // Transcription failed
-      alert('Failed to transcribe audio. Make sure the backend transcription endpoint is available.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Handle personality switch
-  const handlePersonalityChange = async (newPersonality: PersonalityType) => {
-    if (newPersonality === personality || isPersonalitySwitching) return;
-
-    setIsPersonalitySwitching(true);
-    try {
-      const response = await fetch(`${BACKEND_URL}/personalities/switch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personality_id: newPersonality }),
-      });
-
-      if (response.ok) {
-        setPersonality(newPersonality);
-        // Store preference in localStorage
-        localStorage.setItem("mona_personality", newPersonality);
-      } else {
-        const error = await response.json();
-        console.error("Failed to switch personality:", error);
-        alert("Failed to switch personality. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error switching personality:", error);
-      alert("Failed to switch personality. Please try again.");
-    } finally {
-      setIsPersonalitySwitching(false);
-    }
-  };
-
-  // Load saved personality preference on mount
-  useEffect(() => {
-    const savedPersonality = localStorage.getItem("mona_personality") as PersonalityType | null;
-    if (savedPersonality && (savedPersonality === "girlfriend" || savedPersonality === "mommy")) {
-      setPersonality(savedPersonality);
-      // Sync with backend
-      fetch(`${BACKEND_URL}/personalities/switch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personality_id: savedPersonality }),
-      }).catch(console.error);
-    }
-  }, []);
 
   const emotionLabel = getEmotionLabel(latestEmotion);
 
@@ -404,7 +248,7 @@ export default function ChatInterface() {
         >
           <div className="rounded-3xl border border-slate-200 bg-white/95 px-8 py-6 text-center">
             <svg className="mx-auto h-12 w-12 text-purple-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
             </svg>
             <h3 className="text-xl font-semibold mb-2">Click to Enable Audio</h3>
             <p className="text-sm text-slate-600">Mona wants to say hello!</p>
@@ -433,6 +277,26 @@ export default function ChatInterface() {
                     <span className="font-medium">Linked</span>
                     <span className="text-slate-400 dark:text-slate-500">·</span>
                     <span className="text-slate-500 dark:text-slate-400">{emotionLabel}</span>
+                    <span className="text-slate-400 dark:text-slate-500">·</span>
+                    <span title={affectionLevel.replace('_', ' ')}>
+                      {affectionLevel === "devoted" ? (
+                        <svg className="inline h-3.5 w-3.5 text-red-500 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                      ) : affectionLevel === "close" ? (
+                        <svg className="inline h-3.5 w-3.5 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                      ) : affectionLevel === "warming_up" ? (
+                        <svg className="inline h-3.5 w-3.5 text-pink-300" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                      ) : (
+                        <svg className="inline h-3.5 w-3.5 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                        </svg>
+                      )}
+                    </span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
@@ -452,6 +316,37 @@ export default function ChatInterface() {
             onOpenShop={() => setShowShopModal(true)}
           />
         </header>
+
+        {/* Connection error banner */}
+        {connectionError && (
+          <div className="mx-4 sm:mx-8 mt-2 pointer-events-auto animate-slideDown">
+            <div className={`flex items-center gap-3 rounded-xl glass border px-4 py-3 text-sm ${
+              connectionError.includes("refresh")
+                ? "border-red-300 text-red-700 dark:border-red-700 dark:text-red-300"
+                : "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300"
+            }`}>
+              {connectionError.includes("refresh") ? (
+                <>
+                  <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="flex-1">Connection lost. Please refresh the page.</span>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="flex-shrink-0 rounded-lg bg-red-500 px-3 py-1 text-xs font-semibold text-white hover:bg-red-600 active:scale-95 transition-all"
+                  >
+                    Refresh
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500 flex-shrink-0" />
+                  <span>Mona is reconnecting...</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Chat panel - extends up from the chat button */}
         {showChat && (
@@ -517,7 +412,7 @@ export default function ChatInterface() {
                     className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
@@ -537,7 +432,7 @@ export default function ChatInterface() {
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={!isConnected || isRecording}
-                  className="flex h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 border border-slate-300 transition-all hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100"
+                  className="flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 border border-slate-300 transition-all duration-200 hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100"
                   title="Upload image"
                 >
                   <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -549,7 +444,7 @@ export default function ChatInterface() {
                   type="button"
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={!isConnected || isProcessing}
-                  className={`flex h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 ${
+                  className={`flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-200 active:scale-95 ${
                     isRecording
                       ? 'animate-pulse bg-red-500 text-white border border-red-500'
                       : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100'
@@ -595,7 +490,7 @@ export default function ChatInterface() {
             <button
               type="button"
               onClick={() => setViewMode((prev) => prev === "full" ? "portrait" : "full")}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
               title={viewMode === "full" ? "Switch to portrait view" : "Switch to full view"}
             >
               {viewMode === "full" ? (
@@ -617,12 +512,12 @@ export default function ChatInterface() {
               <button
                 type="button"
                 onClick={() => setShowOutfitMenu((prev) => !prev)}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
                 title="Outfit options"
               >
-                {/* Hanger icon */}
+                {/* Shirt icon */}
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6a2 2 0 100-4 2 2 0 000 4zm0 0l8 8H4l8-8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.5 2L2 7l4.5 1V22h11V8L22 7l-4.5-5h-11z" />
                 </svg>
               </button>
               {/* Outfit menu dropdown */}
@@ -704,13 +599,15 @@ export default function ChatInterface() {
                 if (!audioEnabled) enableAudio(); // Enable audio on first interaction
                 setShowChat((prev) => !prev);
               }}
-              className="flex-shrink-0 rounded-xl glass border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:border-slate-400 hover:bg-white/50 active:scale-95 whitespace-nowrap dark:border-slate-500 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800/50"
+              className="flex-shrink-0 rounded-xl glass border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-slate-400 hover:bg-white/50 active:scale-95 whitespace-nowrap dark:border-slate-500 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800/50"
             >
               {showChat ? "Hide" : "Chat"}
             </button>
           </div>
         </footer>
       </div>
+
+      <ToastContainer />
     </div>
   );
 }
@@ -723,10 +620,3 @@ function getEmotionLabel(emotion: EmotionData | null): string {
   return `${toTitle(emotion.emotion)} · ${toTitle(emotion.intensity)}`;
 }
 
-function formatAnimationName(name: string): string {
-  // Convert snake_case to Title Case (e.g., "standing_idle" -> "Standing Idle")
-  return name
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}

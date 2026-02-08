@@ -10,6 +10,8 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
 
+from openai import AsyncOpenAI
+
 
 class EmotionType(str, Enum):
     """Primary emotion types"""
@@ -208,6 +210,70 @@ class EmotionEngine:
 
         # Default
         return EmotionType.CONTENT
+
+    async def analyze_message_llm(
+        self, client: AsyncOpenAI, user_message: str, mona_response: str
+    ) -> EmotionType:
+        """Use GPT-4o-mini to detect the most appropriate emotion for Mona.
+
+        Runs as a background task after the response is streamed so it has
+        zero latency impact.  Falls back to the keyword-based
+        ``analyze_message()`` on any error.
+        """
+        # Honour the test: command shortcut — check before hitting the LLM
+        message_lower = user_message.lower()
+        if message_lower.startswith("test:"):
+            return self.analyze_message(user_message)
+
+        valid_emotions = ", ".join(e.value for e in EmotionType)
+
+        try:
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You decide what emotion a virtual companion should express. "
+                            f"Valid emotions: {valid_emotions}. "
+                            "Reply with ONLY the emotion name, nothing else."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f'User said: "{user_message}"\n'
+                            f'Companion replied: "{mona_response}"'
+                        ),
+                    },
+                ],
+                temperature=0.1,
+                max_tokens=10,
+            )
+
+            emotion_str = response.choices[0].message.content.strip().lower()
+
+            # Validate against enum
+            try:
+                emotion = EmotionType(emotion_str)
+            except ValueError:
+                emotion = self.analyze_message(user_message)
+
+            # Apply the refined emotion to current state
+            self.emotion_history.append(self.current_state)
+            self.current_state = EmotionState(
+                primary_emotion=emotion,
+                intensity=EmotionIntensity.MEDIUM,
+                timestamp=datetime.now(),
+            )
+            if len(self.emotion_history) > 10:
+                self.emotion_history.pop(0)
+
+            return emotion
+
+        except Exception as e:
+            print(f"⚠ LLM emotion detection failed, using keyword fallback: {e}")
+            return self.analyze_message(user_message)
 
     def update_emotion(self, user_message: str, intensity: EmotionIntensity = EmotionIntensity.MEDIUM):
         """Update Mona's emotion based on user message"""

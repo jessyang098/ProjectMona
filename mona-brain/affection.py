@@ -10,6 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict
 
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 
@@ -87,6 +88,74 @@ class AffectionEngine:
         self._states[user_id] = new_state
         return new_state
 
+    async def analyze_sentiment_llm(
+        self, client: AsyncOpenAI, user_message: str, mona_response: str
+    ) -> int:
+        """Use GPT-4o-mini to score the sentiment delta of a user message.
+
+        Returns a value between -10 and +10.
+        Falls back to ``_delta_from_message()`` on error.
+        """
+        try:
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are scoring how a message affects a virtual companion's affection "
+                            "toward the user. Return a single integer from -10 to +10.\n"
+                            "Examples:\n"
+                            '  "I love pizza" → 2 (positive but not directed at companion)\n'
+                            '  "I love you" → 8 (strong affection toward companion)\n'
+                            '  "You\'re annoying" → -6 (negative toward companion)\n'
+                            '  "Tell me about cats" → 1 (neutral engagement)\n'
+                            "Reply with ONLY the integer, nothing else."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f'User said: "{user_message}"\n'
+                            f'Companion replied: "{mona_response}"'
+                        ),
+                    },
+                ],
+                temperature=0.2,
+                max_tokens=5,
+            )
+
+            raw = response.choices[0].message.content.strip()
+            delta = int(raw)
+            return max(-10, min(10, delta))
+
+        except Exception as e:
+            print(f"⚠ LLM sentiment scoring failed, using keyword fallback: {e}")
+            return self._delta_from_message(user_message)
+
+    async def update_affection_llm(
+        self,
+        client: AsyncOpenAI,
+        user_id: str,
+        user_message: str,
+        mona_response: str,
+    ) -> AffectionState:
+        """LLM-powered affection update.  Runs as a background task."""
+        delta = await self.analyze_sentiment_llm(client, user_message, mona_response)
+        state = self._get_state(user_id)
+        new_score = max(0, min(100, state.score + delta))
+        level = self._score_to_level(new_score)
+        trend = "up" if delta > 0 else "down" if delta < 0 else "steady"
+
+        new_state = AffectionState(
+            score=new_score,
+            level=level,
+            trend=trend,
+            last_interaction=datetime.utcnow(),
+        )
+        self._states[user_id] = new_state
+        return new_state
+
     def describe_state(self, user_id: str) -> str:
         """Return a short human-readable description for prompts."""
 
@@ -98,6 +167,15 @@ class AffectionEngine:
 
     def get_state(self, user_id: str) -> AffectionState:
         return self._get_state(user_id)
+
+    def load_from_db(self, user_id: str, score: int, level: str):
+        """Initialize affection state from database."""
+        self._states[user_id] = AffectionState(
+            score=score,
+            level=AffectionLevel(level),
+            trend="steady",
+            last_interaction=datetime.utcnow(),
+        )
 
     def reset(self, user_id: str):
         self._states.pop(user_id, None)

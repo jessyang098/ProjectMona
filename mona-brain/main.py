@@ -1,78 +1,21 @@
 import asyncio
 import random
 import os
-import time
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from logging_config import setup_logging
 from analytics import analytics, Analytics
+from rate_limiter import rate_limiter
+from pipeline_timer import PipelineTimer
+from connection_manager import ConnectionManager, manager
+from tts_manager import tts_manager
 
 # Setup structured logging
 setup_logging()
 
-
-class RateLimiter:
-    """Simple in-memory rate limiting."""
-
-    def __init__(self, max_requests: int = 100, window_seconds: int = 3600):
-        self.requests: Dict[str, list] = defaultdict(list)
-        self.max_requests = max_requests
-        self.window = window_seconds
-
-    def is_allowed(self, user_id: str) -> bool:
-        """Check if user is within rate limit."""
-        now = time.time()
-        # Clean old requests
-        self.requests[user_id] = [t for t in self.requests[user_id] if now - t < self.window]
-        if len(self.requests[user_id]) >= self.max_requests:
-            return False
-        self.requests[user_id].append(now)
-        return True
-
-
-# Global rate limiter (100 messages per hour)
-rate_limiter = RateLimiter(max_requests=100, window_seconds=3600)
-
-
-class PipelineTimer:
-    """Tracks timing for the message-to-voice pipeline."""
-
-    def __init__(self, client_id: str):
-        self.client_id = client_id
-        self.start_time = time.perf_counter()
-        self.checkpoints: Dict[str, float] = {}
-
-    def checkpoint(self, name: str):
-        """Record a checkpoint time."""
-        self.checkpoints[name] = time.perf_counter()
-
-    def get_elapsed(self, checkpoint_name: str = None) -> float:
-        """Get elapsed time in ms from start or from a checkpoint."""
-        if checkpoint_name and checkpoint_name in self.checkpoints:
-            return (time.perf_counter() - self.checkpoints[checkpoint_name]) * 1000
-        return (time.perf_counter() - self.start_time) * 1000
-
-    def log_summary(self):
-        """Log a summary of all timing checkpoints."""
-        total_ms = self.get_elapsed()
-        print(f"\n{'='*60}")
-        print(f"⏱️  PIPELINE TIMING SUMMARY (Client: {self.client_id[:8]}...)")
-        print(f"{'='*60}")
-
-        prev_time = self.start_time
-        for name, checkpoint_time in self.checkpoints.items():
-            step_ms = (checkpoint_time - prev_time) * 1000
-            total_at_checkpoint = (checkpoint_time - self.start_time) * 1000
-            print(f"  {name:<30} +{step_ms:>7.0f}ms  (total: {total_at_checkpoint:>7.0f}ms)")
-            prev_time = checkpoint_time
-
-        print(f"{'─'*60}")
-        print(f"  {'TOTAL':<30} {total_ms:>8.0f}ms  ({total_ms/1000:.2f}s)")
-        print(f"{'='*60}\n")
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles as BaseStaticFiles
@@ -89,8 +32,8 @@ except ImportError:
     pass  # dotenv is optional
 
 from llm import MonaLLM
-from database import init_db, get_db, User, ChatMessage, GuestSession, async_session
-from auth import router as auth_router, verify_token
+from database import init_db, get_db, User, ChatMessage, GuestSession, async_session, load_affection_from_db, save_affection_to_db
+from auth import router as auth_router, verify_token, get_current_user
 from config import GUEST_MESSAGE_LIMIT
 from personality_loader import load_personality_from_yaml, list_available_personalities
 from tts import MonaTTS
@@ -197,6 +140,15 @@ async def lifespan(_app: FastAPI):
         print(f"⚠ Warning: Could not initialize Whisper - {e}")
         openai_client = None
 
+    # Initialize TTS manager with all available engines
+    tts_manager.initialize(
+        sovits=mona_tts_sovits,
+        fishspeech=mona_tts_fishspeech,
+        cartesia=mona_tts_cartesia,
+        openai_tts=mona_tts,
+    )
+    print("✓ TTS manager initialized")
+
     # Initialize proactive messaging system
     if mona_llm:
         proactive_messenger.set_llm(mona_llm)
@@ -237,7 +189,6 @@ async def lifespan(_app: FastAPI):
             except Exception as e:
                 print(f"⚠ LLM warmup error: {e}")
 
-    import asyncio
     asyncio.create_task(startup_warmup())
 
     yield
@@ -308,30 +259,6 @@ DUMMY_RESPONSES = [
     "I'm here whenever you need someone to talk to.",
     "You seem like a really interesting person!",
 ]
-
-
-class ConnectionManager:
-    """Manages WebSocket connections"""
-
-    def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-
-    async def connect(self, websocket: WebSocket, client_id: str):
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
-        print(f"Client {client_id} connected. Total connections: {len(self.active_connections)}")
-
-    def disconnect(self, client_id: str):
-        if client_id in self.active_connections:
-            del self.active_connections[client_id]
-            print(f"Client {client_id} disconnected. Total connections: {len(self.active_connections)}")
-
-    async def send_message(self, message: dict, client_id: str):
-        if client_id in self.active_connections:
-            await self.active_connections[client_id].send_json(message)
-
-
-manager = ConnectionManager()
 
 
 import re
@@ -406,6 +333,7 @@ async def get_personalities():
 
 class PersonalitySwitchRequest(BaseModel):
     personality_id: str
+    client_id: Optional[str] = None
 
 
 @app.post("/personalities/switch")
@@ -429,8 +357,14 @@ async def switch_personality(request: PersonalitySwitchRequest):
         new_personality = load_personality_from_yaml(archetype=request.personality_id)
         if mona_llm:
             mona_llm.personality = new_personality
-            # Clear all conversation states to apply new personality
-            mona_llm.conversations.clear()
+            if request.client_id:
+                # Only clear the requesting user's conversation
+                mona_llm.conversations.pop(request.client_id, None)
+            else:
+                # Rebuild system prompts for all active conversations
+                # instead of wiping entire conversation history
+                for uid in list(mona_llm.conversations.keys()):
+                    mona_llm._update_system_prompt(uid)
             print(f"✓ Switched personality to: {request.personality_id}")
 
         return {
@@ -479,6 +413,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
     # Use user.id for LLM state so it persists across devices/sessions
     llm_user_id = user.id if user else client_id
+    affection_save_counter = 0
 
     try:
         # Send auth status to client
@@ -501,6 +436,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 } if user else None,
                 "guestMessagesRemaining": guest_messages_remaining if is_guest else None,
                 "guestMessageLimit": GUEST_MESSAGE_LIMIT if is_guest else None,
+                "affection": {
+                    "score": user.affection_score if user else 35,
+                    "level": user.affection_level if user else "distant",
+                },
             }
             await manager.send_message(auth_status, client_id)
 
@@ -510,6 +449,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 print(f"👤 Set user info for LLM: {user.nickname or user.name} (id: {llm_user_id[:8]}...)")
 
             # Load chat history for authenticated users
+            has_history = False
             if user:
                 result = await db.execute(
                     select(ChatMessage)
@@ -519,6 +459,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 )
                 history = result.scalars().all()
                 if history:
+                    has_history = True
                     history_message = {
                         "type": "chat_history",
                         "messages": [
@@ -546,6 +487,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                         mona_llm.load_memories(llm_user_id, db_memories)
                         print(f"🧠 Loaded {len(db_memories)} memories for {user.email}")
 
+                    # Load persisted affection
+                    db_affection = await load_affection_from_db(db, user.id)
+                    if db_affection:
+                        mona_llm.load_affection(llm_user_id, db_affection[0], db_affection[1])
+                        print(f"💕 Loaded affection for {user.email}: score={db_affection[0]}, level={db_affection[1]}")
+
                 # Deliver any pending proactive messages
                 try:
                     delivered = await proactive_messenger.deliver_pending_messages(db, user.id)
@@ -554,14 +501,21 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 except Exception as e:
                     print(f"⚠ Failed to deliver pending messages: {e}")
 
-        # Send welcome message
-        if mona_llm:
-            # Get initial emotion state
+        # Send welcome message (skip for returning users with chat history)
+        if has_history:
+            # Returning user - use "welcome back" instead of intro
+            user_display = user.nickname or user.name if user else None
+            if user_display:
+                welcome_content = f"Hey {user_display}, welcome back~"
+            else:
+                welcome_content = "Hey, you're back~"
+            emotion_data = mona_llm.get_emotion_state(llm_user_id) if mona_llm else {}
+        elif mona_llm:
             emotion_data = mona_llm.get_emotion_state(llm_user_id)
-            welcome_content = "Hi! I'm Mona! I'm so happy to meet you!"
+            welcome_content = "Hey! I'm Mona~ what should I call you?"
         else:
             emotion_data = {}
-            welcome_content = "Hi! I'm Mona! I'm so happy to meet you! (Running in dummy mode)"
+            welcome_content = "Hey! I'm Mona~ what should I call you? (Running in dummy mode)"
 
         welcome_message = {
             "type": "message",
@@ -574,65 +528,24 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
         # Generate welcome voice in background (non-blocking)
         async def generate_welcome_audio():
-            print(f"🎤 [STARTUP AUDIO] Starting audio generation for client {client_id}")
-            print(f"🎤 [STARTUP AUDIO] Text to generate: '{welcome_content}'")
-            audio_url = None
-            lip_sync_data = None
-
-            # Preprocess text to remove problematic phonemes like "tch"
+            print(f"[STARTUP AUDIO] Starting audio generation for client {client_id}")
             tts_text = preprocess_tts_text(welcome_content)
-
-            # Try GPT-SoVITS first (high-quality anime voice)
-            if mona_tts_sovits:
-                print(f"🎤 [STARTUP AUDIO] Attempting GPT-SoVITS generation...")
-                try:
-                    audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text)
-                    print(f"🎤 [STARTUP AUDIO] GPT-SoVITS returned: {audio_path}")
-                    if audio_path:
-                        audio_url = f"/audio/{Path(audio_path).name}"
-                        print(f"✓ [STARTUP AUDIO] Generated startup greeting voice with GPT-SoVITS: {audio_url}")
-                        if lip_sync_data:
-                            print(f"✓ [STARTUP AUDIO] Lip sync data: {len(lip_sync_data)} cues")
-                    else:
-                        print(f"⚠️ [STARTUP AUDIO] GPT-SoVITS returned None")
-                except Exception as e:
-                    print(f"❌ [STARTUP AUDIO] GPT-SoVITS error: {e}")
-            else:
-                print(f"⚠️ [STARTUP AUDIO] GPT-SoVITS not available (mona_tts_sovits is None)")
-
-            # Fall back to OpenAI TTS if SoVITS failed
-            if not audio_url and mona_tts:
-                print(f"🎤 [STARTUP AUDIO] Attempting OpenAI TTS fallback...")
-                try:
-                    audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text)
-                    print(f"🎤 [STARTUP AUDIO] OpenAI TTS returned: {audio_path}")
-                    if audio_path:
-                        audio_url = f"/audio/{Path(audio_path).name}"
-                        # Use OpenAI TTS lip sync if GPT-SoVITS didn't provide any
-                        if not lip_sync_data and openai_lip_sync:
-                            lip_sync_data = openai_lip_sync
-                            print(f"✓ [STARTUP AUDIO] Lip sync from OpenAI TTS: {len(lip_sync_data)} cues")
-                        print(f"✓ [STARTUP AUDIO] Generated startup greeting voice with OpenAI TTS: {audio_url}")
-                    else:
-                        print(f"⚠️ [STARTUP AUDIO] OpenAI TTS returned None")
-                except Exception as e:
-                    print(f"❌ [STARTUP AUDIO] OpenAI TTS error: {e}")
-            elif not audio_url:
-                print(f"⚠️ [STARTUP AUDIO] OpenAI TTS not available (mona_tts is None)")
+            audio_url, lip_sync_data, used_engine, duration = await tts_manager.generate(
+                tts_text, engine_preference="sovits"
+            )
 
             # Send audio update when ready
             if audio_url:
                 audio_update = {
                     "type": "audio_ready",
                     "audioUrl": audio_url,
-                    "lipSync": lip_sync_data,  # Include lip sync timing data
+                    "lipSync": lip_sync_data,
                     "timestamp": datetime.now().isoformat(),
                 }
-                print(f"📤 [STARTUP AUDIO] Sending audio_ready message: {audio_update}")
                 await manager.send_message(audio_update, client_id)
-                print(f"✓ [STARTUP AUDIO] Audio update sent successfully")
+                print(f"[STARTUP AUDIO] Audio update sent successfully")
             else:
-                print(f"❌ [STARTUP AUDIO] No audio URL generated - no audio will be sent")
+                print(f"[STARTUP AUDIO] No audio URL generated - no audio will be sent")
 
         # Start background task
         print(f"🚀 [STARTUP AUDIO] Creating background task for audio generation")
@@ -642,6 +555,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             # Receive message from client
             data = await websocket.receive_text()
             message_data = json.loads(data)
+
+            # Handle heartbeat ping
+            if message_data.get("type") == "ping":
+                await manager.send_message({"type": "pong"}, client_id)
+                continue
 
             # Start pipeline timer
             timer = PipelineTimer(client_id)
@@ -656,14 +574,17 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
             use_lip_sync = lip_sync_mode == "textbased"
             print(f"Lip sync mode: {lip_sync_mode} (enabled={use_lip_sync})")
 
-            # Rate limiting check
-            rate_limit_id = user.id if user else guest_session_id
+            # Rate limiting check (IP-based for guests, user ID for authenticated)
+            client_ip = websocket.client.host if websocket.client else "unknown"
+            rate_limit_id = user.id if not is_guest else f"ip:{client_ip}"
             if not rate_limiter.is_allowed(rate_limit_id):
+                wait_seconds = rate_limiter.get_wait_time(rate_limit_id)
                 rate_limit_message = {
                     "type": "error",
-                    "message": "You're sending messages too quickly. Please slow down.",
+                    "message": f"You're sending messages too quickly! Please wait {max(1, int(wait_seconds))} seconds before trying again.",
                 }
                 await manager.send_message(rate_limit_message, client_id)
+                print(f"Rate limited {rate_limit_id} (wait {wait_seconds:.1f}s)")
                 continue
 
             # Check guest message limit
@@ -770,40 +691,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                             tts_text = preprocess_tts_text(mona_content)
 
                             if tts_text.strip():
-                                # Use selected TTS engine
-                                if tts_engine == "fishspeech" and mona_tts_fishspeech and not mona_tts_fishspeech.mock_mode:
-                                    audio_path, lip_sync_data = await mona_tts_fishspeech.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
-                                    used_engine = "fishspeech"
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-
-                                elif tts_engine == "cartesia" and mona_tts_cartesia and not mona_tts_cartesia.mock_mode:
-                                    audio_path, lip_sync_data = await mona_tts_cartesia.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
-                                    used_engine = "cartesia"
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-
-                                elif tts_engine == "sovits" and mona_tts_sovits:
-                                    audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
-                                    used_engine = "sovits"
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-
-                                # Fall back to sovits if selected engine failed
-                                if not audio_url and mona_tts_sovits:
-                                    audio_path, lip_sync_data = await mona_tts_sovits.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
-                                    used_engine = "sovits"
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-
-                                # Fall back to OpenAI TTS as last resort
-                                if not audio_url and mona_tts:
-                                    audio_path, openai_lip_sync = await mona_tts.generate_speech(tts_text, generate_lip_sync=use_lip_sync)
-                                    used_engine = "openai"
-                                    if audio_path:
-                                        audio_url = f"/audio/{Path(audio_path).name}"
-                                        if not lip_sync_data and openai_lip_sync:
-                                            lip_sync_data = openai_lip_sync
+                                audio_url, lip_sync_data, used_engine, tts_duration = await tts_manager.generate(
+                                    tts_text,
+                                    engine_preference=tts_engine,
+                                    generate_lip_sync=use_lip_sync,
+                                )
 
                             timer.checkpoint("5_tts_complete")
 
@@ -812,7 +704,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                 analytics.track(
                                     Analytics.EVENT_VOICE_USED,
                                     user.id if user else None,
-                                    {"engine": used_engine, "guest_session_id": guest_session_id if is_guest else None}
+                                    {"engine": used_engine, "requested_engine": tts_engine, "guest_session_id": guest_session_id if is_guest else None}
                                 )
 
                             # Send complete message
@@ -832,7 +724,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
 
                             if audio_url:
                                 lip_sync_cue_count = len(lip_sync_data) if lip_sync_data else 0
-                                print(f"🎤 TTS complete | engine={used_engine} | cues={lip_sync_cue_count} | text='{tts_text[:50]}...'")
+                                print(f"TTS complete | engine={used_engine} | cues={lip_sync_cue_count} | text='{tts_text[:50]}...'")
 
                             # Save Mona's response to database (for authenticated users)
                             if user and mona_content:
@@ -858,6 +750,19 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                                             await save_memory_to_db(db, user.id, mem)
                                         if pending_memories:
                                             print(f"🧠 Saved {len(pending_memories)} new memories for {user.email}")
+
+                                        # Save affection state periodically (every 5 messages) to reduce DB writes
+                                        affection_data = mona_llm.get_affection_for_save(llm_user_id)
+                                        if affection_data:
+                                            affection_save_counter += 1
+                                            if affection_save_counter % 5 == 0:
+                                                await save_affection_to_db(db, user.id, affection_data[0], affection_data[1])
+                                            # Always broadcast the update to frontend
+                                            await manager.send_message({
+                                                "type": "affection_update",
+                                                "score": affection_data[0],
+                                                "level": affection_data[1],
+                                            }, client_id)
 
                             # Log timing summary
                             timer.log_summary()
@@ -893,9 +798,24 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 await manager.send_message(response_message, client_id)
 
     except WebSocketDisconnect:
+        # Save affection on disconnect to capture any unsaved updates
+        if user and mona_llm:
+            affection_data = mona_llm.get_affection_for_save(llm_user_id)
+            if affection_data:
+                async with async_session() as db:
+                    await save_affection_to_db(db, user.id, affection_data[0], affection_data[1])
         manager.disconnect(client_id)
     except Exception as e:
         print(f"Error in WebSocket connection: {e}")
+        # Save affection on error disconnect to capture any unsaved updates
+        if user and mona_llm:
+            try:
+                affection_data = mona_llm.get_affection_for_save(llm_user_id)
+                if affection_data:
+                    async with async_session() as db:
+                        await save_affection_to_db(db, user.id, affection_data[0], affection_data[1])
+            except Exception:
+                pass  # Don't let save failure mask the original error
         manager.disconnect(client_id)
 
 
@@ -936,6 +856,37 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             status_code=500,
             content={"error": str(e)}
         )
+
+
+@app.get("/memories")
+async def get_memories(user: User = Depends(get_current_user)):
+    """Get active memories for the authenticated user."""
+    from fastapi.responses import JSONResponse
+
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    async with async_session() as db:
+        memories = await load_memories_from_db(db, user.id, limit=30)
+        return {"memories": memories}
+
+
+@app.delete("/memories/{memory_key}")
+async def delete_memory(memory_key: str, user: User = Depends(get_current_user)):
+    """Delete a specific memory by key."""
+    from fastapi.responses import JSONResponse
+
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    async with async_session() as db:
+        await deprecate_memories_by_key(db, user.id, [memory_key])
+
+    # Also update in-memory cache so Mona stops referencing this memory immediately
+    if mona_llm:
+        mona_llm.deprecate_memory(user.id, memory_key)
+
+    return {"success": True}
 
 
 if __name__ == "__main__":

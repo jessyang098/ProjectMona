@@ -9,11 +9,13 @@ and confidence scoring.
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional
 
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 
@@ -344,6 +346,74 @@ class MemoryManager:
 
         return memories
 
+    async def extract_memories_llm(
+        self, client: AsyncOpenAI, user_id: str, user_message: str
+    ) -> List[MemoryItem]:
+        """Use GPT-4o-mini to extract personal facts, preferences, and events.
+
+        Runs as a background task after the response is streamed.
+        Falls back to ``process_user_message()`` on error.
+        """
+        if not user_message.strip():
+            return []
+
+        valid_categories = ", ".join(c.value for c in MemoryCategory)
+
+        try:
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Extract personal facts, preferences, and events from the user's message. "
+                            "Return a JSON object with a single key \"memories\" containing an array. "
+                            "Each element has: key (str, unique identifier like 'name', 'favorite_color', "
+                            "'likes:cats'), value (str, the actual value), content (str, natural language "
+                            "sentence), category (one of: " + valid_categories + "), importance (int 0-100), "
+                            "confidence (float 0.0-1.0).\n"
+                            "If nothing worth remembering, return {\"memories\": []}.\n"
+                            "Do NOT extract: workplace/employer, location/address, or transient emotions. "
+                            "Birthday IS allowed."
+                        ),
+                    },
+                    {"role": "user", "content": user_message},
+                ],
+                temperature=0.1,
+                max_tokens=200,
+                response_format={"type": "json_object"},
+            )
+
+            raw = response.choices[0].message.content
+            data = json.loads(raw)
+            items = data.get("memories", [])
+
+            memories: List[MemoryItem] = []
+            for item in items:
+                category_str = item.get("category", "other")
+                try:
+                    category = MemoryCategory(category_str)
+                except ValueError:
+                    category = MemoryCategory.OTHER
+
+                mem = self.remember(
+                    user_id,
+                    item.get("content", ""),
+                    category=category,
+                    importance=int(item.get("importance", 60)),
+                    confidence=float(item.get("confidence", 0.85)),
+                    key=item.get("key"),
+                    value=item.get("value"),
+                )
+                if mem:
+                    memories.append(mem)
+
+            return memories
+
+        except Exception as e:
+            print(f"⚠ LLM memory extraction failed, using regex fallback: {e}")
+            return self.process_user_message(user_id, user_message)
+
     def get_recent_memories(self, user_id: str, limit: int = 5) -> List[MemoryItem]:
         """Return the most recent active, non-expired memories for a user."""
         memories = self._memories.get(user_id, [])
@@ -394,6 +464,14 @@ class MemoryManager:
             return ""
         bullets = [memory.to_bullet() for memory in memories]
         return "\n".join(bullets)
+
+    def deprecate_by_key(self, user_id: str, key: str):
+        """Mark a memory as deprecated by its key in the in-memory cache."""
+        memories = self._memories.get(user_id, [])
+        for mem in memories:
+            if mem.key == key and mem.status == "active":
+                mem.status = "deprecated"
+                break
 
     def clear(self, user_id: str):
         """Forget everything about a user (used when clearing history)."""
