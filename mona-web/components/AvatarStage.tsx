@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useRef, useEffect } from "react";
+import { Suspense, useMemo, useRef, useEffect, useCallback } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import dynamic from "next/dynamic";
@@ -80,7 +80,18 @@ interface AvatarStageProps {
   avatarUrl?: string;
   onAudioEnd?: () => void;
   lipSyncMode?: SettingsLipSyncMode;
+  isDarkMode?: boolean;
+  affectionLevel?: string;
+  onTap?: () => void;
 }
+
+// FOV offset based on affection level (closer as affection grows)
+const AFFECTION_FOV_OFFSET: Record<string, number> = {
+  distant: 0,
+  warming_up: -1,
+  close: -3,
+  devoted: -5,
+};
 
 // Camera presets for different view modes
 const VIEW_PRESETS = {
@@ -124,13 +135,14 @@ const getPresetKey = (viewMode: "portrait" | "full"): keyof typeof VIEW_PRESETS 
 };
 
 // Component to handle camera transitions
-function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
+function CameraController({ viewMode, affectionLevel = "distant" }: { viewMode: "portrait" | "full"; affectionLevel?: string }) {
   const { camera } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const lastLogTime = useRef(0);
 
   // Get the appropriate preset based on device and view mode
   const presetKey = getPresetKey(viewMode);
+  const fovOffset = AFFECTION_FOV_OFFSET[affectionLevel] ?? 0;
 
   useEffect(() => {
     const preset = VIEW_PRESETS[presetKey];
@@ -139,7 +151,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
     const startPos = camera.position.clone();
     const endPos = preset.position;
     const startFov = (camera as THREE.PerspectiveCamera).fov;
-    const endFov = preset.fov;
+    const endFov = preset.fov + fovOffset;
     const startTime = performance.now();
     const duration = 500; // ms
 
@@ -167,7 +179,7 @@ function CameraController({ viewMode }: { viewMode: "portrait" | "full" }) {
     };
 
     animate();
-  }, [presetKey, camera]);
+  }, [presetKey, camera, fovOffset]);
 
   // Log camera position on change (throttled to avoid spam)
   const handleCameraChange = () => {
@@ -223,13 +235,39 @@ function Live2DLoadingIndicator() {
   );
 }
 
-export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl, onAudioEnd, lipSyncMode = "textbased" }: AvatarStageProps) {
+export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl, onAudioEnd, lipSyncMode = "textbased", isDarkMode = false, affectionLevel = "distant", onTap }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
     }
     return emotionPalette[emotion.emotion] || emotionPalette.neutral;
   }, [emotion]);
+
+  // Mood-reactive gradient background
+  const moodGradient = useMemo(() => {
+    const base = isDarkMode ? "#0c0a14" : "#fffdf8";
+    return `radial-gradient(ellipse at 50% 80%, ${palette.primary}30, ${palette.accent}15, ${base})`;
+  }, [palette, isDarkMode]);
+
+  // Tap-to-interact: distinguish tap from orbit drag
+  const pointerStart = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    pointerStart.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!pointerStart.current || !onTap) return;
+    const dx = e.clientX - pointerStart.current.x;
+    const dy = e.clientY - pointerStart.current.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const elapsed = Date.now() - pointerStart.current.time;
+    // Tap: small movement + quick press
+    if (dist < 5 && elapsed < 300) {
+      onTap();
+    }
+    pointerStart.current = null;
+  }, [onTap]);
 
   // Convert relative audio URLs to absolute URLs pointing to backend
   const absoluteAudioUrl = useMemo(() => {
@@ -255,41 +293,52 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
   // Get the initial preset based on device and view mode
   const initialPresetKey = typeof window !== "undefined" ? getPresetKey(viewMode) : viewMode;
   const initialPreset = VIEW_PRESETS[initialPresetKey];
+  const initialFov = initialPreset.fov + (AFFECTION_FOV_OFFSET[affectionLevel] ?? 0);
 
   // Render Live2D avatar if it's a Live2D model
   if (isLive2D) {
     return (
-      <div className="h-full w-full" style={{ backgroundColor: "#fffdf8" }}>
-        <Suspense fallback={<Live2DLoadingIndicator />}>
-          <Live2DAvatar
-            key={modelUrl}
-            modelUrl={modelUrl}
-            emotion={emotion}
-            audioUrl={absoluteAudioUrl}
-            lipSync={lipSync}
-            onAudioEnd={onAudioEnd}
-          />
-        </Suspense>
+      <div className="h-full w-full relative" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+        <div
+          className="absolute inset-0 transition-all duration-[1500ms]"
+          style={{ background: moodGradient }}
+        />
+        <div className="relative h-full w-full">
+          <Suspense fallback={<Live2DLoadingIndicator />}>
+            <Live2DAvatar
+              key={modelUrl}
+              modelUrl={modelUrl}
+              emotion={emotion}
+              audioUrl={absoluteAudioUrl}
+              lipSync={lipSync}
+              onAudioEnd={onAudioEnd}
+            />
+          </Suspense>
+        </div>
       </div>
     );
   }
 
   // Render VRM avatar (Three.js canvas)
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full relative" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+      <div
+        className="absolute inset-0 transition-all duration-[1500ms]"
+        style={{ background: moodGradient }}
+      />
       <Canvas
         shadows
-        camera={{ position: initialPreset.position.toArray() as [number, number, number], fov: initialPreset.fov }}
-        gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.9 }}
+        camera={{ position: initialPreset.position.toArray() as [number, number, number], fov: initialFov }}
+        gl={{ alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.9 }}
+        className="relative"
       >
-        <color attach="background" args={["#fffdf8"]} />
         <ambientLight intensity={0.6} color="#ffffff" />
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
         <Suspense fallback={<LoadingIndicator />}>
           <VRMAvatar key={modelUrl} url={modelUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} onAudioEnd={onAudioEnd} lipSyncMode={lipSyncMode} />
         </Suspense>
-        <CameraController viewMode={viewMode} />
+        <CameraController viewMode={viewMode} affectionLevel={affectionLevel} />
       </Canvas>
     </div>
   );

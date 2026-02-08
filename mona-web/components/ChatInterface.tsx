@@ -10,9 +10,10 @@ import { useAvatarConfig } from "@/hooks/useAvatarConfig";
 import { useTTSSettings } from "@/hooks/useTTSSettings";
 import { useRecording } from "@/hooks/useRecording";
 import { useChatUI } from "@/hooks/useChatUI";
-import ChatMessage from "./ChatMessage";
-import TypingIndicator from "./TypingIndicator";
 import AvatarStage, { AVATAR_OPTIONS } from "./AvatarStage";
+import FloatingBubbles from "./FloatingBubbles";
+import ChatHistoryModal from "./ChatHistoryModal";
+import ContextMenu from "./ContextMenu";
 import LoginPrompt from "./LoginPrompt";
 import UserMenu from "./UserMenu";
 import ProfileModal from "./ProfileModal";
@@ -33,8 +34,9 @@ export default function ChatInterface() {
   const [viewMode, setViewMode] = useState<"portrait" | "full">("full");
   const [guestLimitInfo, setGuestLimitInfo] = useState<{ messagesUsed: number; messageLimit: number } | null>(null);
   const [volume, setVolume] = useState(1);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showContextMenu, setShowContextMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastTapRef = useRef(0);
 
   const { user, isAuthenticated, isLoading: isAuthLoading, guestSessionId, updateGuestStatus, setGuestLimitReached, resetGuestSession } = useAuth();
   const { isDarkMode, setDarkMode } = useTheme();
@@ -45,7 +47,7 @@ export default function ChatInterface() {
   const { selectedAvatar, setSelectedAvatar, outfitVisibility, setOutfitVisibility, showOutfitMenu, setShowOutfitMenu } = useAvatarConfig();
   const { ttsEngine, setTtsEngine, lipSyncMode, setLipSyncMode, personality, isPersonalitySwitching, handlePersonalityChange } = useTTSSettings(showToast);
   const {
-    showChat, setShowChat,
+    showHistory, setShowHistory,
     showLoginPrompt, setShowLoginPrompt,
     showProfileModal, setShowProfileModal,
     showSettingsModal, setShowSettingsModal,
@@ -108,17 +110,14 @@ export default function ChatInterface() {
   });
 
   // Get the latest audio URL and lip sync data
-  // Priority: audio segments (sentence-level TTS) > message audio (legacy)
   const currentSegment = getNextSegment();
   const hasAudioSegments = audioSegments.length > 0;
 
-  // Fall back to message-level audio if no segments are queued
   const latestMonaMessageWithAudio = messages
     .slice()
     .reverse()
     .find((msg) => msg.sender === "mona" && msg.audioUrl);
 
-  // Use segment audio if available, otherwise use message audio
   const latestAudioUrl = hasAudioSegments && currentSegment
     ? currentSegment.audioUrl
     : latestMonaMessageWithAudio?.audioUrl;
@@ -126,43 +125,37 @@ export default function ChatInterface() {
     ? currentSegment.lipSync
     : latestMonaMessageWithAudio?.lipSync;
 
-  // Handler for when audio segment finishes playing - advance to next segment
   const handleAudioEnd = useCallback(() => {
     if (currentSegment) {
       markSegmentPlayed(currentSegment.segmentIndex);
     }
   }, [currentSegment, markSegmentPlayed]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping]);
+  // Tap-to-interact handler (rate-limited to 1 per 3 seconds)
+  const handleAvatarTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 3000) return;
+    lastTapRef.current = now;
+    if (!audioEnabled) enableAudio();
+    sendMessage("[tap]", undefined, ttsEngine, lipSyncMode);
+  }, [audioEnabled, enableAudio, sendMessage, ttsEngine, lipSyncMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!audioEnabled) enableAudio(); // Enable audio on first interaction
+    if (!audioEnabled) enableAudio();
 
-    // Check for test commands (test:crouch, test:lay, test:expr:joy, test:speak, etc.)
-    const { command, expressionCommand, speakCommand, speakText, remainingText } = parseTestCommand(inputValue);
+    // Check for test commands
+    const { command, expressionCommand, speakCommand, speakText } = parseTestCommand(inputValue);
     if (command) {
-      if (command.type === "play" && command.pose) {
-        triggerPose(command.pose);
-      } else if (command.type === "stop") {
-        returnToRest();
-      }
+      if (command.type === "play" && command.pose) triggerPose(command.pose);
+      else if (command.type === "stop") returnToRest();
       setInputValue("");
       inputRef.current?.blur();
       return;
     }
     if (expressionCommand) {
-      if (expressionCommand.type === "set" && expressionCommand.expression) {
-        triggerExpression(expressionCommand.expression, expressionCommand.weight ?? 1.0);
-      } else if (expressionCommand.type === "clear") {
-        clearExpressions();
-      }
+      if (expressionCommand.type === "set" && expressionCommand.expression) triggerExpression(expressionCommand.expression, expressionCommand.weight ?? 1.0);
+      else if (expressionCommand.type === "clear") clearExpressions();
       setInputValue("");
       inputRef.current?.blur();
       return;
@@ -178,12 +171,77 @@ export default function ChatInterface() {
       sendMessage(inputValue.trim(), selectedImage?.base64, ttsEngine, lipSyncMode);
       setInputValue("");
       clearSelectedImage();
-      // Blur input to close mobile keyboard and reset scroll position
       inputRef.current?.blur();
     }
   };
 
-  const emotionLabel = getEmotionLabel(latestEmotion);
+  // Handle mic/send button — mic when empty, send when has text
+  const handleMicOrSend = () => {
+    if (inputValue.trim() || selectedImage) {
+      // Trigger form submit
+      const form = inputRef.current?.closest("form");
+      form?.requestSubmit();
+    } else {
+      // Toggle recording
+      if (isRecording) stopRecording();
+      else startRecording();
+    }
+  };
+
+  // Context menu items
+  const contextMenuItems = [
+    {
+      id: "image",
+      label: "Photo",
+      icon: (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      onClick: () => imageInputRef.current?.click(),
+      disabled: !isConnected || isRecording,
+    },
+    {
+      id: "view",
+      label: viewMode === "full" ? "Portrait View" : "Full View",
+      icon: viewMode === "full" ? (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" strokeWidth={1.5} />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
+        </svg>
+      ) : (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="2.5" strokeWidth={1.5} />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 7.5v5m0 0l-3 4m3-4l3 4m-6-7h6" />
+        </svg>
+      ),
+      onClick: () => setViewMode(prev => prev === "full" ? "portrait" : "full"),
+    },
+    {
+      id: "outfit",
+      label: "Wardrobe",
+      icon: (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.5 2L2 7l4.5 1V22h11V8L22 7l-4.5-5h-11z" />
+        </svg>
+      ),
+      onClick: () => setShowOutfitMenu(prev => !prev),
+    },
+  ];
+
+  // Affection heart icon
+  const HeartIcon = () => {
+    if (affectionLevel === "devoted") {
+      return <svg className="inline h-3.5 w-3.5 text-red-500 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
+    }
+    if (affectionLevel === "close") {
+      return <svg className="inline h-3.5 w-3.5 text-pink-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
+    }
+    if (affectionLevel === "warming_up") {
+      return <svg className="inline h-3.5 w-3.5 text-pink-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
+    }
+    return <svg className="inline h-3.5 w-3.5 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>;
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
@@ -195,7 +253,6 @@ export default function ChatInterface() {
           setIsInitialPrompt(false);
         }}
         onTryForFree={async () => {
-          // Reset guest session (start fresh) and enable audio
           resetGuestSession();
           await enableAudio();
           setShowLoginPrompt(false);
@@ -240,7 +297,14 @@ export default function ChatInterface() {
         }}
       />
 
-      {/* Audio enablement overlay - shown for authenticated users who haven't enabled audio */}
+      {/* Chat history modal */}
+      <ChatHistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        messages={messages}
+      />
+
+      {/* Audio enablement overlay */}
       {!audioEnabled && isAuthenticated && (
         <div
           className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer"
@@ -258,45 +322,37 @@ export default function ChatInterface() {
 
       {/* Avatar fills the stage */}
       <div className="absolute inset-0">
-        <AvatarStage emotion={latestEmotion} audioUrl={audioEnabled ? latestAudioUrl : undefined} lipSync={audioEnabled && lipSyncMode !== "realtime" ? latestLipSync : undefined} viewMode={viewMode} outfitVisibility={outfitVisibility} avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url} onAudioEnd={handleAudioEnd} lipSyncMode={lipSyncMode} />
+        <AvatarStage
+          emotion={latestEmotion}
+          audioUrl={audioEnabled ? latestAudioUrl : undefined}
+          lipSync={audioEnabled && lipSyncMode !== "realtime" ? latestLipSync : undefined}
+          viewMode={viewMode}
+          outfitVisibility={outfitVisibility}
+          avatarUrl={AVATAR_OPTIONS.find(a => a.id === selectedAvatar)?.url}
+          onAudioEnd={handleAudioEnd}
+          lipSyncMode={lipSyncMode}
+          isDarkMode={isDarkMode}
+          affectionLevel={affectionLevel}
+          onTap={handleAvatarTap}
+        />
       </div>
 
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
-        {/* Status */}
+        {/* Header — minimal status */}
         <header className="px-4 pt-4 sm:px-8 flex items-center justify-between">
           <div className="inline-flex items-center gap-3 rounded-2xl glass border border-slate-300 px-4 py-2.5 text-slate-800 pointer-events-auto animate-fadeIn dark:border-slate-500 dark:text-slate-100">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
-              <span className="text-white text-lg font-bold">M</span>
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
+              <span className="text-white text-sm font-bold">M</span>
             </div>
             <div>
               <p className="text-sm font-semibold tracking-tight">Mona</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isConnected ? (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                    <span className="font-medium">Linked</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">Linked</span>
                     <span className="text-slate-400 dark:text-slate-500">·</span>
-                    <span className="text-slate-500 dark:text-slate-400">{emotionLabel}</span>
-                    <span className="text-slate-400 dark:text-slate-500">·</span>
-                    <span title={affectionLevel.replace('_', ' ')}>
-                      {affectionLevel === "devoted" ? (
-                        <svg className="inline h-3.5 w-3.5 text-red-500 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                        </svg>
-                      ) : affectionLevel === "close" ? (
-                        <svg className="inline h-3.5 w-3.5 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                        </svg>
-                      ) : affectionLevel === "warming_up" ? (
-                        <svg className="inline h-3.5 w-3.5 text-pink-300" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                        </svg>
-                      ) : (
-                        <svg className="inline h-3.5 w-3.5 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-                        </svg>
-                      )}
-                    </span>
+                    <span title={affectionLevel.replace('_', ' ')}><HeartIcon /></span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
@@ -306,6 +362,16 @@ export default function ChatInterface() {
                 )}
               </p>
             </div>
+            {/* Chat history button */}
+            <button
+              onClick={() => setShowHistory(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100/60 transition-colors dark:hover:text-slate-200 dark:hover:bg-slate-700/60"
+              title="Chat history"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
           </div>
 
           {/* User menu / Sign in */}
@@ -348,181 +414,42 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {/* Chat panel - extends up from the chat button */}
-        {showChat && (
-          <div className="absolute right-3 sm:right-6 bottom-24 sm:bottom-28 w-80 sm:w-96 pointer-events-auto animate-slideUp">
-            <div className="flex max-h-64 sm:max-h-80 flex-col rounded-2xl glass border border-slate-300 p-4 dark:border-slate-500">
-              <div className="flex-1 overflow-y-auto overscroll-contain pr-2 space-y-1">
-                {messages.length === 0 && isConnected && (
-                  <div className="py-8 text-center">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/50 dark:to-purple-900/50 mb-3">
-                      <svg className="h-6 w-6 text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Say hi to Mona</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Start a conversation</p>
-                  </div>
-                )}
-
-                {messages.map((message, index) => (
-                  <ChatMessage key={`${message.timestamp}-${index}`} message={message} />
-                ))}
-
-                {isTyping && <TypingIndicator />}
-
-                {isGeneratingAudio && !isTyping && (
-                  <div className="flex mb-2 justify-start animate-fadeIn">
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 border border-purple-100 text-purple-600 text-xs font-medium dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-400">
-                      <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Generating voice...</span>
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Floating chat bubbles */}
+        <FloatingBubbles
+          messages={messages}
+          isTyping={isTyping}
+          isGeneratingAudio={isGeneratingAudio}
+        />
 
         {/* Spacer to push input to bottom */}
         <div className="flex-1" />
 
-        {/* Input */}
+        {/* Slim pill input bar */}
         <footer className="px-3 sm:px-8 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
-            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-1.5 rounded-xl glass border border-slate-300 px-2 sm:px-3 py-1 sm:py-1.5 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:border-slate-500 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
-              {/* Image preview */}
-              {selectedImage && (
-                <div className="relative inline-block animate-fadeInScale">
-                  <Image
-                    src={selectedImage.preview}
-                    alt="Selected image"
-                    width={100}
-                    height={100}
-                    className="rounded-xl object-cover border border-slate-200/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={clearSelectedImage}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              {/* Input row */}
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* Hidden file input */}
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-                {/* Image upload button */}
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={!isConnected || isRecording}
-                  className="flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 border border-slate-300 transition-all duration-200 hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100"
-                  title="Upload image"
-                >
-                  <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-                {/* Voice recording button */}
-                <button
-                  type="button"
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={!isConnected || isProcessing}
-                  className={`flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-200 active:scale-95 ${
-                    isRecording
-                      ? 'animate-pulse bg-red-500 text-white border border-red-500'
-                      : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 hover:border-slate-400 hover:text-slate-700 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-600 dark:hover:border-slate-400 dark:hover:text-slate-100'
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                  title={isRecording ? 'Stop recording' : 'Start voice input'}
-                >
-                  {isProcessing ? (
-                    <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px] animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
-                  )}
-                </button>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onBlur={() => {
-                    // Fix iOS Safari keyboard dismiss - reset scroll position
-                    setTimeout(() => {
-                      window.scrollTo(0, 0);
-                    }, 100);
-                  }}
-                  placeholder={isConnected ? "Send Mona a thought…" : "Connecting to Mona..."}
-                  disabled={!isConnected || isRecording}
-                  className="min-w-0 flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 text-sm dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!isConnected || (!inputValue.trim() && !selectedImage) || isRecording}
-                  className="flex-shrink-0 rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Send
-                </button>
-              </div>
-            </form>
-            {/* View mode toggle */}
-            <button
-              type="button"
-              onClick={() => setViewMode((prev) => prev === "full" ? "portrait" : "full")}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
-              title={viewMode === "full" ? "Switch to portrait view" : "Switch to full view"}
-            >
-              {viewMode === "full" ? (
-                // Portrait icon (face/bust)
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="8" r="4" strokeWidth={1.5} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
-                </svg>
-              ) : (
-                // Full body icon
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="5" r="2.5" strokeWidth={1.5} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 7.5v5m0 0l-3 4m3-4l3 4m-6-7h6" />
-                </svg>
-              )}
-            </button>
-            {/* Outfit toggle button */}
+          <div className="mx-auto flex w-full max-w-2xl items-center gap-2">
+            {/* "+" context menu button */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowOutfitMenu((prev) => !prev)}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl glass border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 hover:bg-white/50 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/50"
-                title="Outfit options"
+                onClick={() => {
+                  if (!audioEnabled) enableAudio();
+                  setShowContextMenu(prev => !prev);
+                }}
+                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full glass border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 ${showContextMenu ? "rotate-45" : ""}`}
+                title="More options"
               >
-                {/* Shirt icon */}
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.5 2L2 7l4.5 1V22h11V8L22 7l-4.5-5h-11z" />
+                <svg className="h-5 w-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </button>
-              {/* Outfit menu dropdown */}
+              <ContextMenu
+                isOpen={showContextMenu}
+                onClose={() => setShowContextMenu(false)}
+                items={contextMenuItems}
+              />
+              {/* Outfit menu (opened from context menu) */}
               {showOutfitMenu && (
-                <div className="absolute bottom-12 right-0 w-52 rounded-2xl glass border border-slate-300 p-3 animate-fadeInScale dark:border-slate-500">
+                <div className="absolute bottom-14 left-0 w-52 rounded-2xl glass border border-slate-300 p-3 animate-fadeInScale dark:border-slate-500 z-20">
                   <p className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Avatar</p>
                   {AVATAR_OPTIONS.map((avatar) => (
                     <label
@@ -566,12 +493,7 @@ export default function ChatInterface() {
                     <input
                       type="checkbox"
                       checked={outfitVisibility.colorVariant}
-                      onChange={(e) =>
-                        setOutfitVisibility((prev) => ({
-                          ...prev,
-                          colorVariant: e.target.checked,
-                        }))
-                      }
+                      onChange={(e) => setOutfitVisibility((prev) => ({ ...prev, colorVariant: e.target.checked }))}
                       className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 dark:border-slate-500"
                     />
                     <span className="text-sm text-slate-700 font-medium dark:text-slate-200">Alternate Color</span>
@@ -580,12 +502,7 @@ export default function ChatInterface() {
                     <input
                       type="checkbox"
                       checked={outfitVisibility.lingerie}
-                      onChange={(e) =>
-                        setOutfitVisibility((prev) => ({
-                          ...prev,
-                          lingerie: e.target.checked,
-                        }))
-                      }
+                      onChange={(e) => setOutfitVisibility((prev) => ({ ...prev, lingerie: e.target.checked }))}
                       className="h-4 w-4 rounded border-slate-300 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 dark:border-slate-500"
                     />
                     <span className="text-sm text-slate-700 font-medium dark:text-slate-200">Lingerie</span>
@@ -593,16 +510,84 @@ export default function ChatInterface() {
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!audioEnabled) enableAudio(); // Enable audio on first interaction
-                setShowChat((prev) => !prev);
-              }}
-              className="flex-shrink-0 rounded-xl glass border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-slate-400 hover:bg-white/50 active:scale-95 whitespace-nowrap dark:border-slate-500 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800/50"
-            >
-              {showChat ? "Hide" : "Chat"}
-            </button>
+
+            {/* Hidden file input */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
+            {/* Main input pill */}
+            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-1.5 rounded-full glass border border-slate-300 px-4 py-1.5 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:border-slate-500 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
+              {/* Image preview */}
+              {selectedImage && (
+                <div className="relative inline-block animate-fadeInScale pt-1">
+                  <Image
+                    src={selectedImage.preview}
+                    alt="Selected image"
+                    width={80}
+                    height={80}
+                    className="rounded-lg object-cover border border-slate-200/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={clearSelectedImage}
+                    className="absolute -right-2 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Input row */}
+              <div className="flex items-center gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onBlur={() => {
+                    setTimeout(() => { window.scrollTo(0, 0); }, 100);
+                  }}
+                  placeholder={isConnected ? "Talk to Mona…" : "Connecting..."}
+                  disabled={!isConnected || isRecording}
+                  className="min-w-0 flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 text-sm dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+                {/* Send / Mic combo button */}
+                <button
+                  type={inputValue.trim() || selectedImage ? "submit" : "button"}
+                  onClick={!(inputValue.trim() || selectedImage) ? handleMicOrSend : undefined}
+                  disabled={!isConnected || isProcessing}
+                  className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-95 ${
+                    inputValue.trim() || selectedImage
+                      ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white"
+                      : isRecording
+                        ? "animate-pulse bg-red-500 text-white"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                  title={inputValue.trim() || selectedImage ? "Send" : isRecording ? "Stop recording" : "Voice input"}
+                >
+                  {isProcessing ? (
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : inputValue.trim() || selectedImage ? (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </footer>
       </div>
@@ -611,12 +596,3 @@ export default function ChatInterface() {
     </div>
   );
 }
-
-function getEmotionLabel(emotion: EmotionData | null): string {
-  if (!emotion || !emotion.emotion || !emotion.intensity) {
-    return "Calibrating";
-  }
-  const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-  return `${toTitle(emotion.emotion)} · ${toTitle(emotion.intensity)}`;
-}
-

@@ -128,22 +128,6 @@ type SubscriptionTier = {
 
 const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
-    id: "trial",
-    name: "3-Day Trial",
-    price: null,
-    badge: "Try Free",
-    badgeColor: "from-slate-500 to-slate-600",
-    features: [
-      { text: "Unlimited messages", included: true },
-      { text: "Voice responses", included: true },
-      { text: "3D animated avatar", included: true },
-      { text: "Memory & context", included: true },
-      { text: "Expressions & gestures", included: true },
-      { text: "Full experience for 3 days", included: true },
-      { text: "No credit card required", included: true },
-    ],
-  },
-  {
     id: "monthly",
     name: "Premium",
     price: 19.99,
@@ -281,12 +265,12 @@ export default function ShopModal({ isOpen, onClose, isAuthenticated = false, on
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                   activeTab === tab.id
-                    ? "bg-white text-slate-900"
+                    ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white"
                     : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                <span className={activeTab === tab.id ? "text-pink-500" : ""}>{tab.icon}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
@@ -387,10 +371,12 @@ function CharactersTab({ onPurchase }: { onPurchase: () => void }) {
                   </button>
                 ) : character.comingSoon ? (
                   <button
-                    disabled
-                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-400 cursor-not-allowed"
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-500 transition hover:border-pink-300 hover:text-pink-500"
                   >
-                    Coming Soon
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    Notify Me
                   </button>
                 ) : (
                   <button
@@ -411,7 +397,7 @@ function CharactersTab({ onPurchase }: { onPurchase: () => void }) {
 
 function OutfitsTab({ onPurchase }: { onPurchase: () => void }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
       {OUTFITS.map((outfit) => (
         <div
           key={outfit.id}
@@ -422,7 +408,7 @@ function OutfitsTab({ onPurchase }: { onPurchase: () => void }) {
           }`}
         >
           {/* Outfit Preview */}
-          <div className={`relative aspect-[4/5] ${outfit.color}`}>
+          <div className={`relative aspect-[3/4] ${outfit.color}`}>
             <div className="absolute inset-0 flex items-center justify-center">
               <svg className="h-16 w-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 2l-1 1m1-1l1 1m-1-1v3m0 0l-7 4v10a1 1 0 001 1h12a1 1 0 001-1V10l-7-4z" />
@@ -487,7 +473,7 @@ function VoicesTab({ onPurchase }: { onPurchase: () => void }) {
           key={voice.id}
           className={`group relative overflow-hidden rounded-2xl border-2 transition-all ${
             voice.owned
-              ? "border-pink-200 bg-pink-50/50"
+              ? "border-pink-200 bg-pink-50"
               : "border-slate-200 bg-white hover:border-slate-300"
           }`}
         >
@@ -566,107 +552,128 @@ function VoicesTab({ onPurchase }: { onPurchase: () => void }) {
 
 function SubscriptionTab({ onPurchase }: { onPurchase: () => void }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Side-by-side tier cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {SUBSCRIPTION_TIERS.map((tier) => (
-          <div
-            key={tier.id}
-            className={`relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all ${
-              tier.highlight
-                ? "border-pink-400 bg-gradient-to-b from-pink-50 to-white"
-                : "border-slate-200 bg-white hover:border-slate-300"
-            }`}
-          >
-            {/* Badge */}
-            {tier.badge && (
-              <div
-                className={`absolute -top-0 left-0 right-0 bg-gradient-to-r ${tier.badgeColor} py-1 text-center text-xs font-semibold text-white`}
-              >
-                {tier.badge}
-              </div>
-            )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {SUBSCRIPTION_TIERS.map((tier) => {
+          const isAnnual = tier.id === "annual";
 
-            {/* Content */}
-            <div className={`flex flex-1 flex-col p-4 ${tier.badge ? "pt-8" : ""}`}>
-              {/* Tier name */}
-              <h3 className="text-lg font-bold text-slate-900">{tier.name}</h3>
-
-              {/* Price */}
-              <div className="mt-2">
-                {tier.price === null ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-slate-900">Free</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-baseline gap-1">
-                      {tier.originalPrice && (
-                        <span className="text-sm text-slate-400 line-through">${tier.originalPrice}</span>
-                      )}
-                      <span className="text-3xl font-bold text-slate-900">${tier.price}</span>
-                    </div>
-                    <p className="text-sm text-slate-500">per {tier.period}</p>
-                  </>
-                )}
-                {tier.periodNote && (
-                  <p className="mt-1 text-xs text-pink-600 font-medium">{tier.periodNote}</p>
-                )}
-              </div>
-
-              {/* Savings badge */}
-              {tier.savings && (
-                <div className="mt-2">
-                  <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                    {tier.savings}
-                  </span>
+          const card = (
+            <div
+              className={`relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all ${
+                isAnnual
+                  ? "border-transparent"
+                  : tier.highlight
+                  ? "border-pink-400 bg-gradient-to-b from-pink-50 to-white"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              {/* Badge */}
+              {tier.badge && (
+                <div
+                  className={`absolute -top-0 left-0 right-0 bg-gradient-to-r ${tier.badgeColor} py-1 text-center text-xs font-semibold text-white`}
+                >
+                  {tier.badge}
                 </div>
               )}
 
-              {/* Features list */}
-              <ul className="mt-4 flex-1 space-y-2">
-                {tier.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2 text-sm">
-                    {feature.included ? (
-                      <svg className="h-4 w-4 flex-shrink-0 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4 flex-shrink-0 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    )}
-                    <span className={feature.included ? "text-slate-700" : "text-slate-400"}>
-                      {feature.text}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {/* Content */}
+              <div className={`flex flex-1 flex-col p-5 ${tier.badge ? "pt-8" : ""}`}>
+                {/* Tier name */}
+                <h3 className="text-lg font-bold text-slate-900">{tier.name}</h3>
 
-              {/* Action button */}
-              <button
-                onClick={onPurchase}
-                className={`mt-4 w-full rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                  tier.highlight
-                    ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:brightness-110"
-                    : tier.id === "trial"
-                    ? "bg-slate-900 text-white hover:bg-slate-800"
-                    : "bg-slate-900 text-white hover:bg-slate-800"
-                }`}
-              >
-                {tier.id === "trial"
-                  ? "Start Free Trial"
-                  : tier.id === "annual"
-                  ? "Save 50%"
-                  : "Subscribe"}
-              </button>
+                {/* Price */}
+                <div className="mt-2">
+                  {tier.price === null ? (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold text-slate-900">Free</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        {tier.originalPrice && (
+                          <span className="text-sm text-slate-400 line-through">${tier.originalPrice}</span>
+                        )}
+                        <span className="text-3xl font-bold text-slate-900">${tier.price}</span>
+                      </div>
+                      <p className="text-sm text-slate-500">per {tier.period}</p>
+                    </>
+                  )}
+                  {tier.periodNote && (
+                    <p className="mt-1 text-xs text-pink-600 font-medium">{tier.periodNote}</p>
+                  )}
+                </div>
+
+                {/* Savings pill */}
+                {tier.savings && (
+                  <div className="mt-2">
+                    <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      {tier.savings}
+                    </span>
+                  </div>
+                )}
+
+                {/* Features list */}
+                <ul className="mt-4 flex-1 space-y-2">
+                  {tier.features.map((feature, index) => (
+                    <li key={index} className="flex items-center gap-2 text-sm">
+                      {feature.included ? (
+                        <svg className="h-4 w-4 flex-shrink-0 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4 flex-shrink-0 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                      <span className={feature.included ? "text-slate-700" : "text-slate-400"}>
+                        {feature.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Action button */}
+                <button
+                  onClick={onPurchase}
+                  className={`mt-4 w-full rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                    isAnnual
+                      ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:brightness-110"
+                      : "bg-slate-900 text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {tier.id === "annual" ? "Save 50%" : "Subscribe"}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+
+          // Wrap annual card in gradient border
+          if (isAnnual) {
+            return (
+              <div key={tier.id} className="bg-gradient-to-r from-pink-400 to-purple-500 p-[1px] rounded-2xl">
+                {card}
+              </div>
+            );
+          }
+
+          return <div key={tier.id}>{card}</div>;
+        })}
       </div>
 
+      {/* Trial CTA link */}
+      <div className="text-center">
+        <button
+          onClick={onPurchase}
+          className="text-sm font-medium text-slate-600 transition hover:text-pink-500"
+        >
+          Or start with a 3-day free trial <span aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+
+      {/* Trust signals */}
       <p className="text-center text-xs text-slate-400">
-        Cancel anytime. No commitment required.
+        Cancel anytime &middot; No commitment &middot; 30-day money back
       </p>
     </div>
   );

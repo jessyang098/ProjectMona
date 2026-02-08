@@ -109,6 +109,14 @@ export default {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
         },
+        bubbleIn: {
+          "0%": { opacity: "0", transform: "scale(0.8) translateY(8px)" },
+          "100%": { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
+        bubbleOut: {
+          "0%": { opacity: "1", transform: "scale(1) translateY(0)" },
+          "100%": { opacity: "0", transform: "scale(0.9) translateY(8px)" },
+        },
       },
       animation: {
         fadeIn: "fadeIn 0.3s ease-out",
@@ -124,6 +132,8 @@ export default {
         spin: "spin 1s linear infinite",
         wave: "wave 1.2s ease-in-out infinite",
         scaleIn: "scaleIn 0.2s ease-out",
+        bubbleIn: "bubbleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        bubbleOut: "bubbleOut 0.4s ease-out forwards",
       },
       transitionTimingFunction: {
         "bounce-in": "cubic-bezier(0.34, 1.56, 0.64, 1)",

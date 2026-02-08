@@ -135,6 +135,25 @@ html {
     border: 1px solid rgba(255, 255, 255, 0.15);
   }
 
+  /* Glass bubble variants for floating messages */
+  .glass-bubble {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+  .dark .glass-bubble {
+    background: rgba(30, 27, 45, 0.75);
+  }
+
+  .glass-bubble-mona {
+    background: rgba(255, 240, 250, 0.8);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+  .dark .glass-bubble-mona {
+    background: rgba(40, 25, 45, 0.8);
+  }
+
   /* Brand gradient text */
   .text-gradient {
     background: var(--brand-gradient);

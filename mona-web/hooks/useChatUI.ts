@@ -8,7 +8,7 @@ interface UseChatUIDeps {
 }
 
 export function useChatUI({ isAuthLoading, isAuthenticated }: UseChatUIDeps) {
-  const [showChat, setShowChat] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -24,8 +24,8 @@ export function useChatUI({ isAuthLoading, isAuthenticated }: UseChatUIDeps) {
   }, [isAuthLoading, isAuthenticated]);
 
   return {
-    showChat,
-    setShowChat,
+    showHistory,
+    setShowHistory,
     showLoginPrompt,
     setShowLoginPrompt,
     showProfileModal,

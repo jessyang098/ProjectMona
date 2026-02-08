@@ -51,7 +51,7 @@ class MonaLLM:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4o",
         personality: MonaPersonality = default_mona,
         max_history: int = 20
     ):
