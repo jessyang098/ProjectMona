@@ -26,7 +26,7 @@ export interface LipSyncConfig {
 }
 
 // Default max mouth open for avatars (Moe, Lily use higher value)
-const DEFAULT_MAX_MOUTH_OPEN = 0.55;
+const DEFAULT_MAX_MOUTH_OPEN = 0.75;
 
 const DEFAULT_CONFIG: LipSyncConfig = {
   smoothingFactor: 0.15, // Lower = snappier transitions for clearer enunciation

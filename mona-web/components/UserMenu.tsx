@@ -62,7 +62,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Sign in button */}
         <button
           onClick={onOpenLogin}
-          className="inline-flex items-center gap-2 rounded-xl glass border border-slate-300 px-3 py-2.5 text-sm text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
+          className="inline-flex items-center gap-2 rounded-xl bg-white/50 backdrop-blur-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-700 transition-all duration-200 hover:bg-white/70 active:scale-95 dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
         >
           {guestMessagesRemaining !== null && (
             <span className={`text-xs ${guestMessagesRemaining <= 3 ? "text-amber-600 dark:text-amber-300" : "text-slate-400 dark:text-slate-500"}`}>
@@ -80,7 +80,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
     <div ref={menuRef} className="relative pointer-events-auto">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-xl glass border border-slate-300 p-1.5 pr-3 text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
+        className="flex items-center gap-2 rounded-xl bg-white/50 backdrop-blur-xl border border-slate-300 p-1.5 pr-3 text-slate-700 transition-all duration-200 hover:bg-white/70 active:scale-95 dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
       >
         {/* User avatar */}
         {user?.avatarUrl ? (

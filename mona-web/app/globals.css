@@ -127,6 +127,15 @@ html {
            focus-visible:ring-purple-500/50 focus-visible:ring-offset-2;
   }
 
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Glass effect utility */
   .glass {
     background: var(--surface-glass);

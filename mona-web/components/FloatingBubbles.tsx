@@ -113,7 +113,7 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
   }, []);
 
   return (
-    <div className="absolute inset-x-0 bottom-24 sm:bottom-28 top-20 pointer-events-none flex flex-col justify-end px-4 sm:px-8 gap-2 overflow-hidden">
+    <div className="flex-1 min-h-0 pointer-events-none flex flex-col justify-end px-4 sm:px-8 pb-2 gap-2 overflow-y-auto scrollbar-hide">
       {/* Existing message bubbles */}
       {bubbles.map((bubble) => {
         const isMona = bubble.message.sender === "mona";
@@ -126,7 +126,7 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
             onClick={() => handleBubbleClick(bubble.id)}
           >
             <div
-              className={`relative rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg backdrop-blur-xl ${
+              className={`relative rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg backdrop-blur-xl break-words whitespace-pre-wrap ${
                 isMona
                   ? "glass-bubble-mona border border-pink-200/40 text-slate-800 dark:border-pink-500/30 dark:text-slate-100"
                   : "glass-bubble border border-purple-200/40 text-slate-800 dark:border-purple-500/30 dark:text-slate-100"
