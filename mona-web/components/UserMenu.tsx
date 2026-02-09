@@ -39,7 +39,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Settings button - always visible */}
         <button
           onClick={onOpenSettings}
-          className="flex h-10 w-10 items-center justify-center rounded-xl glass border border-slate-300 text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/50 backdrop-blur-xl border border-slate-300 text-slate-700 transition-all duration-200 hover:bg-white/70 active:scale-95 dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
           title="Settings"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
         {/* Shop button - always visible */}
         <button
           onClick={onOpenShop}
-          className="flex h-10 w-10 items-center justify-center rounded-xl glass border border-slate-300 text-slate-700 backdrop-blur-md transition-all duration-200 hover:bg-slate-100/60 active:scale-95 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/50 backdrop-blur-xl border border-slate-300 text-slate-700 transition-all duration-200 hover:bg-white/70 active:scale-95 dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
           title="Shop"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

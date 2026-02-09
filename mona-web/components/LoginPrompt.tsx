@@ -190,7 +190,7 @@ export default function LoginPrompt({
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 font-medium text-slate-600 transition-all hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98] dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600"
                 >
                   Try for free
-                  <span className="ml-2 text-xs text-slate-400">(10 free messages)</span>
+                  <span className="ml-2 text-xs text-slate-400">(25 free messages)</span>
                 </button>
               </>
             )}

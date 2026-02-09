@@ -340,7 +340,7 @@ export default function ChatInterface() {
       <div className="relative z-10 flex flex-col pointer-events-none" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
         {/* Header — minimal status */}
         <header className="px-4 pt-4 sm:px-8 flex items-center justify-between">
-          <div className="inline-flex items-center gap-3 rounded-2xl glass border border-slate-300 px-4 py-2.5 text-slate-800 pointer-events-auto animate-fadeIn dark:border-slate-500 dark:text-slate-100">
+          <div className="inline-flex items-center gap-3 rounded-2xl bg-white/50 backdrop-blur-xl border border-slate-300 px-4 py-2.5 text-slate-800 pointer-events-auto animate-fadeIn dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-100">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
               <span className="text-white text-sm font-bold">M</span>
             </div>
@@ -362,16 +362,6 @@ export default function ChatInterface() {
                 )}
               </p>
             </div>
-            {/* Chat history button */}
-            <button
-              onClick={() => setShowHistory(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100/60 transition-colors dark:hover:text-slate-200 dark:hover:bg-slate-700/60"
-              title="Chat history"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
           </div>
 
           {/* User menu / Sign in */}
@@ -406,7 +396,7 @@ export default function ChatInterface() {
                   if (!audioEnabled) enableAudio();
                   setShowContextMenu(prev => !prev);
                 }}
-                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full glass border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 active:scale-95 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 ${showContextMenu ? "rotate-45" : ""}`}
+                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/50 backdrop-blur-xl border border-slate-300 text-slate-600 transition-all duration-200 hover:border-slate-400 hover:text-slate-800 active:scale-95 dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-400 dark:hover:text-slate-100 ${showContextMenu ? "rotate-45" : ""}`}
                 title="More options"
               >
                 <svg className="h-5 w-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -507,7 +497,7 @@ export default function ChatInterface() {
             />
 
             {/* Main input pill */}
-            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-1.5 rounded-full glass border border-slate-300 px-4 py-1.5 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:border-slate-500 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
+            <form onSubmit={handleSubmit} className="flex flex-1 min-w-0 flex-col gap-1.5 rounded-full bg-white/40 backdrop-blur-xl border border-slate-200/60 px-4 py-1.5 transition-all focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 dark:bg-slate-800/40 dark:border-slate-600/60 dark:focus-within:border-purple-500 dark:focus-within:ring-purple-500/20">
               {/* Image preview */}
               {selectedImage && (
                 <div className="relative inline-block animate-fadeInScale pt-1">
@@ -543,6 +533,17 @@ export default function ChatInterface() {
                   disabled={!isConnected || isRecording}
                   className="min-w-0 flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 text-sm dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
+                {/* Chat history button */}
+                <button
+                  type="button"
+                  onClick={() => setShowHistory(true)}
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100/60 transition-colors dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-700/60"
+                  title="Chat history"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
                 {/* Send / Mic combo button */}
                 <button
                   type={inputValue.trim() || selectedImage ? "submit" : "button"}
