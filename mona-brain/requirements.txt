@@ -33,6 +33,10 @@ torch==2.4.0
 torchaudio==2.4.0
 torchvision==0.19.0
 
+# Lip sync (IPA phoneme analysis via espeak-ng)
+phonemizer>=3.3.0
+mutagen>=1.47.0                 # MP3 duration measurement for lip sync timing
+
 # ML dependencies
 transformers>=4.44.0
 tokenizers>=0.19.1

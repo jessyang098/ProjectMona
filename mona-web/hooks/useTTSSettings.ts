@@ -8,7 +8,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:800
 
 export function useTTSSettings(showToast?: (msg: string, type?: ToastType) => void) {
   const [ttsEngine, setTtsEngine] = useState<TtsEngine>("sovits");
-  const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>("textbased");
+  const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>("formant");
   const [personality, setPersonality] = useState<PersonalityType>("girlfriend");
   const [isPersonalitySwitching, setIsPersonalitySwitching] = useState(false);
 

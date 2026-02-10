@@ -17,19 +17,16 @@ from lip_sync import generate_lip_sync_from_text
 from tts_preprocess import clean_for_tts
 from analytics import analytics, calculate_tts_cost
 
-# Average speech rate: ~150 words/min = 2.5 words/sec
-# Average word length ~5 chars, so ~12-13 chars/sec
-# Fish Audio tends to be slightly faster
-CHARS_PER_SECOND = 14.0
 
-
-def estimate_duration_from_text(text: str) -> float:
-    """Estimate audio duration from text length (avoids ffmpeg conversion)."""
-    # Count characters, excluding extra whitespace
-    char_count = len(" ".join(text.split()))
-    # Add small buffer for natural pauses
-    estimated = char_count / CHARS_PER_SECOND + 0.3
-    return max(0.5, estimated)  # Minimum 0.5s
+def get_mp3_duration(path: str) -> float:
+    """Get actual MP3 duration using mutagen. Returns seconds."""
+    try:
+        from mutagen.mp3 import MP3
+        audio = MP3(path)
+        return audio.info.length
+    except Exception as e:
+        print(f"Fish Audio [Duration ERROR] {e}, falling back to estimate")
+        return 0.0
 
 
 class MonaTTSFishSpeech:
@@ -187,10 +184,14 @@ class MonaTTSFishSpeech:
                     estimated_cost=cost,
                 )
 
-            # Generate text-based lip sync using estimated duration (no ffmpeg needed)
+            # Generate text-based lip sync using actual MP3 duration
             lip_sync_data = None
             if generate_lip_sync:
-                audio_duration = estimate_duration_from_text(text)
+                audio_duration = get_mp3_duration(str(cache_path))
+                if audio_duration <= 0:
+                    # Fallback: estimate from text length (~14 chars/sec)
+                    char_count = len(" ".join(text.split()))
+                    audio_duration = max(0.5, char_count / 14.0 + 0.3)
                 lip_sync_data = generate_lip_sync_from_text(text, audio_duration)
                 if lip_sync_data:
                     lip_sync_cache_path.write_text(json.dumps(lip_sync_data))
