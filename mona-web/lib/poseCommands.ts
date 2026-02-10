@@ -265,8 +265,8 @@ export function parseTestCommand(input: string): {
         return { command: null, expressionCommand: { type: "clear" }, speakCommand: false, speakText: null, remainingText: null };
       }
 
-      if (VALID_EXPRESSIONS.includes(exprName)) {
-        // Map to actual VRM expression name (some are case-sensitive)
+      if (exprName) {
+        // Map to actual expression name (VRM names are case-sensitive, Live2D uses snake_case)
         const actualName = EXPRESSION_NAME_MAP[exprName] ?? exprName;
         return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, speakCommand: false, speakText: null, remainingText: null };
       }

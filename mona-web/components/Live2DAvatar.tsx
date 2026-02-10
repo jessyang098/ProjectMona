@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { EmotionData, LipSyncCue } from "@/types/chat";
+import { onExpressionCommand } from "@/lib/poseCommands";
 
 // Types from pixi-live2d-display
 interface Live2DModel {
@@ -571,6 +572,25 @@ export default function Live2DAvatar({
 
     tryExpression(0);
   }, [emotion]);
+
+  // Listen for test expression commands (test:expr:<name>)
+  useEffect(() => {
+    const cleanup = onExpressionCommand((cmd) => {
+      if (!modelRef.current) return;
+
+      if (cmd.type === "clear") {
+        // Reset to neutral by triggering an empty/neutral expression
+        modelRef.current.expression("neutral").catch(() => {});
+        return;
+      }
+
+      if (cmd.expression) {
+        modelRef.current.expression(cmd.expression).catch(() => {});
+      }
+    });
+
+    return cleanup;
+  }, []);
 
   // Handle audio playback
   useEffect(() => {

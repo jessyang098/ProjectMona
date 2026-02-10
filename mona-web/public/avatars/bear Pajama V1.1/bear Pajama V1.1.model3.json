@@ -14,7 +14,42 @@
 			"bear Pajama V1.1.2048/texture_08.png"
 		],
 		"Physics": "bear Pajama V1.1.physics3.json",
-		"DisplayInfo": "bear Pajama V1.1.cdi3.json"
+		"DisplayInfo": "bear Pajama V1.1.cdi3.json",
+		"Expressions": [
+			{ "Name": "anger", "File": "anger.exp3.json" },
+			{ "Name": "bear", "File": "bear.exp3.json" },
+			{ "Name": "box", "File": "box.exp3.json" },
+			{ "Name": "coat", "File": "coat.exp3.json" },
+			{ "Name": "cry", "File": "cry.exp3.json" },
+			{ "Name": "ear", "File": "ear.exp3.json" },
+			{ "Name": "eat", "File": "eat.exp3.json" },
+			{ "Name": "eat_eat", "File": "eat eat.exp3.json" },
+			{ "Name": "fly", "File": "fly.exp3.json" },
+			{ "Name": "game", "File": "game.exp3.json" },
+			{ "Name": "glasses", "File": "glasses.exp3.json" },
+			{ "Name": "hat", "File": "hat.exp3.json" },
+			{ "Name": "love", "File": "love.exp3.json" },
+			{ "Name": "mouse", "File": "mouse.exp3.json" },
+			{ "Name": "no", "File": "no.exp3.json" },
+			{ "Name": "pillow", "File": "pillow.exp3.json" },
+			{ "Name": "red", "File": "red.exp3.json" },
+			{ "Name": "snot_bubbles", "File": "Snot bubbles.exp3.json" },
+			{ "Name": "drum_mouth", "File": "Drum mouth.exp3.json" },
+			{ "Name": "pen_fingers", "File": "Pen fingers.exp3.json" },
+			{ "Name": "sticky_note", "File": "Sticky note.exp3.json" },
+			{ "Name": "white_board", "File": "White board.exp3.json" },
+			{ "Name": "black_braids", "File": "Black braids.exp3.json" },
+			{ "Name": "white_hair", "File": "White hair.exp3.json" },
+			{ "Name": "white_hair_braids", "File": "White hair braids.exp3.json" },
+			{ "Name": "white_ponytail", "File": "White ponytail.exp3.json" }
+		],
+		"Motions": {
+			"": [
+				{ "File": "bear cry.motion3.json" },
+				{ "File": "eat.motion3.json" },
+				{ "File": "sleep.motion3.json" }
+			]
+		}
 	},
 	"Groups": [
 		{
