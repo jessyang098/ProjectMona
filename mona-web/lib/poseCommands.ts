@@ -276,22 +276,24 @@ export function parseTestCommand(input: string): {
 
     // Pose commands
     switch (command) {
+      case "wave":
+        return { command: { type: "play", pose: "wave" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+      case "goodbye":
+        return { command: { type: "play", pose: "goodbye" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+      case "sad":
+        return { command: { type: "play", pose: "sad" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+      case "angry":
+        return { command: { type: "play", pose: "angry" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+      case "blush":
+        return { command: { type: "play", pose: "blush" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+      case "sleepy":
+        return { command: { type: "play", pose: "sleepy" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+      case "lay":
+        return { command: { type: "play", pose: "lay" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "standing_idle":
       case "standing-idle":
       case "idle":
         return { command: { type: "play", pose: "standing_idle" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "default":
-        return { command: { type: "play", pose: "default" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "crouch":
-        return { command: { type: "play", pose: "crouch" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "lay":
-        return { command: { type: "play", pose: "lay" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "stand":
-        return { command: { type: "play", pose: "stand" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "stand1":
-        return { command: { type: "play", pose: "stand1" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
-      case "wave":
-        return { command: { type: "play", pose: "wave" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
       case "rest":
       case "stop":
         return { command: { type: "stop" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };

@@ -13,21 +13,11 @@ export type EmotionType = "happy" | "excited" | "curious" | "embarrassed" | "sad
 export type GestureName =
   | "wave"
   | "goodbye"
-  | "thinking"
-  | "excited_jump"
-  | "clapping"
   | "blush"
   | "sad"
-  | "looking_around"
   | "angry"
-  | "relax"
   | "sleepy"
-  | "surprised"
-  | "crouch"
   | "lay"
-  | "stand"
-  | "stand1"
-  | "default"
   | "standing_idle";
 
 interface GestureConfig {
@@ -42,43 +32,16 @@ interface GestureConfig {
 
 const GESTURE_CONFIGS: GestureConfig[] = [
   // === VRMA (VRM-native) Animations ===
-  // Only includes files that actually exist in /public/animations/
-
-  // Wave/Greeting
-  { name: "wave", path: "/animations/Goodbye.vrma", triggerEmotions: [], priority: 10 },
+  { name: "wave", path: "/animations/Goodbye.vrma", triggerEmotions: ["happy", "excited"], priority: 10 },
   { name: "goodbye", path: "/animations/Goodbye.vrma", triggerEmotions: [], priority: 10 },
-
-  // Happy/Excited gestures - map to existing animations
-  // Note: Jump.vrma and Clapping.vrma don't exist, using Surprised as fallback for excitement
-  { name: "excited_jump", path: "/animations/Surprised.vrma", triggerEmotions: ["excited"], priority: 9 },
-  { name: "clapping", path: "/animations/Surprised.vrma", triggerEmotions: ["happy", "excited"], priority: 8 },
-
-  // Curious gestures
-  { name: "thinking", path: "/animations/Thinking.vrma", triggerEmotions: ["curious"], priority: 7 },
-  { name: "looking_around", path: "/animations/LookAround.vrma", triggerEmotions: ["curious"], priority: 6 },
-
-  // Embarrassed gestures - Blush.vrma doesn't exist, use Sleepy as shy/embarrassed fallback
   { name: "blush", path: "/animations/Sleepy.vrma", triggerEmotions: ["embarrassed"], priority: 8 },
-
-  // Sad/Concerned gestures
   { name: "sad", path: "/animations/Sad.vrma", triggerEmotions: ["sad", "concerned"], priority: 7 },
-
-  // Angry/Frustrated gestures - Angry.vrma doesn't exist, use Sad as frustrated fallback
   { name: "angry", path: "/animations/Sad.vrma", triggerEmotions: ["annoyed", "frustrated"], priority: 7 },
-
-  // Surprise gesture
-  { name: "surprised", path: "/animations/Surprised.vrma", triggerEmotions: ["surprised"], priority: 8 },
-
-  // Neutral/Idle gestures
-  { name: "relax", path: "/animations/Relax.vrma", triggerEmotions: ["neutral"], priority: 5 },
   { name: "sleepy", path: "/animations/Sleepy.vrma", triggerEmotions: ["neutral"], priority: 4 },
 
-  // === Mixamo FBX Animations (hold poses) ===
+  // === Mixamo FBX Animations ===
   { name: "standing_idle", path: "/animations/standing-idle.fbx", triggerEmotions: [], priority: 0, isLoopingIdle: true },
-  { name: "default", path: "/animations/default.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
   { name: "lay", path: "/animations/lay.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
-  { name: "stand", path: "/animations/stand.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
-  { name: "stand1", path: "/animations/stand1.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
 ];
 
 export interface GestureManagerConfig {

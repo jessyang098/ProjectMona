@@ -2,7 +2,7 @@ export interface EmotionData {
   emotion: string;
   intensity: string;
   timestamp: string;
-  gesture?: string;  // Optional gesture animation to play (e.g., "wave", "clapping", "thinking")
+  gesture?: string;  // Optional gesture animation to play (e.g., "wave", "sad", "sleepy")
 }
 
 // Lip sync modes
