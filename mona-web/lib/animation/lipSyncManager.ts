@@ -95,6 +95,12 @@ const JAW_COUPLING: Record<keyof PhonemeValues, number> = {
 // Dead zone: values below this are snapped to zero to prevent mesh micro-drift
 const DEAD_ZONE_THRESHOLD = 0.01;
 
+// Formant silence threshold: used for word-gap detection in formant mode
+// The main amplitudeThreshold (0.0005 from VRMAvatar) is too low to detect word gaps
+// because TTS audio has residual noise above that level even between words.
+// This higher threshold reliably detects actual inter-word silence in TTS output.
+const FORMANT_SILENCE_THRESHOLD = 0.015;
+
 // Micro-movement state for natural variation
 interface MicroMovementState {
   phase: number;
@@ -850,16 +856,16 @@ export class LipSyncManager {
     const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
     const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
 
-    if (amplitude < amplitudeThreshold) {
+    if (amplitude < FORMANT_SILENCE_THRESHOLD) {
       return phonemes;
     }
 
     // === LAYER 1: Jaw Opening from F1 Energy ===
     // F1 energy correlates directly with jaw openness in speech production
     // Open vowels (/a/) have high F1 (~850Hz), closed vowels (/i/) have low F1 (~310Hz)
-    // Amplitude is used as a secondary modulator, not the primary driver
+    // Amplitude gates the formant output with a gradient curve (not binary on/off)
     const f1Driven = formants.f1Energy * formantConfig.f1Weight * 2.5;
-    const amplitudeGate = Math.min(1.0, (amplitude - amplitudeThreshold) * 4.0);
+    const amplitudeGate = Math.min(1.0, (amplitude - FORMANT_SILENCE_THRESHOLD) * 8.0);
     const jawLevel = Math.min(maxMouthOpen, f1Driven * amplitudeGate);
 
     // === LAYER 2: Vowel Shape Classification ===
@@ -984,12 +990,8 @@ export class LipSyncManager {
 
   /**
    * Add micro-movement variation to phoneme values.
-   * Uses 3-octave multi-sine for organic natural variation:
-   * - Slow breathing rhythm (~0.7 Hz)
-   * - Mid-speed tongue/jaw movement (~3.1 Hz)
-   * - Fast micro-jitter (~7.3 Hz)
-   * Incommensurate frequencies prevent repetitive patterns.
-   * Counter-movement on oh/ou creates organic feel.
+   * Prevents the avatar from looking "frozen" during sustained vowels.
+   * Single sine at ~4Hz is sufficient for anime VRM blend shapes.
    */
   private addMicroMovement(values: PhonemeValues, deltaTime: number = 0.016): PhonemeValues {
     const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
@@ -998,26 +1000,19 @@ export class LipSyncManager {
     // Update phase
     this.microMovement.phase += deltaTime;
 
-    // Wrap phase to prevent floating point issues over time
-    if (this.microMovement.phase > 1000) {
-      this.microMovement.phase -= 1000;
+    // Wrap phase to prevent floating point issues
+    if (this.microMovement.phase > 100) {
+      this.microMovement.phase -= 100;
     }
 
-    const t = this.microMovement.phase;
-
-    // 3-octave multi-sine with incommensurate frequencies
-    const breathLayer = Math.sin(t * 0.7 * Math.PI * 2) * amp * 0.6;   // slow breathing
-    const tongueLayer = Math.sin(t * 3.1 * Math.PI * 2) * amp * 1.0;   // mid tongue movement
-    const jitterLayer = Math.sin(t * 7.3 * Math.PI * 2) * amp * 0.35;  // fast micro-jitter
-
-    const combined = breathLayer + tongueLayer + jitterLayer;
+    const variation = Math.sin(this.microMovement.phase * 4.0 * Math.PI * 2) * amp;
 
     return {
-      aa: Math.max(0, values.aa + combined * 0.5),   // jaw gets half the movement
-      ee: Math.max(0, values.ee + combined * 0.3),   // lips get less
-      ih: Math.max(0, values.ih + combined * 0.3),
-      oh: Math.max(0, values.oh - combined * 0.2),   // counter-movement for organic feel
-      ou: Math.max(0, values.ou - combined * 0.15),   // counter-movement
+      aa: Math.max(0, values.aa + variation * 0.6),
+      ee: Math.max(0, values.ee + variation * 0.3),
+      ih: Math.max(0, values.ih + variation * 0.3),
+      oh: Math.max(0, values.oh + variation * 0.4),
+      ou: Math.max(0, values.ou + variation * 0.3),
     };
   }
 
@@ -1040,12 +1035,14 @@ export class LipSyncManager {
     // Calculate amplitude
     const amplitude = this.calculateRMSAmplitude(this.timeDomainBuffer);
 
-    // === Hysteresis-based silence detection ===
-    // Prevents mouth flickering when amplitude hovers around threshold
-    const rawSilence = amplitude < this.config.amplitudeThreshold;
-    if (rawSilence) {
+    // === Silence detection ===
+    // Use dedicated formant silence threshold (0.015) instead of config.amplitudeThreshold (0.0005)
+    // The config threshold is too low to detect word gaps in TTS audio
+    const isBelowThreshold = amplitude < FORMANT_SILENCE_THRESHOLD;
+
+    // Hysteresis: prevent flickering at threshold boundary
+    if (isBelowThreshold) {
       this.silenceFrameCount++;
-      // Only transition to silence after sustained quiet (4 frames / ~67ms)
       if (this.silenceFrameCount >= this.SILENCE_HYSTERESIS_FRAMES) {
         this.isSpeaking = false;
       }
@@ -1054,7 +1051,7 @@ export class LipSyncManager {
       this.isSpeaking = true;
     }
 
-    // If fully silent (past hysteresis), decay mouth to closed
+    // If fully silent (past hysteresis), snap mouth to closed
     if (!this.isSpeaking) {
       const silentValues: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
       this.applyAsymmetricSmoothing(silentValues, expressionManager, true);
@@ -1095,8 +1092,10 @@ export class LipSyncManager {
       phonemeValues = this.addMicroMovement(phonemeValues);
     }
 
-    // Apply with asymmetric easing (fast attack, smooth release)
-    this.applyAsymmetricSmoothing(phonemeValues, expressionManager, false);
+    // Apply with asymmetric easing
+    // Use fast decay whenever amplitude is below threshold (word gaps)
+    // This ensures the mouth closes quickly between words
+    this.applyAsymmetricSmoothing(phonemeValues, expressionManager, isBelowThreshold);
   }
 
   /**

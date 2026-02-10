@@ -95,8 +95,8 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-3 sm:px-8 pointer-events-none">
-      <div className="flex flex-col gap-2 pb-2">
+    <div className="mx-auto w-full max-w-2xl px-3 sm:px-8 pointer-events-none shrink-0">
+      <div className="flex flex-col gap-2 pb-2 max-h-[40vh] overflow-y-auto scrollbar-hide">
         {bubbles.map((bubble) => {
           const isMona = bubble.message.sender === "mona";
           const isExiting = bubble.state === "exiting";
