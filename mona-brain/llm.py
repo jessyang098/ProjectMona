@@ -20,23 +20,6 @@ from affection import AffectionEngine
 from analytics import analytics, calculate_llm_cost
 
 
-# Available gestures for LLM selection
-GESTURE_DESCRIPTIONS = """
-Available gestures (choose the most appropriate one):
-- wave: Greeting or saying hi/bye
-- clapping: Celebrating, congratulating, excited about good news
-- excited_jump: Very excited, can't contain excitement
-- thinking: Pondering, considering something, curious
-- looking_around: Curious, searching, wondering
-- blush: Embarrassed, flustered, receiving compliment
-- sad: Sad, sympathetic, bad news
-- angry: Frustrated, annoyed, upset
-- surprised: Shocked, surprised by something unexpected
-- relax: Calm, content, peaceful moment
-- sleepy: Tired, bored, drowsy
-- none: No gesture needed (most common - use for normal conversation)
-"""
-
 
 class ConversationMessage(BaseModel):
     """A single message in the conversation history"""
@@ -51,7 +34,7 @@ class MonaLLM:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-4o",
+        model: str = "gpt-4o-mini",
         personality: MonaPersonality = default_mona,
         max_history: int = 20
     ):
@@ -394,9 +377,11 @@ let your personality unfold over the first few messages. Make them want to come 
 
             async def _post_response_analysis():
                 try:
-                    await emotion_engine.analyze_message_llm(_client, _user_msg, _assistant_msg)
-                    await _affection.update_affection_llm(_client, _uid, _user_msg, _assistant_msg)
-                    await _memory.extract_memories_llm(_client, _uid, _user_msg)
+                    await asyncio.gather(
+                        emotion_engine.analyze_message_llm(_client, _user_msg, _assistant_msg),
+                        _affection.update_affection_llm(_client, _uid, _user_msg, _assistant_msg),
+                        _memory.extract_memories_llm(_client, _uid, _user_msg),
+                    )
                 except Exception as e:
                     print(f"⚠ Background analysis failed: {e}")
 
@@ -408,14 +393,8 @@ let your personality unfold over the first few messages. Make them want to come 
                 emotion_data["gesture"] = forced_gesture
                 print(f"🎬 TEST: Forced gesture: {forced_gesture}")
             else:
-                # Use LLM to select the most appropriate gesture based on context
-                selected_gesture = await self._select_gesture(
-                    assistant_message,
-                    user_message,
-                    emotion_data.get("emotion", "neutral")
-                )
-                emotion_data["gesture"] = selected_gesture
-                print(f"🎬 LLM selected gesture: {selected_gesture}")
+                # Use deterministic emotion→gesture map (already set by get_emotion_for_expression)
+                print(f"🎬 Gesture: {emotion_data.get('gesture', 'none')} (from emotion map)")
 
             yield {
                 "event": "complete",
@@ -444,66 +423,6 @@ let your personality unfold over the first few messages. Make them want to come 
                 emotion = event.get("emotion", {}) or emotion
         return full_text, emotion
 
-    async def _select_gesture(self, mona_response: str, user_message: str, emotion: str) -> str:
-        """
-        Use a fast LLM call to select the most appropriate gesture for Mona's response.
-        This runs in parallel with TTS generation to minimize latency.
-        """
-        try:
-            prompt = f"""You are selecting a body gesture animation for a virtual girlfriend character.
-
-User said: "{user_message}"
-She responds: "{mona_response}"
-Her current emotion: {emotion}
-
-{GESTURE_DESCRIPTIONS}
-
-IMPORTANT: Most normal conversation should use "none". Only use a gesture when it really fits.
-- Greetings → wave
-- Great news/celebration → clapping or excited_jump
-- Thinking about something → thinking
-- Embarrassed by compliment → blush
-- Comforting sad news → sad
-- Frustrated/annoyed → angry
-- Shocked by something → surprised
-
-Respond with ONLY the gesture name, nothing else."""
-
-            response = await self.client.chat.completions.create(
-                model="gpt-4o-mini",  # Fast and cheap for this simple task
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=20,
-            )
-
-            # Track gesture selection cost
-            if response.usage:
-                cost = calculate_llm_cost(
-                    response.usage.prompt_tokens,
-                    response.usage.completion_tokens,
-                    "gpt-4o-mini"
-                )
-                await analytics.track_api_cost(
-                    service="openai_chat",
-                    model="gpt-4o-mini",
-                    input_tokens=response.usage.prompt_tokens,
-                    output_tokens=response.usage.completion_tokens,
-                    estimated_cost=cost,
-                )
-
-            gesture = response.choices[0].message.content.strip().lower()
-
-            # Validate the gesture is in our list
-            valid_gestures = [g.value for g in GestureType]
-            if gesture in valid_gestures:
-                return gesture
-
-            # Default to none if invalid
-            return "none"
-
-        except Exception as e:
-            print(f"Error selecting gesture: {e}")
-            return "none"
 
     def _check_gesture_test_command(self, user_message: str) -> Optional[str]:
         """

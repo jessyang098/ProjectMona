@@ -554,16 +554,17 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
         while True:
             # Receive message from client
             data = await websocket.receive_text()
+
+            # Start pipeline timer before any processing (captures full request time)
+            timer = PipelineTimer(client_id)
+            timer.checkpoint("1_message_received")
+
             message_data = json.loads(data)
 
             # Handle heartbeat ping
             if message_data.get("type") == "ping":
                 await manager.send_message({"type": "pong"}, client_id)
                 continue
-
-            # Start pipeline timer
-            timer = PipelineTimer(client_id)
-            timer.checkpoint("1_message_received")
 
             # Extract image data and TTS engine preference
             image_base64 = message_data.get("image")
@@ -602,7 +603,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                         await manager.send_message(limit_message, client_id)
                         continue  # Skip processing this message
 
-                    # Increment guest message count
+            timer.checkpoint("2_validation_complete")
+
+            # DB writes: increment guest count, track analytics, update user timestamps
+            if is_guest:
+                async with async_session() as db:
+                    result = await db.execute(select(GuestSession).where(GuestSession.session_id == guest_session_id))
+                    guest_session = result.scalar_one_or_none()
                     if guest_session:
                         guest_session.message_count += 1
                         guest_session.last_active = datetime.now()
@@ -623,8 +630,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                     if db_user:
                         db_user.last_message_at = datetime.utcnow()
                         await db.commit()
-
-            timer.checkpoint("2_validation_complete")
 
             # Echo user message back (for confirmation)
             user_message = {

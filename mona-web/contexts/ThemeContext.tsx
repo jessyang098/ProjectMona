@@ -13,22 +13,19 @@ const ThemeContext = createContext<ThemeContextType | null>(null);
 const STORAGE_KEY = "mona_dark_mode";
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize from localStorage and system preference
+  // Initialize from localStorage (default to dark mode for new users)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check localStorage first
+    // Check localStorage first — only override default if user has a saved preference
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored !== null) {
       setIsDarkMode(stored === "true");
-    } else {
-      // Fall back to system preference
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setIsDarkMode(prefersDark);
     }
+    // New users get dark mode by default (no else branch needed)
     setIsInitialized(true);
   }, []);
 

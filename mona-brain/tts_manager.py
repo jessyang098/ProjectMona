@@ -47,7 +47,7 @@ class TTSManager:
             (audio_url, lip_sync_data, used_engine, duration_seconds)
             audio_url is like "/audio/filename.wav" or None if all engines failed.
         """
-        tts_start = time.time()
+        tts_start = time.perf_counter()
         audio_url = None
         lip_sync_data = None
         used_engine = None
@@ -79,7 +79,7 @@ class TTSManager:
                 if not lip_sync_data and fallback_lip_sync:
                     lip_sync_data = fallback_lip_sync
 
-        duration = time.time() - tts_start
+        duration = time.perf_counter() - tts_start
         text_preview = text[:50] + "..." if len(text) > 50 else text
         print(f"TTS [{used_engine or 'none'}] generated in {duration:.2f}s for '{text_preview}'")
         if used_engine and engine_preference not in (used_engine or ""):

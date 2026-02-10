@@ -114,7 +114,7 @@ class MonaTTSSoVITS:
                 "prompt_lang": self.prompt_lang,
                 "speed_factor": self.speed_factor,
                 "text_split_method": "cut0",
-                "streaming_mode": 1,
+                "streaming_mode": 0,
             }
 
             # Use longer timeout for warmup (model loading can be slow)
@@ -212,7 +212,7 @@ class MonaTTSSoVITS:
                 "prompt_lang": self.prompt_lang,
                 "speed_factor": self.speed_factor,
                 "text_split_method": "cut0",
-                "streaming_mode": 1,
+                "streaming_mode": 0,
             }
 
             # Call GPT-SoVITS API using shared session (connection pooling)
