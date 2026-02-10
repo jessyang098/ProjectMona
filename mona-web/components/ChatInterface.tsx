@@ -375,15 +375,15 @@ export default function ChatInterface() {
 
         {/* Connection error — shown inline in header status */}
 
-        {/* Floating chat bubbles */}
+        {/* Spacer to push bubbles + input to bottom */}
+        <div className="flex-1" />
+
+        {/* Floating chat bubbles — directly above input */}
         <FloatingBubbles
           messages={messages}
           isTyping={isTyping}
           isGeneratingAudio={isGeneratingAudio}
         />
-
-        {/* Spacer to push input to bottom */}
-        <div className="flex-1" />
 
         {/* Slim pill input bar */}
         <footer className="px-3 sm:px-8 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>

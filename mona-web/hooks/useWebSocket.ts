@@ -113,6 +113,11 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions, clientI
               if (next.length && next[next.length - 1].isStreaming) {
                 next.pop();
               }
+              // Deduplicate: skip if last message has same content, sender, and similar timestamp
+              const last = next[next.length - 1];
+              if (last && last.sender === newMessage.sender && last.content === newMessage.content) {
+                return next;
+              }
               return [...next, newMessage];
             });
 

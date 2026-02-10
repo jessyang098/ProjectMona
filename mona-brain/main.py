@@ -501,55 +501,49 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
                 except Exception as e:
                     print(f"⚠ Failed to deliver pending messages: {e}")
 
-        # Send welcome message (skip for returning users with chat history)
-        if has_history:
-            # Returning user - use "welcome back" instead of intro
-            user_display = user.nickname or user.name if user else None
-            if user_display:
-                welcome_content = f"Hey {user_display}, welcome back~"
+        # Send welcome message only for new users (no chat history)
+        # Returning users already see their conversation from chat_history
+        if not has_history:
+            if mona_llm:
+                emotion_data = mona_llm.get_emotion_state(llm_user_id)
+                welcome_content = "Hey! I'm Mona~ what should I call you?"
             else:
-                welcome_content = "Hey, you're back~"
-            emotion_data = mona_llm.get_emotion_state(llm_user_id) if mona_llm else {}
-        elif mona_llm:
-            emotion_data = mona_llm.get_emotion_state(llm_user_id)
-            welcome_content = "Hey! I'm Mona~ what should I call you?"
-        else:
-            emotion_data = {}
-            welcome_content = "Hey! I'm Mona~ what should I call you? (Running in dummy mode)"
+                emotion_data = {}
+                welcome_content = "Hey! I'm Mona~ what should I call you? (Running in dummy mode)"
 
-        welcome_message = {
-            "type": "message",
-            "content": welcome_content,
-            "sender": "mona",
-            "timestamp": datetime.now().isoformat(),
-            "emotion": emotion_data,
-        }
-        await manager.send_message(welcome_message, client_id)
+            welcome_message = {
+                "type": "message",
+                "content": welcome_content,
+                "sender": "mona",
+                "timestamp": datetime.now().isoformat(),
+                "emotion": emotion_data,
+            }
+            await manager.send_message(welcome_message, client_id)
 
-        # Generate welcome voice in background (non-blocking)
-        async def generate_welcome_audio():
-            print(f"[STARTUP AUDIO] Starting audio generation for client {client_id}")
-            tts_text = preprocess_tts_text(welcome_content)
-            audio_url, lip_sync_data, used_engine, duration = await tts_manager.generate(
-                tts_text, engine_preference="sovits"
-            )
+            # Generate welcome voice in background (non-blocking)
+            async def generate_welcome_audio():
+                print(f"[STARTUP AUDIO] Starting audio generation for client {client_id}")
+                tts_text = preprocess_tts_text(welcome_content)
+                audio_url, lip_sync_data, used_engine, duration = await tts_manager.generate(
+                    tts_text, engine_preference="sovits"
+                )
 
-            # Send audio update when ready
-            if audio_url:
-                audio_update = {
-                    "type": "audio_ready",
-                    "audioUrl": audio_url,
-                    "lipSync": lip_sync_data,
-                    "timestamp": datetime.now().isoformat(),
-                }
-                await manager.send_message(audio_update, client_id)
-                print(f"[STARTUP AUDIO] Audio update sent successfully")
-            else:
-                print(f"[STARTUP AUDIO] No audio URL generated - no audio will be sent")
+                # Send audio update when ready
+                if audio_url:
+                    audio_update = {
+                        "type": "audio_ready",
+                        "audioUrl": audio_url,
+                        "lipSync": lip_sync_data,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                    await manager.send_message(audio_update, client_id)
+                    print(f"[STARTUP AUDIO] Audio update sent successfully")
+                else:
+                    print(f"[STARTUP AUDIO] No audio URL generated - no audio will be sent")
 
-        # Start background task
-        print(f"🚀 [STARTUP AUDIO] Creating background task for audio generation")
-        asyncio.create_task(generate_welcome_audio())
+            # Start background task
+            print(f"🚀 [STARTUP AUDIO] Creating background task for audio generation")
+            asyncio.create_task(generate_welcome_audio())
 
         while True:
             # Receive message from client
