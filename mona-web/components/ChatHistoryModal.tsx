@@ -20,19 +20,21 @@ export default function ChatHistoryModal({ isOpen, onClose, messages }: ChatHist
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <>
+      {/* Backdrop */}
       <div
-        className="relative mx-auto mt-16 flex w-full max-w-lg flex-1 flex-col overflow-hidden rounded-t-3xl bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-700 animate-slideUp"
+        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        onClick={onClose}
+      />
+
+      {/* Side panel — slides in from right */}
+      <div
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-white/90 backdrop-blur-xl border-l border-slate-200 dark:bg-slate-900/90 dark:border-slate-700 transition-transform duration-300 ease-out ${isOpen ? "translate-x-0" : "translate-x-full"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+        <div className="flex items-center justify-between border-b border-slate-200/60 px-5 py-4 dark:border-slate-700/60">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Chat History</h2>
           <button
             onClick={onClose}
@@ -63,6 +65,6 @@ export default function ChatHistoryModal({ isOpen, onClose, messages }: ChatHist
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,0 +1,59 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "Vena - Kimono Outfit.moc3",
+		"Textures": [
+			"Vena - Kimono Outfit.2048/texture_00.png",
+			"Vena - Kimono Outfit.2048/texture_01.png",
+			"Vena - Kimono Outfit.2048/texture_02.png",
+			"Vena - Kimono Outfit.2048/texture_03.png",
+			"Vena - Kimono Outfit.2048/texture_04.png",
+			"Vena - Kimono Outfit.2048/texture_05.png",
+			"Vena - Kimono Outfit.2048/texture_06.png",
+			"Vena - Kimono Outfit.2048/texture_07.png"
+		],
+		"Physics": "Vena - Kimono Outfit.physics3.json",
+		"DisplayInfo": "Vena - Kimono Outfit.cdi3.json",
+		"Expressions": [
+			{ "Name": "blush", "File": "blush.exp3.json" },
+			{ "Name": "squeezed_eyes", "File": "squeezed eyes.exp3.json" },
+			{ "Name": "closed_eyes", "File": "closed eyes.exp3.json" },
+			{ "Name": "empty_eyes", "File": "empty eyes.exp3.json" },
+			{ "Name": "cry", "File": "cry.exp3.json" },
+			{ "Name": "chibi", "File": "chibi.exp3.json" },
+			{ "Name": "remove_all_acc", "File": "remove all acc.exp3.json" },
+			{ "Name": "clothing_color", "File": "clothing color.exp3.json" },
+			{ "Name": "clothing_color_1", "File": "clothing color 1.exp3.json" },
+			{ "Name": "clothing_color_3", "File": "clothing color 3.exp3.json" },
+			{ "Name": "eye_color_1", "File": "eye color 1.exp3.json" },
+			{ "Name": "eye_color_2", "File": "eye color 2.exp3.json" },
+			{ "Name": "eye_color_3", "File": "eye color 3.exp3.json" },
+			{ "Name": "haircolor_1", "File": "haircolor 1.exp3.json" },
+			{ "Name": "haircolor_2", "File": "haircolor 2.exp3.json" },
+			{ "Name": "haircolor_3", "File": "haircolor 3.exp3.json" },
+			{ "Name": "acc_color_1", "File": "acc color 1.exp3.json" },
+			{ "Name": "acc_color_2", "File": "acc color 2.exp3.json" },
+			{ "Name": "acc_color_3", "File": "acc color 3.exp3.json" },
+			{ "Name": "boba_small", "File": "boba size - small.exp3.json" },
+			{ "Name": "boba_larger", "File": "boba size - larger.exp3.json" },
+			{ "Name": "hat_toggle", "File": "hat offon.exp3.json" },
+			{ "Name": "wings_toggle", "File": "wings offonn.exp3.json" },
+			{ "Name": "horns_toggle", "File": "horns offon.exp3.json" },
+			{ "Name": "preset1", "File": "preset1.exp3.json" },
+			{ "Name": "preset2", "File": "preset2.exp3.json" },
+			{ "Name": "preset3", "File": "preset3.exp3.json" }
+		]
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": ["ParamMouthOpenY"]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": ["ParamEyeLOpen", "ParamEyeROpen"]
+		}
+	]
+}

@@ -13,7 +13,7 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
 };
 
 export function useAvatarConfig() {
-  const [selectedAvatar, setSelectedAvatar] = useState<AvatarId>("moe");
+  const [selectedAvatar, setSelectedAvatar] = useState<AvatarId>("vena");
   const [outfitVisibility, setOutfitVisibility] = useState<OutfitVisibility>(DEFAULT_OUTFIT);
   const [showOutfitMenu, setShowOutfitMenu] = useState(false);
 

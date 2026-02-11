@@ -1,0 +1,934 @@
+{
+	"Version": 3,
+	"Parameters": [
+		{
+			"Id": "Param3exp",
+			"GroupId": "ParamGroup14",
+			"Name": "exp - blush"
+		},
+		{
+			"Id": "Param3exp4",
+			"GroupId": "ParamGroup14",
+			"Name": "exp - squeezed eyes"
+		},
+		{
+			"Id": "Param3exp5",
+			"GroupId": "ParamGroup14",
+			"Name": "exp - closed eyes"
+		},
+		{
+			"Id": "Param3exp6",
+			"GroupId": "ParamGroup14",
+			"Name": "exp - empty eyes"
+		},
+		{
+			"Id": "Param3exp2cry",
+			"GroupId": "ParamGroup14",
+			"Name": "exp - cry"
+		},
+		{
+			"Id": "ParamOnOff16",
+			"GroupId": "ParamGroup14",
+			"Name": "Toggle - Chibi Size"
+		},
+		{
+			"Id": "ParamOnOff18",
+			"GroupId": "ParamGroup14",
+			"Name": "breast size"
+		},
+		{
+			"Id": "ParamOnOff6",
+			"GroupId": "ParamGroup14",
+			"Name": "Slider - Clothing Color"
+		},
+		{
+			"Id": "ParamOnOff7",
+			"GroupId": "ParamGroup14",
+			"Name": "Slider - Eye Color"
+		},
+		{
+			"Id": "ParamOnOff8",
+			"GroupId": "ParamGroup14",
+			"Name": "Slider - Accessory Color"
+		},
+		{
+			"Id": "ParamOnOff9",
+			"GroupId": "ParamGroup14",
+			"Name": "Slider - hair Color"
+		},
+		{
+			"Id": "hornstoggle",
+			"GroupId": "ParamGroup14",
+			"Name": "hornstoggle"
+		},
+		{
+			"Id": "hattoggle",
+			"GroupId": "ParamGroup14",
+			"Name": "hattoggle"
+		},
+		{
+			"Id": "headwings",
+			"GroupId": "ParamGroup14",
+			"Name": "headwings"
+		},
+		{
+			"Id": "headwings2",
+			"GroupId": "ParamGroup14",
+			"Name": "wingstoggle"
+		},
+		{
+			"Id": "ParamMouthOpenY",
+			"GroupId": "",
+			"Name": "Mouth Open"
+		},
+		{
+			"Id": "ParamMouthForm",
+			"GroupId": "",
+			"Name": "Mouth Form"
+		},
+		{
+			"Id": "ParamMouthX",
+			"GroupId": "",
+			"Name": "Mouth X"
+		},
+		{
+			"Id": "ParamMouthcheekp",
+			"GroupId": "",
+			"Name": "cheekpuff"
+		},
+		{
+			"Id": "Param2",
+			"GroupId": "",
+			"Name": "Face Phys 1"
+		},
+		{
+			"Id": "ParamFacePhysic2",
+			"GroupId": "",
+			"Name": "Face Physic 2"
+		},
+		{
+			"Id": "ParamMouthPhysic1",
+			"GroupId": "",
+			"Name": "Mouth Physic 1"
+		},
+		{
+			"Id": "ParamMouthPhysic2",
+			"GroupId": "",
+			"Name": "Mouth Physic 2"
+		},
+		{
+			"Id": "ParamAngleX2",
+			"GroupId": "ParamGroup2",
+			"Name": "Aug Angle X"
+		},
+		{
+			"Id": "ParamAngleY2",
+			"GroupId": "ParamGroup2",
+			"Name": "Aug Angle Y"
+		},
+		{
+			"Id": "ParamAngleZ2",
+			"GroupId": "ParamGroup2",
+			"Name": "aug Angle Z"
+		},
+		{
+			"Id": "ParamAngleX",
+			"GroupId": "ParamGroup2",
+			"Name": "Angle X"
+		},
+		{
+			"Id": "ParamAngleY",
+			"GroupId": "ParamGroup2",
+			"Name": "Angle Y"
+		},
+		{
+			"Id": "ParamAngleZ",
+			"GroupId": "ParamGroup2",
+			"Name": "Angle Z"
+		},
+		{
+			"Id": "ParamBodyAngleX",
+			"GroupId": "ParamGroup",
+			"Name": "Body Angle X"
+		},
+		{
+			"Id": "ParamBodyAngleY",
+			"GroupId": "ParamGroup",
+			"Name": "Body Angle Y"
+		},
+		{
+			"Id": "ParamBodyAngleZ",
+			"GroupId": "ParamGroup",
+			"Name": "Body Angle Z"
+		},
+		{
+			"Id": "ParamLegR",
+			"GroupId": "ParamGroup",
+			"Name": "Leg L"
+		},
+		{
+			"Id": "ParamLegL",
+			"GroupId": "ParamGroup",
+			"Name": "Leg R"
+		},
+		{
+			"Id": "ParamBreath",
+			"GroupId": "ParamGroup3",
+			"Name": "呼吸"
+		},
+		{
+			"Id": "ParamArmR1",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm R"
+		},
+		{
+			"Id": "ParamArmR2",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm R 2"
+		},
+		{
+			"Id": "ParamArmR3",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm R 3"
+		},
+		{
+			"Id": "ParamArmR4",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm R 4"
+		},
+		{
+			"Id": "ParamArmR5",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm R 5"
+		},
+		{
+			"Id": "ParamArmL1",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm L"
+		},
+		{
+			"Id": "ParamArmL2",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm L 2"
+		},
+		{
+			"Id": "ParamArmL3",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm L 3"
+		},
+		{
+			"Id": "ParamArmL4",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm L 4"
+		},
+		{
+			"Id": "ParamArmL5",
+			"GroupId": "ParamGroup3",
+			"Name": "Arm L 5"
+		},
+		{
+			"Id": "ParamBoobY",
+			"GroupId": "ParamGroup4",
+			"Name": "Boba Y"
+		},
+		{
+			"Id": "ParamBoobY2",
+			"GroupId": "ParamGroup4",
+			"Name": "Boba Y2"
+		},
+		{
+			"Id": "ParamBoobX",
+			"GroupId": "ParamGroup4",
+			"Name": "Boba X"
+		},
+		{
+			"Id": "ParamSkirtFlap",
+			"GroupId": "ParamGroupSway",
+			"Name": "Skirt Flap"
+		},
+		{
+			"Id": "ParamSkirtSway",
+			"GroupId": "ParamGroupSway",
+			"Name": "Skirt Sway"
+		},
+		{
+			"Id": "ParamSkirtFlap2",
+			"GroupId": "ParamGroupSway",
+			"Name": "Skirt Flap"
+		},
+		{
+			"Id": "ParamSkirtSway2",
+			"GroupId": "ParamGroupSway",
+			"Name": "Skirt Sway"
+		},
+		{
+			"Id": "ParamEyeLOpen",
+			"GroupId": "",
+			"Name": "EyeL Open"
+		},
+		{
+			"Id": "ParamEyeLSmile",
+			"GroupId": "",
+			"Name": "EyeL Smile"
+		},
+		{
+			"Id": "ParamEyeROpen",
+			"GroupId": "",
+			"Name": "EyeR Open"
+		},
+		{
+			"Id": "ParamEyeRSmile",
+			"GroupId": "",
+			"Name": "EyeR Smile"
+		},
+		{
+			"Id": "ParamEyeBallX",
+			"GroupId": "",
+			"Name": "Eyeball X"
+		},
+		{
+			"Id": "ParamEyeBallY",
+			"GroupId": "",
+			"Name": "Eyeball Y"
+		},
+		{
+			"Id": "ParamBrowLY",
+			"GroupId": "",
+			"Name": "BrowL Y"
+		},
+		{
+			"Id": "ParamBrowRY",
+			"GroupId": "",
+			"Name": "BrowR Y"
+		},
+		{
+			"Id": "ParamBrowLAngle",
+			"GroupId": "",
+			"Name": "BrowL Angle"
+		},
+		{
+			"Id": "ParamBrowRAngle",
+			"GroupId": "",
+			"Name": "BrowR Angle"
+		},
+		{
+			"Id": "ParamBrowLForm",
+			"GroupId": "",
+			"Name": "BrowL Form"
+		},
+		{
+			"Id": "ParamBrowRForm",
+			"GroupId": "",
+			"Name": "BrowR Form"
+		},
+		{
+			"Id": "EyeLSquint",
+			"GroupId": "",
+			"Name": "EyeL Squint"
+		},
+		{
+			"Id": "EyeR_Squint",
+			"GroupId": "",
+			"Name": "EyeR Squint"
+		},
+		{
+			"Id": "EyelashPhys1L",
+			"GroupId": "",
+			"Name": "1"
+		},
+		{
+			"Id": "EyelashPhys2L",
+			"GroupId": "",
+			"Name": "2"
+		},
+		{
+			"Id": "EyelashPhys2L2",
+			"GroupId": "",
+			"Name": "3"
+		},
+		{
+			"Id": "EyelashPhys2L3",
+			"GroupId": "",
+			"Name": "4"
+		},
+		{
+			"Id": "EyePhys1L2",
+			"GroupId": "",
+			"Name": "1"
+		},
+		{
+			"Id": "EyePhys1L",
+			"GroupId": "",
+			"Name": "2"
+		},
+		{
+			"Id": "EyeShinePhys1L",
+			"GroupId": "",
+			"Name": "1"
+		},
+		{
+			"Id": "EyeShinePhys2L",
+			"GroupId": "",
+			"Name": "2"
+		},
+		{
+			"Id": "EyelashPhys1L2",
+			"GroupId": "",
+			"Name": "1"
+		},
+		{
+			"Id": "EyelashPhys1R2",
+			"GroupId": "",
+			"Name": "2"
+		},
+		{
+			"Id": "EyelashPhys1R3",
+			"GroupId": "",
+			"Name": "3"
+		},
+		{
+			"Id": "EyelashPhys1R4",
+			"GroupId": "",
+			"Name": "4"
+		},
+		{
+			"Id": "EyePhys1L3",
+			"GroupId": "",
+			"Name": "1"
+		},
+		{
+			"Id": "EyePhys1L4",
+			"GroupId": "",
+			"Name": "2"
+		},
+		{
+			"Id": "EyeShinePhys1L2",
+			"GroupId": "",
+			"Name": "1"
+		},
+		{
+			"Id": "EyeShinePhys2L2",
+			"GroupId": "",
+			"Name": "2"
+		},
+		{
+			"Id": "asdasd",
+			"GroupId": "ParamGroup6",
+			"Name": "hair x"
+		},
+		{
+			"Id": "asa",
+			"GroupId": "ParamGroup6",
+			"Name": "hair x"
+		},
+		{
+			"Id": "asddd",
+			"GroupId": "ParamGroup6",
+			"Name": "hair x"
+		},
+		{
+			"Id": "ddsad",
+			"GroupId": "ParamGroup6",
+			"Name": "hair x"
+		},
+		{
+			"Id": "asdasdd",
+			"GroupId": "ParamGroup6",
+			"Name": "hair y"
+		},
+		{
+			"Id": "dasdsdd",
+			"GroupId": "ParamGroup6",
+			"Name": "hair y"
+		},
+		{
+			"Id": "aasd",
+			"GroupId": "ParamGroup6",
+			"Name": "hair y"
+		},
+		{
+			"Id": "sdd",
+			"GroupId": "ParamGroup6",
+			"Name": "hair y"
+		},
+		{
+			"Id": "dsda",
+			"GroupId": "ParamGroup6",
+			"Name": "hair y"
+		},
+		{
+			"Id": "Param5",
+			"GroupId": "ParamGroup9",
+			"Name": "Animation Repeat"
+		},
+		{
+			"Id": "Param7",
+			"GroupId": "",
+			"Name": "尾を上げて幸せ"
+		},
+		{
+			"Id": "Param_Angle_Rotation22",
+			"GroupId": "ParamGroup7",
+			"Name": "[0]Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation23",
+			"GroupId": "ParamGroup7",
+			"Name": "[1]Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation24",
+			"GroupId": "ParamGroup7",
+			"Name": "[2]Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation25",
+			"GroupId": "ParamGroup7",
+			"Name": "[3]Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation26",
+			"GroupId": "ParamGroup7",
+			"Name": "[4]Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation38",
+			"GroupId": "ParamGroup10",
+			"Name": "[0]←肘 Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation39",
+			"GroupId": "ParamGroup10",
+			"Name": "[1]←肘 Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation46",
+			"GroupId": "ParamGroup11",
+			"Name": "[0]Rotation Deformer of Model Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation47",
+			"GroupId": "ParamGroup11",
+			"Name": "[1]Rotation Deformer of Model Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation48",
+			"GroupId": "ParamGroup11",
+			"Name": "[2]Rotation Deformer of Model Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation49",
+			"GroupId": "ParamGroup12",
+			"Name": "[0]Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation50",
+			"GroupId": "ParamGroup12",
+			"Name": "[1]Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation52",
+			"GroupId": "ParamGroup12",
+			"Name": "[2]Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation53",
+			"GroupId": "ParamGroup12",
+			"Name": "[3]Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation54",
+			"GroupId": "ParamGroup12",
+			"Name": "[4]Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation55",
+			"GroupId": "ParamGroup12",
+			"Name": "[5]Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation82",
+			"GroupId": "ParamGroup15",
+			"Name": "[0]Rotation Deformer of Parts Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation83",
+			"GroupId": "ParamGroup15",
+			"Name": "[1]Rotation Deformer of Parts Rotation"
+		},
+		{
+			"Id": "Param_Angle_Rotation84",
+			"GroupId": "ParamGroup15",
+			"Name": "[2]Rotation Deformer of Parts Rotation"
+		}
+	],
+	"ParameterGroups": [
+		{
+			"Id": "ParamGroup14",
+			"GroupId": "",
+			"Name": "expressions"
+		},
+		{
+			"Id": "ParamGroup5",
+			"GroupId": "",
+			"Name": "Body Change"
+		},
+		{
+			"Id": "ParamGroup2",
+			"GroupId": "",
+			"Name": "XYZ"
+		},
+		{
+			"Id": "ParamGroup",
+			"GroupId": "",
+			"Name": "Body XYZ"
+		},
+		{
+			"Id": "ParamGroup3",
+			"GroupId": "",
+			"Name": "Arm"
+		},
+		{
+			"Id": "ParamGroup4",
+			"GroupId": "",
+			"Name": "Boba"
+		},
+		{
+			"Id": "ParamGroupSway",
+			"GroupId": "",
+			"Name": "Sway"
+		},
+		{
+			"Id": "ParamGroup6",
+			"GroupId": "",
+			"Name": "Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "ParamGroup13",
+			"GroupId": "",
+			"Name": "Folder 1"
+		},
+		{
+			"Id": "ParamGroup9",
+			"GroupId": "",
+			"Name": "Mermaid Tail - Version 1.psd Rotation23"
+		},
+		{
+			"Id": "ParamGroup7",
+			"GroupId": "",
+			"Name": "Rotation Deformer of Hair back Rotation"
+		},
+		{
+			"Id": "ParamGroup10",
+			"GroupId": "",
+			"Name": "←肘 Rotation"
+		},
+		{
+			"Id": "ParamGroup11",
+			"GroupId": "",
+			"Name": "Rotation Deformer of Model Rotation"
+		},
+		{
+			"Id": "ParamGroup12",
+			"GroupId": "",
+			"Name": "Rotation Deformer of legs Rotation"
+		},
+		{
+			"Id": "ParamGroup15",
+			"GroupId": "",
+			"Name": "Rotation Deformer of Parts Rotation"
+		}
+	],
+	"Parts": [
+		{
+			"Id": "Part35",
+			"Name": "color 1"
+		},
+		{
+			"Id": "Part33",
+			"Name": "color 2"
+		},
+		{
+			"Id": "Part32",
+			"Name": "color 4"
+		},
+		{
+			"Id": "Part34",
+			"Name": "kimono.psd (Corresponding layer not found)"
+		},
+		{
+			"Id": "Part31",
+			"Name": "kimono.psd (Corresponding layer not found)"
+		},
+		{
+			"Id": "Part29",
+			"Name": "kimono.psd (Corresponding layer not found)"
+		},
+		{
+			"Id": "Part25",
+			"Name": "Parts56"
+		},
+		{
+			"Id": "Part30",
+			"Name": "Vena.psd (Corresponding layer not found)"
+		},
+		{
+			"Id": "Part24",
+			"Name": "ii_0WRcGN4IBxm3yu51.png"
+		},
+		{
+			"Id": "Part20",
+			"Name": "Vena.psd"
+		},
+		{
+			"Id": "Part23",
+			"Name": "Parts53"
+		},
+		{
+			"Id": "Part14",
+			"Name": "Illustration4.psd"
+		},
+		{
+			"Id": "Part",
+			"Name": "学習用モデル体"
+		},
+		{
+			"Id": "PartSketch0",
+			"Name": "[ 下絵 ]"
+		},
+		{
+			"Id": "PartSkirt",
+			"Name": "Skirt"
+		},
+		{
+			"Id": "Part76",
+			"Name": "Mermaid Tail - Version 1.psd"
+		},
+		{
+			"Id": "Model4",
+			"Name": "Model"
+		},
+		{
+			"Id": "Model3",
+			"Name": "Model"
+		},
+		{
+			"Id": "Model2",
+			"Name": "Model"
+		},
+		{
+			"Id": "Model",
+			"Name": "Model"
+		},
+		{
+			"Id": "Part2",
+			"Name": "頭部"
+		},
+		{
+			"Id": "Part3",
+			"Name": "体"
+		},
+		{
+			"Id": "torso4",
+			"Name": "torso"
+		},
+		{
+			"Id": "torso3",
+			"Name": "torso"
+		},
+		{
+			"Id": "Expressions2",
+			"Name": "Expressions"
+		},
+		{
+			"Id": "Accessories",
+			"Name": "Accessories"
+		},
+		{
+			"Id": "Bangs2",
+			"Name": "Bangs"
+		},
+		{
+			"Id": "Part22",
+			"Name": "Parts52"
+		},
+		{
+			"Id": "ArtMesh1_Skinning",
+			"Name": "Folder 2 Copy 5(Skinning)"
+		},
+		{
+			"Id": "head2",
+			"Name": "head"
+		},
+		{
+			"Id": "torso2",
+			"Name": "torso"
+		},
+		{
+			"Id": "Part19",
+			"Name": "Hair back"
+		},
+		{
+			"Id": "Expressions",
+			"Name": "Expressions"
+		},
+		{
+			"Id": "Part6",
+			"Name": "Side Hair"
+		},
+		{
+			"Id": "Bangs",
+			"Name": "Bangs"
+		},
+		{
+			"Id": "head",
+			"Name": "head"
+		},
+		{
+			"Id": "torso",
+			"Name": "torso"
+		},
+		{
+			"Id": "Part13",
+			"Name": "Hair back"
+		},
+		{
+			"Id": "Part8",
+			"Name": "→腕"
+		},
+		{
+			"Id": "Part4",
+			"Name": "←腕"
+		},
+		{
+			"Id": "Clothes3",
+			"Name": "Clothes"
+		},
+		{
+			"Id": "Part27",
+			"Name": "Folder 8"
+		},
+		{
+			"Id": "Part21",
+			"Name": "Parts47"
+		},
+		{
+			"Id": "eyes2",
+			"Name": "eyes"
+		},
+		{
+			"Id": "Part18",
+			"Name": "Folder 19"
+		},
+		{
+			"Id": "Clothes2",
+			"Name": "Clothes"
+		},
+		{
+			"Id": "legs2",
+			"Name": "legs"
+		},
+		{
+			"Id": "ArtMesh501_Skinning",
+			"Name": "Folder 9 Copy 5(Skinning)"
+		},
+		{
+			"Id": "ArtMesh89_Skinning",
+			"Name": "Folder 14(Skinning)"
+		},
+		{
+			"Id": "ArtMesh96_Skinning",
+			"Name": "Folder 6(Skinning)"
+		},
+		{
+			"Id": "eyes",
+			"Name": "eyes"
+		},
+		{
+			"Id": "mouth",
+			"Name": "mouth"
+		},
+		{
+			"Id": "Part11",
+			"Name": "Folder 15"
+		},
+		{
+			"Id": "Clothes",
+			"Name": "Clothes"
+		},
+		{
+			"Id": "Part12",
+			"Name": "Folder 38"
+		},
+		{
+			"Id": "legs",
+			"Name": "legs"
+		},
+		{
+			"Id": "ArtMesh82_Skinning",
+			"Name": "Folder 35(Skinning)"
+		},
+		{
+			"Id": "Part9",
+			"Name": "手"
+		},
+		{
+			"Id": "Part5",
+			"Name": "手"
+		},
+		{
+			"Id": "Iris2",
+			"Name": "Iris"
+		},
+		{
+			"Id": "Eyelash2",
+			"Name": "Eyelash"
+		},
+		{
+			"Id": "Part16",
+			"Name": "Folder 20"
+		},
+		{
+			"Id": "Part17",
+			"Name": "Eye Folds"
+		},
+		{
+			"Id": "Part26",
+			"Name": "Parts63"
+		},
+		{
+			"Id": "ArtMesh93_Skinning",
+			"Name": "Folder 13(Skinning)"
+		},
+		{
+			"Id": "Eyelash",
+			"Name": "Eyelash"
+		},
+		{
+			"Id": "Part7",
+			"Name": "Eye Folds"
+		},
+		{
+			"Id": "Part15",
+			"Name": "Eye Shine"
+		},
+		{
+			"Id": "Iris",
+			"Name": "Iris"
+		},
+		{
+			"Id": "Part10",
+			"Name": "Eye Shine"
+		}
+	],
+	"CombinedParameters": [
+		[
+			"ParamMouthOpenY",
+			"ParamMouthForm"
+		],
+		[
+			"ParamAngleX2",
+			"ParamAngleY2"
+		]
+	]
+}

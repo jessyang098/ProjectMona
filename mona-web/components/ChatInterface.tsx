@@ -21,7 +21,7 @@ import SettingsModal from "./SettingsModal";
 import ShopModal from "./ShopModal";
 import { EmotionData } from "@/types/chat";
 import Image from "next/image";
-import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions, triggerTestSpeak } from "@/lib/poseCommands";
+import { parseTestCommand, triggerPose, returnToRest, triggerExpression, clearExpressions, triggerTestSpeak, triggerDance } from "@/lib/poseCommands";
 import { useAnimationState } from "@/hooks/useAnimationState";
 import { useToast } from "@/contexts/ToastContext";
 import ToastContainer from "./Toast";
@@ -118,11 +118,13 @@ export default function ChatInterface() {
     .reverse()
     .find((msg) => msg.sender === "mona" && msg.audioUrl);
 
-  const latestAudioUrl = hasAudioSegments && currentSegment
-    ? currentSegment.audioUrl
+  // Only fall back to message-level audio when NO segments exist (non-segmented response).
+  // When segments exist but all are played, return undefined — don't replay via the message's audioUrl.
+  const latestAudioUrl = hasAudioSegments
+    ? currentSegment?.audioUrl
     : latestMonaMessageWithAudio?.audioUrl;
-  const latestLipSync = hasAudioSegments && currentSegment
-    ? currentSegment.lipSync
+  const latestLipSync = hasAudioSegments
+    ? currentSegment?.lipSync
     : latestMonaMessageWithAudio?.lipSync;
 
   const handleAudioEnd = useCallback(() => {
@@ -145,7 +147,7 @@ export default function ChatInterface() {
     if (!audioEnabled) enableAudio();
 
     // Check for test commands
-    const { command, expressionCommand, speakCommand, speakText } = parseTestCommand(inputValue);
+    const { command, expressionCommand, speakCommand, speakText, danceCommand } = parseTestCommand(inputValue);
     if (command) {
       if (command.type === "play" && command.pose) triggerPose(command.pose);
       else if (command.type === "stop") returnToRest();
@@ -162,6 +164,12 @@ export default function ChatInterface() {
     }
     if (speakCommand && speakText) {
       triggerTestSpeak(speakText);
+      setInputValue("");
+      inputRef.current?.blur();
+      return;
+    }
+    if (danceCommand) {
+      triggerDance(danceCommand as "toggle" | "start" | "stop");
       setInputValue("");
       inputRef.current?.blur();
       return;
@@ -387,6 +395,15 @@ export default function ChatInterface() {
 
         {/* Slim pill input bar */}
         <footer className="px-3 sm:px-8 pointer-events-auto" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
+          {/* Emotion status — above right side of input */}
+          {latestEmotion?.emotion && latestEmotion.emotion !== "neutral" && (
+            <div className="mx-auto w-full max-w-2xl flex justify-end px-14 pb-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/50 backdrop-blur-xl border border-purple-200/40 px-2.5 py-1 text-[11px] font-medium text-purple-600 animate-fadeIn dark:bg-slate-800/50 dark:border-purple-500/30 dark:text-purple-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                {latestEmotion.emotion.charAt(0).toUpperCase() + latestEmotion.emotion.slice(1)}
+              </span>
+            </div>
+          )}
           <div className="mx-auto flex w-full max-w-2xl items-center gap-2">
             {/* "+" context menu button */}
             <div className="relative">

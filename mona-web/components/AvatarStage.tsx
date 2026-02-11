@@ -57,6 +57,7 @@ const emotionPalette: Record<string, { primary: string; accent: string }> = {
 
 // Available avatar options
 export const AVATAR_OPTIONS = [
+  { id: "vena", label: "Vena", url: "/avatars/Vena/Vena - Kimono Outfit.model3.json", type: "live2d" as const },
   { id: "moe", label: "Moe", url: "/avatars/Moe.vrm", type: "vrm" as const },
   { id: "mona1", label: "Mona", url: "/avatars/Mona1.vrm", type: "vrm" as const },
   { id: "tora", label: "Tora", url: "/avatars/Tora.vrm", type: "vrm" as const },

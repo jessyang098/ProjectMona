@@ -1,0 +1,35 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "ParamOnOff18",
+            "Value": -0.6667362451553345,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamOnOff6",
+            "Value": 1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamOnOff7",
+            "Value": 1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamOnOff8",
+            "Value": 1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamOnOff9",
+            "Value": 1.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "headwings",
+            "Value": 1.0,
+            "Blend": "Add"
+        }
+    ]
+}

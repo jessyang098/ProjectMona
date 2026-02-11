@@ -314,8 +314,8 @@ export class LipSyncManager {
       if (!this.analyser) {
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 2048;
-        // Lower smoothingTimeConstant for more responsive lip sync (default 0.8 is too sluggish)
-        this.analyser.smoothingTimeConstant = 0.4;
+        // Low smoothingTimeConstant for responsive vowel transitions (default 0.8 is too sluggish)
+        this.analyser.smoothingTimeConstant = 0.25;
         this.timeDomainBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
         this.frequencyBuffer = new Uint8Array(new ArrayBuffer(this.analyser.frequencyBinCount));
       }
@@ -840,19 +840,16 @@ export class LipSyncManager {
   }
 
   /**
-   * Estimate phonemes using layered formant analysis.
-   * Layer 1: Jaw opening driven by F1 energy (not raw amplitude)
-   * Layer 2: Vowel shape from F1/F2 centroid classification with soft blending
-   * Layer 3: Jaw coupling — all vowels include inherent jaw component
-   * Layer 4: Consonant overlay from sibilant detection
-   * Layer 5: Weight normalization to prevent mesh distortion
+   * Estimate phonemes using amplitude-driven intensity + formant vowel selection.
+   * Amplitude controls HOW MUCH the mouth opens (strong, visible movements).
+   * Formant analysis controls WHICH shape (A/E/I/O/U) is used.
    */
   private estimatePhonemesFormant(
     amplitude: number,
     formants: FormantAnalysis,
     consonantLevel: number
   ): PhonemeValues {
-    const { amplitudeThreshold, maxMouthOpen } = this.config;
+    const { amplitudeScale, maxMouthOpen } = this.config;
     const formantConfig = this.config.formantConfig ?? DEFAULT_FORMANT_CONFIG;
     const phonemes: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
 
@@ -860,35 +857,30 @@ export class LipSyncManager {
       return phonemes;
     }
 
-    // === LAYER 1: Jaw Opening from F1 Energy ===
-    // F1 energy correlates directly with jaw openness in speech production
-    // Open vowels (/a/) have high F1 (~850Hz), closed vowels (/i/) have low F1 (~310Hz)
-    // Amplitude gates the formant output with a gradient curve (not binary on/off)
-    const f1Driven = formants.f1Energy * formantConfig.f1Weight * 2.5;
-    const amplitudeGate = Math.min(1.0, (amplitude - FORMANT_SILENCE_THRESHOLD) * 8.0);
-    const jawLevel = Math.min(maxMouthOpen, f1Driven * amplitudeGate);
+    // === Intensity from amplitude (the primary driver) ===
+    // This is what makes the mouth visibly open/close with speech volume.
+    // amplitudeScale (12.0 from VRMAvatar) ensures strong mouth movement.
+    const intensity = Math.min(maxMouthOpen, (amplitude - FORMANT_SILENCE_THRESHOLD) * amplitudeScale);
 
-    // === LAYER 2: Vowel Shape Classification ===
-    // F1 centroid: low = closed vowels (ee, ou), high = open vowels (aa, oh)
-    // F2 centroid: low = back vowels (oh, ou), high = front vowels (ee, ih)
-    const f1Pos = formants.f1Centroid; // 0 = low F1 (closed), 1 = high F1 (open)
-    const f2Pos = formants.f2Centroid; // 0 = low F2 (back), 1 = high F2 (front)
+    // === Vowel selection from formant centroids ===
+    const f1Pos = formants.f1Centroid; // 0 = closed, 1 = open
+    const f2Pos = formants.f2Centroid; // 0 = back, 1 = front
 
-    // Soft classification using distance-based weights (no hard if/else thresholds)
-    // Each vowel has an ideal F1/F2 position; weight = closeness to that ideal
-    // Female voice tuned: aa(0.8,0.5) ee(0.2,0.9) ih(0.45,0.7) oh(0.55,0.25) ou(0.25,0.3)
+    // Vowel centers in F1/F2 space (tuned for female TTS voices)
     const vowelCenters: Record<keyof PhonemeValues, { f1: number; f2: number }> = {
-      aa: { f1: 0.80, f2: 0.50 },  // open central
-      ee: { f1: 0.20, f2: 0.90 },  // close front
-      ih: { f1: 0.45, f2: 0.70 },  // mid front
-      oh: { f1: 0.55, f2: 0.25 },  // mid back rounded
-      ou: { f1: 0.25, f2: 0.30 },  // close back rounded
+      aa: { f1: 0.80, f2: 0.50 },  // open central — "ah"
+      ee: { f1: 0.20, f2: 0.90 },  // close front — "ee"
+      ih: { f1: 0.45, f2: 0.70 },  // mid front — "eh"
+      oh: { f1: 0.55, f2: 0.25 },  // mid back rounded — "oh"
+      ou: { f1: 0.25, f2: 0.30 },  // close back rounded — "oo"
     };
 
-    // Calculate distance-based weights with Gaussian falloff
-    const sigma = 0.25; // Controls spread of vowel classification regions
+    // Gaussian classification — tight sigma for distinct shapes
+    const sigma = 0.15;
     const sigmaSquared2 = 2 * sigma * sigma;
     let totalWeight = 0;
+    let maxKey: keyof PhonemeValues = 'aa';
+    let maxWeight = 0;
     const vowelWeights: PhonemeValues = { aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 };
 
     for (const key of Object.keys(vowelCenters) as (keyof PhonemeValues)[]) {
@@ -897,48 +889,36 @@ export class LipSyncManager {
       const weight = Math.exp(-distSq / sigmaSquared2);
       vowelWeights[key] = weight;
       totalWeight += weight;
+      if (weight > maxWeight) {
+        maxWeight = weight;
+        maxKey = key;
+      }
     }
 
-    // Normalize weights to sum to 1.0, then scale by lip intensity
-    const lipIntensity = jawLevel * formantConfig.f2Weight;
+    // === Apply intensity to the winning vowel shape ===
+    // The dominant vowel gets the full intensity — this is what makes
+    // individual shapes clearly visible instead of muddy blends.
     if (totalWeight > 0) {
       for (const key of Object.keys(vowelWeights) as (keyof PhonemeValues)[]) {
-        phonemes[key] = (vowelWeights[key] / totalWeight) * lipIntensity;
+        const normalized = vowelWeights[key] / totalWeight;
+        // Sharpen: boost winner, suppress losers (winner-take-most)
+        const sharpened = normalized > 0.3 ? normalized * 1.4 : normalized * 0.5;
+        phonemes[key] = Math.min(maxMouthOpen, sharpened * intensity);
       }
     }
 
-    // === LAYER 3: Jaw Coupling ===
-    // All vowels include inherent jaw component (JALI principle)
-    // Jaw opening is a BASE layer; lip shapes are additive on top
-    let coupledJaw = 0;
-    for (const key of Object.keys(phonemes) as (keyof PhonemeValues)[]) {
-      if (key !== 'aa') {
-        coupledJaw = Math.max(coupledJaw, phonemes[key] * JAW_COUPLING[key]);
-      }
-    }
-    phonemes.aa = Math.max(phonemes.aa, coupledJaw);
+    // === Jaw always opens proportional to speech volume ===
+    // aa (jaw) should always reflect how loud the speech is,
+    // regardless of which vowel is dominant
+    const jawFromIntensity = intensity * (0.5 + formants.f1Energy * formantConfig.f1Weight);
+    phonemes.aa = Math.max(phonemes.aa, Math.min(maxMouthOpen, jawFromIntensity));
 
-    // === LAYER 4: Consonant Overlay ===
-    // Sibilants (s, sh, f, th) reduce jaw opening and add lip tension
+    // === Consonant overlay ===
     if (consonantLevel > formantConfig.consonantSensitivity) {
       const consonantFactor = (consonantLevel - formantConfig.consonantSensitivity) /
                                (1 - formantConfig.consonantSensitivity);
-      phonemes.aa *= (1 - consonantFactor * 0.6);
-      phonemes.ih = Math.max(phonemes.ih, consonantFactor * 0.25);
-    }
-
-    // === LAYER 5: Weight Normalization ===
-    // Prevent total blend shape weight from exceeding a safe limit
-    // Multiple high-weight shapes simultaneously cause mesh distortion
-    const totalPhonemeWeight = phonemes.aa + phonemes.ee + phonemes.ih + phonemes.oh + phonemes.ou;
-    const maxTotalWeight = 1.3; // Allow slight overlap for natural look
-    if (totalPhonemeWeight > maxTotalWeight) {
-      const scale = maxTotalWeight / totalPhonemeWeight;
-      phonemes.aa *= scale;
-      phonemes.ee *= scale;
-      phonemes.ih *= scale;
-      phonemes.oh *= scale;
-      phonemes.ou *= scale;
+      phonemes.aa *= (1 - consonantFactor * 0.4);
+      phonemes.ih = Math.max(phonemes.ih, consonantFactor * 0.3 * intensity);
     }
 
     return phonemes;

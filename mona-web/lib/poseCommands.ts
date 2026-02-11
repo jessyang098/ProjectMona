@@ -235,6 +235,7 @@ export function parseTestCommand(input: string): {
   expressionCommand: ExpressionCommand | null;
   speakCommand: boolean;
   speakText: string | null;
+  danceCommand: string | null;
   remainingText: string | null;
 } {
   const trimmed = input.trim();
@@ -243,6 +244,14 @@ export function parseTestCommand(input: string): {
   // Check for test: prefix commands
   if (lowerTrimmed.startsWith("test:")) {
     const command = lowerTrimmed.slice(5).trim();
+
+    // Dance command: test:dance (toggle), test:dance:stop
+    if (command === "dance") {
+      return { command: null, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: "toggle", remainingText: null };
+    }
+    if (command === "dance:stop") {
+      return { command: null, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: "stop", remainingText: null };
+    }
 
     // Check for speak commands: test:speak or test:speak:<text>
     if (command === "speak" || command.startsWith("speak:")) {
@@ -253,6 +262,7 @@ export function parseTestCommand(input: string): {
         expressionCommand: null,
         speakCommand: true,
         speakText: textToSpeak,
+        danceCommand: null,
         remainingText: null,
       };
     }
@@ -262,45 +272,52 @@ export function parseTestCommand(input: string): {
       const exprName = command.slice(5).trim();
 
       if (exprName === "clear") {
-        return { command: null, expressionCommand: { type: "clear" }, speakCommand: false, speakText: null, remainingText: null };
+        return { command: null, expressionCommand: { type: "clear" }, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       }
 
       if (exprName) {
         // Map to actual expression name (VRM names are case-sensitive, Live2D uses snake_case)
         const actualName = EXPRESSION_NAME_MAP[exprName] ?? exprName;
-        return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, speakCommand: false, speakText: null, remainingText: null };
+        return { command: null, expressionCommand: { type: "set", expression: actualName, weight: 1.0 }, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       }
 
-      return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
+      return { command: null, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: input };
     }
 
     // Pose commands
     switch (command) {
       case "wave":
-        return { command: { type: "play", pose: "wave" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "wave" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "goodbye":
-        return { command: { type: "play", pose: "goodbye" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "goodbye" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "sad":
-        return { command: { type: "play", pose: "sad" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "sad" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "angry":
-        return { command: { type: "play", pose: "angry" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "angry" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "blush":
-        return { command: { type: "play", pose: "blush" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "blush" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "sleepy":
-        return { command: { type: "play", pose: "sleepy" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "sleepy" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "lay":
-        return { command: { type: "play", pose: "lay" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "lay" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "standing_idle":
       case "standing-idle":
       case "idle":
-        return { command: { type: "play", pose: "standing_idle" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "play", pose: "standing_idle" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       case "rest":
       case "stop":
-        return { command: { type: "stop" }, expressionCommand: null, speakCommand: false, speakText: null, remainingText: null };
+        return { command: { type: "stop" }, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: null };
       default:
-        return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
+        return { command: null, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: input };
     }
   }
 
-  return { command: null, expressionCommand: null, speakCommand: false, speakText: null, remainingText: input };
+  return { command: null, expressionCommand: null, speakCommand: false, speakText: null, danceCommand: null, remainingText: input };
+}
+
+/**
+ * Trigger dance mode on the Live2D avatar
+ */
+export function triggerDance(action: "toggle" | "start" | "stop" = "toggle"): void {
+  window.dispatchEvent(new CustomEvent("mona:dance", { detail: action }));
 }

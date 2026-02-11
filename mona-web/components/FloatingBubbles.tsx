@@ -11,7 +11,7 @@ interface FloatingBubblesProps {
 
 interface VisibleBubble {
   id: string;
-  message: Message;
+  messageIndex: number; // Index into messages array — always reads latest content
   state: "entering" | "visible" | "exiting";
 }
 
@@ -21,6 +21,7 @@ const MAX_VISIBLE = 4;
 export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio }: FloatingBubblesProps) {
   const [bubbles, setBubbles] = useState<VisibleBubble[]>([]);
   const prevCountRef = useRef(0);
+  const prevLastContentRef = useRef<string>("");
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const removeBubble = useCallback((id: string) => {
@@ -43,24 +44,33 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
     [removeBubble]
   );
 
-  // Watch for new messages
+  // Watch for new messages (length increase)
   useEffect(() => {
     if (messages.length > prevCountRef.current) {
-      const newMessages = messages.slice(prevCountRef.current);
+      const startIndex = prevCountRef.current;
+      const count = messages.length - startIndex;
       const now = Date.now();
 
       // Generate IDs upfront so they match between state update and timer scheduling
-      const newIds = newMessages.map((_, i) => `${now}-${prevCountRef.current + i}`);
+      const newIds = Array.from({ length: count }, (_, i) => `${now}-${startIndex + i}`);
 
       setBubbles((prev) => {
-        const newBubbles: VisibleBubble[] = newMessages.map((msg, i) => ({
-          id: newIds[i],
-          message: msg,
+        const newBubbles: VisibleBubble[] = newIds.map((id, i) => ({
+          id,
+          messageIndex: startIndex + i,
           state: "entering" as const,
         }));
 
+        // Skip streaming messages — they'll be caught when complete
+        const filtered = newBubbles.filter((b) => {
+          const msg = messages[b.messageIndex];
+          return msg && !msg.isStreaming;
+        });
+
+        if (filtered.length === 0) return prev;
+
         // Combine and keep only last MAX_VISIBLE
-        const combined = [...prev, ...newBubbles];
+        const combined = [...prev, ...filtered];
         if (combined.length > MAX_VISIBLE) {
           const excess = combined.slice(0, combined.length - MAX_VISIBLE);
           excess.forEach((b) => {
@@ -75,8 +85,13 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
         return combined;
       });
 
-      // Schedule dismiss for new messages
-      newIds.forEach((id) => scheduleDismiss(id));
+      // Schedule dismiss for non-streaming messages
+      newIds.forEach((id, i) => {
+        const msg = messages[startIndex + i];
+        if (msg && !msg.isStreaming) {
+          scheduleDismiss(id);
+        }
+      });
 
       // Transition entering → visible after animation
       setTimeout(() => {
@@ -84,7 +99,57 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
       }, 350);
     }
     prevCountRef.current = messages.length;
-  }, [messages.length, scheduleDismiss]);
+  }, [messages, scheduleDismiss]);
+
+  // Watch for streaming message becoming complete (content changes without length change).
+  // When the streaming message is replaced by the final message (pop+push, same length),
+  // we detect it here and create a bubble for the complete message.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    const lastContent = lastMsg?.content || "";
+
+    // Detect: same length as before, last message content changed, and message is NOT streaming
+    if (
+      messages.length === prevCountRef.current &&
+      lastContent !== prevLastContentRef.current &&
+      lastMsg &&
+      !lastMsg.isStreaming
+    ) {
+      const messageIndex = messages.length - 1;
+      const now = Date.now();
+      const id = `${now}-complete-${messageIndex}`;
+
+      // Check if we already have a bubble for this index
+      setBubbles((prev) => {
+        const existing = prev.find((b) => b.messageIndex === messageIndex && b.state !== "exiting");
+        if (existing) return prev; // Already showing this message
+
+        const newBubble: VisibleBubble = { id, messageIndex, state: "entering" };
+        const combined = [...prev, newBubble];
+        if (combined.length > MAX_VISIBLE) {
+          const excess = combined.slice(0, combined.length - MAX_VISIBLE);
+          excess.forEach((b) => {
+            const timer = timersRef.current.get(b.id);
+            if (timer) {
+              clearTimeout(timer);
+              timersRef.current.delete(b.id);
+            }
+          });
+          return combined.slice(-MAX_VISIBLE);
+        }
+        return combined;
+      });
+
+      scheduleDismiss(id);
+
+      setTimeout(() => {
+        setBubbles((prev) => prev.map((b) => (b.state === "entering" ? { ...b, state: "visible" } : b)));
+      }, 350);
+    }
+
+    prevLastContentRef.current = lastContent;
+  }, [messages, scheduleDismiss]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -98,7 +163,10 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
     <div className="mx-auto w-full max-w-2xl px-3 sm:px-8 pointer-events-none shrink-0">
       <div className="flex flex-col gap-2 pb-2 max-h-[40vh] overflow-y-auto scrollbar-hide">
         {bubbles.map((bubble) => {
-          const isMona = bubble.message.sender === "mona";
+          const message = messages[bubble.messageIndex];
+          if (!message) return null;
+
+          const isMona = message.sender === "mona";
           const isExiting = bubble.state === "exiting";
           const isEntering = bubble.state === "entering";
 
@@ -113,16 +181,16 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
               }}
             >
               <div
-                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg backdrop-blur-xl break-words whitespace-pre-wrap ${
+                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap ${
                   isMona
                     ? "glass-bubble-mona border border-pink-200/40 text-slate-800 dark:border-pink-500/30 dark:text-slate-100"
                     : "glass-bubble border border-purple-200/40 text-slate-800 dark:border-purple-500/30 dark:text-slate-100"
                 }`}
               >
-                {bubble.message.content}
-                {isMona && bubble.message.emotion?.emotion && (
+                {message.content}
+                {isMona && message.emotion?.emotion && (
                   <span className="ml-2 inline-block rounded-full bg-purple-100/80 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 align-middle dark:bg-purple-900/40 dark:text-purple-400">
-                    {bubble.message.emotion.emotion.charAt(0).toUpperCase() + bubble.message.emotion.emotion.slice(1)}
+                    {message.emotion.emotion.charAt(0).toUpperCase() + message.emotion.emotion.slice(1)}
                   </span>
                 )}
               </div>
@@ -133,7 +201,7 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
         {/* Typing indicator */}
         {isTyping && (
           <div className="self-start max-w-[85%] animate-bubbleIn">
-            <div className="glass-bubble-mona rounded-2xl border border-pink-200/40 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-pink-500/30">
+            <div className="glass-bubble-mona rounded-2xl border border-pink-200/40 px-4 py-3 dark:border-pink-500/30">
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 animate-wave rounded-full bg-pink-400" style={{ animationDelay: "0ms" }} />
                 <span className="h-2 w-2 animate-wave rounded-full bg-pink-400" style={{ animationDelay: "150ms" }} />
@@ -146,7 +214,7 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
         {/* Audio generation indicator */}
         {isGeneratingAudio && !isTyping && (
           <div className="self-start max-w-[85%] animate-bubbleIn">
-            <div className="glass-bubble-mona rounded-2xl border border-purple-200/40 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-purple-500/30">
+            <div className="glass-bubble-mona rounded-2xl border border-purple-200/40 px-4 py-3 dark:border-purple-500/30">
               <div className="flex items-center gap-2 text-xs font-medium text-purple-600 dark:text-purple-400">
                 <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

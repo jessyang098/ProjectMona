@@ -133,12 +133,12 @@ const DEFAULT_OUTFIT: OutfitVisibility = {
 // Get max mouth open value based on avatar
 function getMaxMouthOpen(avatarUrl: string): number {
   if (avatarUrl.includes("Moe")) {
-    return 0.75;
+    return 0.88;
   }
   if (avatarUrl.includes("Cantarella") || avatarUrl.includes("Eimi")) {
-    return 0.75;
+    return 0.88;
   }
-  return 0.65;
+  return 0.78;
 }
 
 export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT, onAudioEnd, lipSyncMode = "textbased" }: VRMAvatarProps) {
