@@ -158,10 +158,8 @@ export default function Live2DAvatar({
     // Resize the renderer
     app.renderer.resize(width, height);
 
-    // Reposition and rescale the model
-    const modelAny = model as any;
-    const modelOriginalHeight = modelAny.height || 1200;
-    const scale = (height * 1.0) / modelOriginalHeight;
+    // Reposition and rescale the model using stored original height
+    const scale = (height * 1.0) / modelOriginalHeightRef.current;
     model.scale.set(scale);
     model.x = width / 2;
     model.y = height / 2;
@@ -169,6 +167,7 @@ export default function Live2DAvatar({
 
   const appRef = useRef<any>(null);
   const modelRef = useRef<Live2DModel | null>(null);
+  const modelOriginalHeightRef = useRef<number>(1200);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const watermarkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -336,46 +335,7 @@ export default function Live2DAvatar({
     state.headTimer += delta;
     const t = state.headTimer;
 
-    // ── Breathing (drives subtle arm sway via physics weight 10%) ──
-    state.breathTimer += delta;
-    const breathDepth = 0.25 + 0.15 * Math.sin(state.breathTimer * 0.3);
-    const breathValue = (Math.sin(state.breathTimer * 1.8) + 1) * breathDepth;
-    setParam(model, IDLE_PARAMS.breath, breathValue);
-
-    // ── Blinking ──
-    state.blinkTimer += delta;
-    if (state.isBlinking) {
-      state.blinkProgress += delta;
-      const bt = state.blinkProgress / 0.12;
-      if (bt >= 1) {
-        state.isBlinking = false;
-        state.blinkProgress = 0;
-        setParam(model, IDLE_PARAMS.eyeLeft, 1);
-        setParam(model, IDLE_PARAMS.eyeRight, 1);
-        if (!state.pendingDoubleBlink && Math.random() < 0.25) {
-          state.pendingDoubleBlink = true;
-          state.doubleBlinkDelay = 0.08 + Math.random() * 0.06;
-        }
-      } else {
-        const eyeOpen = bt < 0.4
-          ? 1 - (bt / 0.4) * (bt / 0.4)
-          : ((bt - 1) / 0.6) * ((bt - 1) / 0.6);
-        setParam(model, IDLE_PARAMS.eyeLeft, Math.max(0, eyeOpen));
-        setParam(model, IDLE_PARAMS.eyeRight, Math.max(0, eyeOpen));
-      }
-    } else if (state.pendingDoubleBlink) {
-      state.doubleBlinkDelay -= delta;
-      if (state.doubleBlinkDelay <= 0) {
-        state.pendingDoubleBlink = false;
-        state.isBlinking = true;
-        state.blinkProgress = 0;
-      }
-    } else if (state.blinkTimer >= state.nextBlinkTime) {
-      state.blinkTimer = 0;
-      state.nextBlinkTime = 2.5 + Math.random() * 4;
-      state.isBlinking = true;
-      state.blinkProgress = 0;
-    }
+    // Breathing + Blinking handled by SDK (eyeBlink + breath systems)
 
     // ── Head movement — primarily TILT (Z), minimal turn (X), subtle nod (Y) ──
     state.headSettleTimer += delta;
@@ -702,6 +662,7 @@ export default function Live2DAvatar({
         // Scale to fit canvas height (larger)
         const modelAny = model as any;
         const modelOriginalHeight = modelAny.height || 1200;
+        modelOriginalHeightRef.current = modelOriginalHeight; // store for resize
         const scale = (initHeight * 1.0) / modelOriginalHeight;
         model.scale.set(scale);
 
@@ -746,6 +707,13 @@ export default function Live2DAvatar({
 
         app.stage.addChild(model as any);
         modelRef.current = model;
+
+        // Disable SDK focus controller — it adds ±30 to head angles from cursor
+        // Keep eye blink, breathing, and physics from the SDK
+        const im = (model as any).internalModel;
+        if (im) {
+          im.updateFocus = () => {}; // no-op: prevents ±30 head + ±10 body from cursor
+        }
 
         // Hide watermark on initial load + periodic re-hide (Live2D resets it)
         hideWatermark(model);
