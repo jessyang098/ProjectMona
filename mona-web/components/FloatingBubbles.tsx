@@ -22,6 +22,7 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
   const [bubbles, setBubbles] = useState<VisibleBubble[]>([]);
   const prevCountRef = useRef(0);
   const prevLastContentRef = useRef<string>("");
+  const prevLastStreamingRef = useRef<boolean>(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const removeBubble = useCallback((id: string) => {
@@ -101,18 +102,22 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
     prevCountRef.current = messages.length;
   }, [messages, scheduleDismiss]);
 
-  // Watch for streaming message becoming complete (content changes without length change).
+  // Watch for streaming message becoming complete.
   // When the streaming message is replaced by the final message (pop+push, same length),
-  // we detect it here and create a bubble for the complete message.
+  // content may be identical — so we also detect isStreaming transitioning to false.
   useEffect(() => {
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     const lastContent = lastMsg?.content || "";
+    const lastStreaming = !!lastMsg?.isStreaming;
 
-    // Detect: same length as before, last message content changed, and message is NOT streaming
+    // Detect: same length, message is NOT streaming, and either content changed or streaming just ended
+    const contentChanged = lastContent !== prevLastContentRef.current;
+    const streamingEnded = prevLastStreamingRef.current && !lastStreaming;
+
     if (
       messages.length === prevCountRef.current &&
-      lastContent !== prevLastContentRef.current &&
+      (contentChanged || streamingEnded) &&
       lastMsg &&
       !lastMsg.isStreaming
     ) {
@@ -149,6 +154,7 @@ export default function FloatingBubbles({ messages, isTyping, isGeneratingAudio 
     }
 
     prevLastContentRef.current = lastContent;
+    prevLastStreamingRef.current = lastStreaming;
   }, [messages, scheduleDismiss]);
 
   // Cleanup timers on unmount
