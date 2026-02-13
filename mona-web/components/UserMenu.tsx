@@ -48,16 +48,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
           </svg>
         </button>
 
-        {/* Shop button - always visible */}
-        <button
-          onClick={onOpenShop}
-          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/50 backdrop-blur-xl border border-slate-300 text-slate-700 transition-all duration-200 hover:bg-white/70 active:scale-95 dark:bg-slate-800/50 dark:border-slate-500 dark:text-slate-200 dark:hover:bg-slate-700/60"
-          title="Shop"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-        </button>
+        {/* Shop button - hidden for launch (all items are placeholder) */}
 
         {/* Sign in button */}
         <button
@@ -147,19 +138,7 @@ export default function UserMenu({ onOpenLogin, onOpenProfile, onOpenSettings, o
               Settings
             </button>
 
-            {/* Shop */}
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onOpenShop();
-              }}
-              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-              Shop
-            </button>
+            {/* Shop - hidden for launch (all items are placeholder) */}
           </div>
 
           {/* Divider */}

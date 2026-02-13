@@ -11,8 +11,9 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+
 export const metadata: Metadata = {
-  title: "Project Mona - AI Companion",
+  title: "Mona - AI Companion",
   description: "Your personal AI companion with personality and emotion",
   viewport: {
     width: "device-width",

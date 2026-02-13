@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAudioContext } from "@/hooks/useAudioContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { useAvatarConfig } from "@/hooks/useAvatarConfig";
 import { useTTSSettings } from "@/hooks/useTTSSettings";
 import { useRecording } from "@/hooks/useRecording";
 import { useChatUI } from "@/hooks/useChatUI";
-import AvatarStage, { AVATAR_OPTIONS } from "./AvatarStage";
+import AvatarStage, { AVATAR_OPTIONS, type AvatarState } from "./AvatarStage";
 import FloatingBubbles from "./FloatingBubbles";
 import ChatHistoryModal from "./ChatHistoryModal";
 import ContextMenu from "./ContextMenu";
@@ -126,6 +126,15 @@ export default function ChatInterface() {
   const latestLipSync = hasAudioSegments
     ? currentSegment?.lipSync
     : latestMonaMessageWithAudio?.lipSync;
+
+  // Compute avatar state from conversation events
+  // talking: audio playing | thinking: LLM generating | listening: user typing/recording | idle: default
+  const avatarState: AvatarState = useMemo(() => {
+    if (latestAudioUrl) return "talking";
+    if (isTyping || isGeneratingAudio) return "thinking";
+    if (isRecording || inputValue.trim().length > 0) return "listening";
+    return "idle";
+  }, [latestAudioUrl, isTyping, isGeneratingAudio, isRecording, inputValue]);
 
   const handleAudioEnd = useCallback(() => {
     if (currentSegment) {
@@ -342,6 +351,7 @@ export default function ChatInterface() {
           isDarkMode={isDarkMode}
           affectionLevel={affectionLevel}
           onTap={handleAvatarTap}
+          avatarState={avatarState}
         />
       </div>
 

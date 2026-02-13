@@ -11,39 +11,9 @@ import { LipSyncManager } from "@/lib/animation";
 import { GestureManager, type EmotionType, type GestureName } from "@/lib/animation/gestureManager";
 import { onPoseCommand, onExpressionCommand, onSpeakCommand, type PoseCommand, type ExpressionCommand, type SpeakCommand } from "@/lib/poseCommands";
 import { setAnimationState } from "@/lib/animationState";
+import { AvatarStateMachine, type AvatarState } from "@/lib/animation/avatarStateMachine";
 
-// Procedural animation configuration
-const ANIMATION_CONFIG = {
-  // Blinking behavior
-  blink: {
-    minInterval: 0.5,
-    maxInterval: 3.0,
-    speed: 8.0,
-    duration: 0.1,
-  },
-  // Head movement ranges and timing (idle vs talking)
-  head: {
-    nodRange: 0.2,
-    turnRange: 0.06,      // Reduced from 0.13 - keeps gaze more toward user
-    tiltRange: 0.10,      // Reduced slightly for more stable head
-    // Idle: slower, less frequent movements
-    idleFrequency: 1.8,
-    idleSmoothing: 0.02,
-    // Talking: faster, more dynamic movements
-    talkFrequency: 0.8,
-    talkSmoothing: 0.04,
-  },
-  // Torso movement for subtle breathing/sway effect (idle vs talking)
-  torso: {
-    swayRange: 0.08,
-    // Idle: slow, gentle breathing
-    idleFrequency: 2.8,
-    idleSmoothing: 0.01,
-    // Talking: slightly more animated
-    talkFrequency: 1.8,
-    talkSmoothing: 0.02,
-  },
-} as const;
+// Old ANIMATION_CONFIG removed — replaced by AvatarStateMachine
 
 // Per-avatar configuration for different VRM models
 const AVATAR_CONFIGS: Record<string, { scale: number; position: [number, number, number]; rotateY: number }> = {
@@ -119,6 +89,7 @@ interface VRMAvatarProps {
   outfitVisibility?: OutfitVisibility;
   onAudioEnd?: () => void;
   lipSyncMode?: SettingsLipSyncMode;
+  avatarState?: AvatarState;
 }
 
 const DEFAULT_OUTFIT: OutfitVisibility = {
@@ -141,7 +112,7 @@ function getMaxMouthOpen(avatarUrl: string): number {
   return 0.78;
 }
 
-export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT, onAudioEnd, lipSyncMode = "textbased" }: VRMAvatarProps) {
+export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisibility = DEFAULT_OUTFIT, onAudioEnd, lipSyncMode = "textbased", avatarState = "idle" }: VRMAvatarProps) {
   const groupRef = useRef<THREE.Group>(null);
   const hipsRef = useRef<THREE.Object3D | null>(null);
   const chestRef = useRef<THREE.Object3D | null>(null);
@@ -157,6 +128,8 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
   const testExpressionRef = useRef<string | null>(null);
   const emotionExpressionRef = useRef<string | null>(null);
   const prevExpressionRef = useRef<string | null>(null);
+  const stateMachineRef = useRef<AvatarStateMachine>(new AvatarStateMachine());
+  const prevAvatarStateRef = useRef<AvatarState>("idle");
 
   const baseRotations = useRef({
     hips: new THREE.Euler(),
@@ -166,26 +139,7 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
     rightUpperArm: new THREE.Euler(),
   });
 
-  // Animation state for procedural idle behaviors
-  const animationState = useRef({
-    head: {
-      timer: 0,
-      nextChange: 0,
-      targetRotation: { x: 0, y: 0, z: 0 },
-      currentRotation: { x: 0, y: 0, z: 0 },
-    },
-    torso: {
-      timer: 0,
-      nextChange: 0,
-      targetRotation: { x: 0 },
-      currentRotation: { x: 0 },
-    },
-    eyes: {
-      timer: 0,
-      nextBlink: 0,
-      blinkAmount: 0,
-    },
-  });
+  // Old animationState ref removed — replaced by AvatarStateMachine
   const gltf = useLoader(
     GLTFLoader,
     url,
@@ -282,10 +236,10 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
         await gestureManagerRef.current.loadAllGestures();
 
-        // Set standing idle pose on startup
+        // Set idle pose on startup — using temp_idle for testing (switch to "standing_idle" to revert)
         setTimeout(() => {
           if (gestureManagerRef.current) {
-            gestureManagerRef.current.playGesture("standing_idle", 0.5);
+            gestureManagerRef.current.playGesture("temp_idle", 0.5);
           }
         }, 500);
       }
@@ -511,23 +465,34 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
       gestureManagerRef.current.update(delta);
     }
 
-    const anim = animationState.current;
-    const cfg = ANIMATION_CONFIG;
-    const randomInRange = (min: number, max: number) => min + Math.random() * (max - min);
+    // Auto-detect talking from lip sync when no explicit state is given
+    const isTalking = lipSyncRef.current?.isPlaying() ?? false;
+    const effectiveState: AvatarState = avatarState !== "idle" ? avatarState : (isTalking ? "talking" : "idle");
 
-    // Procedural blinking animation
-    anim.eyes.timer += delta;
-    if (anim.eyes.timer > anim.eyes.nextBlink) {
-      anim.eyes.timer = 0;
-      anim.eyes.nextBlink = randomInRange(cfg.blink.minInterval, cfg.blink.maxInterval);
+    // Sync effective state → state machine
+    if (effectiveState !== prevAvatarStateRef.current) {
+      stateMachineRef.current.setState(effectiveState);
+      prevAvatarStateRef.current = effectiveState;
+
+      // Switch body FBX animation based on state (VRM only)
+      if (gestureManagerRef.current) {
+        if (effectiveState === "talking") {
+          gestureManagerRef.current.playGesture("talking_idle", 0.5);
+        } else if (effectiveState === "thinking") {
+          gestureManagerRef.current.playGesture("thinking", 0.8);
+        } else {
+          // idle / listening → return to default idle
+          gestureManagerRef.current.returnToIdle(0.5);
+        }
+      }
     }
 
-    const blinkPhase = anim.eyes.timer < cfg.blink.duration ? delta : -delta;
-    anim.eyes.blinkAmount += blinkPhase * cfg.blink.speed;
-    anim.eyes.blinkAmount = Math.max(0, Math.min(1, anim.eyes.blinkAmount));
+    // Run the physics-based state machine
+    const sm = stateMachineRef.current.update(delta);
 
+    // Apply blinking from state machine
     if (expressionManager) {
-      expressionManager.setValue('blink', anim.eyes.blinkAmount);
+      expressionManager.setValue('blink', sm.blinkAmount);
 
       const activeExpression = testExpressionRef.current ?? emotionExpressionRef.current;
 
@@ -543,57 +508,20 @@ export default function VRMAvatar({ url, emotion, audioUrl, lipSync, outfitVisib
 
     // Track current gesture for animation state publishing
     const currentGesture = gestureManagerRef.current?.getCurrentGesture();
-
     const gestureToPublish = currentGesture ?? null;
     if (gestureToPublish !== lastPublishedGestureRef.current) {
       lastPublishedGestureRef.current = gestureToPublish;
       setAnimationState(gestureToPublish, !!gestureToPublish);
     }
 
-    // Check if avatar is currently talking
-    const isTalking = lipSyncRef.current?.isPlaying() ?? false;
-
-    // Get animation params based on talking state
-    const headFreq = isTalking ? cfg.head.talkFrequency : cfg.head.idleFrequency;
-    const headSmooth = isTalking ? cfg.head.talkSmoothing : cfg.head.idleSmoothing;
-    const torsoFreq = isTalking ? cfg.torso.talkFrequency : cfg.torso.idleFrequency;
-    const torsoSmooth = isTalking ? cfg.torso.talkSmoothing : cfg.torso.idleSmoothing;
-
-    // Procedural head movement
-    anim.head.timer += delta;
-    if (anim.head.timer > headFreq) {
-      // Bias upward: range from -nodRange (look up) to only slight downward nod
-      anim.head.targetRotation.x = randomInRange(-cfg.head.nodRange, cfg.head.nodRange * 0.25);
-      // Center-biased turn: average of two randoms creates bell curve toward 0 (looking at user)
-      const turnBias = ((Math.random() + Math.random()) / 2 - 0.5) * 2; // -1 to 1, biased toward 0
-      anim.head.targetRotation.y = turnBias * cfg.head.turnRange;
-      anim.head.targetRotation.z = randomInRange(-cfg.head.tiltRange, cfg.head.tiltRange);
-      anim.head.timer = 0;
-    }
-
-    anim.head.currentRotation.x += (anim.head.targetRotation.x - anim.head.currentRotation.x) * headSmooth;
-    anim.head.currentRotation.y += (anim.head.targetRotation.y - anim.head.currentRotation.y) * headSmooth;
-    anim.head.currentRotation.z += (anim.head.targetRotation.z - anim.head.currentRotation.z) * headSmooth;
-
+    // Apply state machine head rotation to neck bone
     if (neckRef.current) {
-      neckRef.current.rotation.set(
-        anim.head.currentRotation.x,
-        anim.head.currentRotation.y,
-        anim.head.currentRotation.z
-      );
+      neckRef.current.rotation.set(sm.headX, sm.headY, sm.headZ);
     }
 
-    // Procedural torso sway
-    anim.torso.timer += delta;
-    if (anim.torso.timer > torsoFreq) {
-      anim.torso.targetRotation.x = randomInRange(-cfg.torso.swayRange, cfg.torso.swayRange);
-      anim.torso.timer = 0;
-    }
-
-    anim.torso.currentRotation.x += (anim.torso.targetRotation.x - anim.torso.currentRotation.x) * torsoSmooth;
-
+    // Apply state machine body sway to spine
     if (spineRef.current) {
-      spineRef.current.rotation.x = anim.torso.currentRotation.x;
+      spineRef.current.rotation.x = sm.bodyX;
     }
   });
 

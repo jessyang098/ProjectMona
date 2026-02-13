@@ -8,7 +8,8 @@ import type { EmotionData, LipSyncCue } from "@/types/chat";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { OutfitVisibility } from "./VRMAvatar";
-export type { OutfitVisibility };
+import type { AvatarState } from "@/lib/animation/avatarStateMachine";
+export type { OutfitVisibility, AvatarState };
 
 const VRMAvatar = dynamic(() => import("./VRMAvatar"), { ssr: false });
 const Live2DAvatar = dynamic(() => import("./Live2DAvatar"), { ssr: false });
@@ -60,10 +61,6 @@ export const AVATAR_OPTIONS = [
   { id: "vena", label: "Vena", url: "/avatars/Vena/Vena - Kimono Outfit.model3.json", type: "live2d" as const },
   { id: "moe", label: "Moe", url: "/avatars/Moe.vrm", type: "vrm" as const },
   { id: "mona1", label: "Mona", url: "/avatars/Mona1.vrm", type: "vrm" as const },
-  { id: "tora", label: "Tora", url: "/avatars/Tora.vrm", type: "vrm" as const },
-  { id: "sakura", label: "Sakura", url: "/avatars/sakura.vrm", type: "vrm" as const },
-  { id: "cantarella", label: "Cantarella", url: "/avatars/Cantarella.vrm", type: "vrm" as const },
-  { id: "eimi", label: "Eimi", url: "/avatars/Eimi.vrm", type: "vrm" as const },
   { id: "bear-pajama", label: "Bear Pajama", url: "/avatars/bear Pajama V1.1/bear Pajama V1.1.model3.json", type: "live2d" as const },
 ] as const;
 
@@ -84,6 +81,7 @@ interface AvatarStageProps {
   isDarkMode?: boolean;
   affectionLevel?: string;
   onTap?: () => void;
+  avatarState?: AvatarState;
 }
 
 // FOV offset based on affection level (closer as affection grows)
@@ -211,7 +209,7 @@ function Live2DLoadingIndicator() {
   );
 }
 
-export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl, onAudioEnd, lipSyncMode = "textbased", isDarkMode = false, affectionLevel = "distant", onTap }: AvatarStageProps) {
+export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "full", outfitVisibility, avatarUrl, onAudioEnd, lipSyncMode = "textbased", isDarkMode = false, affectionLevel = "distant", onTap, avatarState = "idle" }: AvatarStageProps) {
   const palette = useMemo(() => {
     if (!emotion) {
       return emotionPalette.neutral;
@@ -288,6 +286,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
               audioUrl={absoluteAudioUrl}
               lipSync={lipSync}
               onAudioEnd={onAudioEnd}
+              avatarState={avatarState}
             />
           </Suspense>
         </div>
@@ -312,7 +311,7 @@ export default function AvatarStage({ emotion, audioUrl, lipSync, viewMode = "fu
         <directionalLight position={[0.7, 1.8, 1.2]} intensity={1.4} color="#ffffff" />
         <directionalLight position={[-0.7, 1.5, 1]} intensity={0.8} color="#f3f4ff" />
         <Suspense fallback={<LoadingIndicator />}>
-          <VRMAvatar key={modelUrl} url={modelUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} onAudioEnd={onAudioEnd} lipSyncMode={lipSyncMode} />
+          <VRMAvatar key={modelUrl} url={modelUrl} emotion={emotion} audioUrl={absoluteAudioUrl} lipSync={lipSync} outfitVisibility={outfitVisibility} onAudioEnd={onAudioEnd} lipSyncMode={lipSyncMode} avatarState={avatarState} />
         </Suspense>
         <CameraController viewMode={viewMode} affectionLevel={affectionLevel} />
       </Canvas>

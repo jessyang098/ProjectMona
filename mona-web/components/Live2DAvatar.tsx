@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { EmotionData, LipSyncCue } from "@/types/chat";
 import { onExpressionCommand } from "@/lib/poseCommands";
+import { AvatarStateMachine, type AvatarState } from "@/lib/animation/avatarStateMachine";
 
 // Types from pixi-live2d-display
 interface Live2DModel {
@@ -33,6 +34,7 @@ interface Live2DAvatarProps {
   audioUrl?: string | null;
   lipSync?: LipSyncCue[];
   onAudioEnd?: () => void;
+  avatarState?: AvatarState;
 }
 
 // Emotion to expression mapping for Live2D models
@@ -118,6 +120,7 @@ export default function Live2DAvatar({
   audioUrl,
   lipSync,
   onAudioEnd,
+  avatarState = "idle",
 }: Live2DAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -182,11 +185,19 @@ export default function Live2DAvatar({
   const timeDomainBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const frequencyBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const prevPhonemeRef = useRef({ aa: 0, ee: 0, ih: 0, oh: 0, ou: 0 });
+  const stateMachineRef = useRef<AvatarStateMachine>(new AvatarStateMachine());
+  const prevAvatarStateRef = useRef<AvatarState>("idle");
+  const avatarStateRef = useRef<AvatarState>(avatarState);
 
   // Keep lipSync ref updated
   useEffect(() => {
     lipSyncRef.current = lipSync;
   }, [lipSync]);
+
+  // Keep avatarState ref updated
+  useEffect(() => {
+    avatarStateRef.current = avatarState;
+  }, [avatarState]);
 
   // Animation state
   const animStateRef = useRef({
@@ -615,6 +626,42 @@ export default function Live2DAvatar({
     }
   }, [setParam]);
 
+  // Tail wag + eyebrow micro-expressions (Live2D-specific flourishes, not state-machine driven)
+  const updateTailAndBrows = useCallback((model: Live2DModel, delta: number) => {
+    const state = animStateRef.current;
+
+    // Eyebrow micro-movements
+    state.browTimer += delta;
+    const browY = Math.sin(state.browTimer * 0.4) * 0.12 + Math.sin(state.browTimer * 1.1) * 0.04;
+    const browAngle = Math.sin(state.browTimer * 0.3) * 0.08;
+    setParam(model, IDLE_PARAMS.browLY, browY);
+    setParam(model, IDLE_PARAMS.browRY, browY);
+    setParam(model, IDLE_PARAMS.browLAngle, browAngle);
+    setParam(model, IDLE_PARAMS.browRAngle, browAngle);
+
+    // Tail wag (periodic)
+    state.tailTimer += delta;
+    if (!state.tailWagging && state.tailTimer >= state.nextTailWagTime) {
+      state.tailWagging = true;
+      state.tailWagProgress = 0;
+      state.tailTimer = 0;
+      state.nextTailWagTime = 8 + Math.random() * 15;
+    }
+    if (state.tailWagging) {
+      state.tailWagProgress += delta;
+      const wagDuration = 2.5;
+      const wp = state.tailWagProgress / wagDuration;
+      if (wp >= 1) {
+        state.tailWagging = false;
+        setParam(model, IDLE_PARAMS.tail, 0);
+      } else {
+        const envelope = Math.sin(wp * Math.PI);
+        const wiggle = Math.sin(state.tailWagProgress * 12) * 0.15;
+        setParam(model, IDLE_PARAMS.tail, (0.6 + wiggle) * envelope);
+      }
+    }
+  }, [setParam]);
+
   // Reset dance params to 0 when dance stops
   const resetDanceParams = useCallback((model: Live2DModel) => {
     setParam(model, IDLE_PARAMS.armL1, 0);
@@ -747,9 +794,10 @@ export default function Live2DAvatar({
         app.stage.addChild(model as any);
         modelRef.current = model;
 
-        // Disable SDK cursor-following (we control eye gaze ourselves)
+        // Disable SDK cursor-following and eye-blink (state machine controls these)
         const im = model.internalModel as any;
         im.updateFocus = () => {};
+        if (im.eyeBlink) im.eyeBlink = null;
 
         // TODO: hideWatermark disabled — testing if Param129/Part84 are shoulder wings
         // hideWatermark(model);
@@ -770,12 +818,68 @@ export default function Live2DAvatar({
           const delta = (now - animStateRef.current.lastTime) / 1000;
           animStateRef.current.lastTime = now;
 
-          // Custom animations disabled — using SDK defaults for testing
-          // if (isDancingRef.current) {
-          //   updateDanceAnimation(modelRef.current, delta);
-          // } else {
-          //   updateIdleAnimations(modelRef.current, delta);
-          // }
+          // State machine driven animations
+          if (isDancingRef.current) {
+            updateDanceAnimation(modelRef.current, delta);
+          } else {
+            // Auto-detect talking from audio playback
+            const isAudioPlaying = audioRef.current ? !audioRef.current.paused : false;
+            const currentAvatarState = avatarStateRef.current;
+            const effectiveState: AvatarState = currentAvatarState !== "idle" ? currentAvatarState : (isAudioPlaying ? "talking" : "idle");
+
+            // Sync state machine
+            if (effectiveState !== prevAvatarStateRef.current) {
+              stateMachineRef.current.setState(effectiveState);
+              prevAvatarStateRef.current = effectiveState;
+            }
+
+            // Run state machine
+            const sm = stateMachineRef.current.update(delta);
+
+            // Apply state machine outputs to Live2D parameters
+            // Head: state machine values are in radians-ish, Live2D expects roughly ±30 degree range
+            // Scale factors tuned for Live2D parameter ranges
+            const headScale = 15; // radians → Live2D angle units
+            setParam(modelRef.current, IDLE_PARAMS.angleX, sm.headY * headScale); // yaw → AngleX (turn)
+            setParam(modelRef.current, IDLE_PARAMS.angleY, sm.headX * headScale); // pitch → AngleY (nod)
+            setParam(modelRef.current, IDLE_PARAMS.angleZ, sm.headZ * headScale); // roll → AngleZ (tilt)
+
+            // Body sway
+            setParam(modelRef.current, IDLE_PARAMS.bodyAngleX, sm.bodyX * 10);
+
+            // Eye gaze
+            setParam(modelRef.current, IDLE_PARAMS.eyeBallX, sm.eyeX * 0.5);
+            setParam(modelRef.current, IDLE_PARAMS.eyeBallY, sm.eyeY * 0.3 + 0.15); // +0.15 bias: look at user
+
+            // Blinking from state machine
+            const eyeOpen = 1 - sm.blinkAmount;
+            setParam(modelRef.current, IDLE_PARAMS.eyeLeft, eyeOpen);
+            setParam(modelRef.current, IDLE_PARAMS.eyeRight, eyeOpen);
+
+            // Breathing (still sine-wave, not state-dependent)
+            const breathValue = (Math.sin(now / 1000 * 1.8) + 1) * 0.25;
+            setParam(modelRef.current, IDLE_PARAMS.breath, breathValue);
+
+            // Resting smile (when not talking)
+            if (effectiveState !== "talking") {
+              const smileValue = 0.15 + 0.1 * Math.sin(now / 1000 * 0.2);
+              setParam(modelRef.current, IDLE_PARAMS.mouthForm, smileValue);
+            }
+
+            // Eye smile (subtle)
+            const eyeSmile = 0.1 + 0.06 * Math.sin(now / 1000 * 0.25);
+            setParam(modelRef.current, IDLE_PARAMS.eyeSmileL, eyeSmile);
+            setParam(modelRef.current, IDLE_PARAMS.eyeSmileR, eyeSmile);
+
+            // Wings — gentle flutter
+            setParam(modelRef.current, IDLE_PARAMS.wingToggle, 1);
+            const wingBase = Math.sin(now / 1000 * 1.2) * 0.3;
+            const wingFlutter = Math.sin(now / 1000 * 3.5) * 0.15;
+            setParam(modelRef.current, IDLE_PARAMS.wingFlap, wingBase + wingFlutter);
+
+            // Tail wag — driven by idle animations still
+            updateTailAndBrows(modelRef.current, delta);
+          }
 
           // Update lip sync if audio is playing
           if (audioRef.current && !audioRef.current.paused) {
@@ -875,7 +979,7 @@ export default function Live2DAvatar({
         appRef.current = null;
       }
     };
-  }, [modelUrl, updateIdleAnimations, updateDanceAnimation, applyLipSync, hideWatermark, findParam]);
+  }, [modelUrl, updateIdleAnimations, updateDanceAnimation, updateTailAndBrows, applyLipSync, hideWatermark, findParam, setParam]);
 
   // Clear all expression parameters back to 0 (return to neutral face)
   const clearExpressions = useCallback((model: Live2DModel) => {

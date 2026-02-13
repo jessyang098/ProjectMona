@@ -18,7 +18,10 @@ export type GestureName =
   | "angry"
   | "sleepy"
   | "lay"
-  | "standing_idle";
+  | "standing_idle"
+  | "talking_idle"
+  | "thinking"
+  | "temp_idle";
 
 interface GestureConfig {
   name: GestureName;
@@ -41,6 +44,9 @@ const GESTURE_CONFIGS: GestureConfig[] = [
 
   // === Mixamo FBX Animations ===
   { name: "standing_idle", path: "/animations/standing-idle.fbx", triggerEmotions: [], priority: 0, isLoopingIdle: true },
+  { name: "temp_idle", path: "/animations/temp-idle.fbx", triggerEmotions: [], priority: 0, isLoopingIdle: true },
+  { name: "talking_idle", path: "/animations/Talking.fbx", triggerEmotions: [], priority: 0, isLoopingIdle: true },
+  { name: "thinking", path: "/animations/Thinking.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
   { name: "lay", path: "/animations/lay.fbx", triggerEmotions: [], priority: 0, isHoldPose: true },
 ];
 
@@ -185,7 +191,8 @@ export class GestureManager {
    * Return to standing idle animation
    */
   returnToIdle(fadeInDuration: number = 0.5): void {
-    this.playGesture("standing_idle", fadeInDuration);
+    // Using riko_idle for testing — switch to "standing_idle" to revert
+    this.playGesture("temp_idle", fadeInDuration);
   }
 
   /**
